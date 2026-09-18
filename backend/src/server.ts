@@ -10,7 +10,7 @@ const startServer = async () => {
     console.log(`🌍 Environment: ${ENV.NODE_ENV}`);
     console.log('----------------------------------------------------');
 
-    // Test DB connection, run migrations if DATABASE_URL is configured
+    // Test DB connection, run migrations if DATABASE_URL is configured..
     if (ENV.DATABASE_URL && !ENV.DATABASE_URL.includes('YOUR_NEON_PASSWORD')) {
       try {
         console.log('Connecting to PostgreSQL database...');
