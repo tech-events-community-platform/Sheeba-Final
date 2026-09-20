@@ -3,7 +3,34 @@ import type { Ticket } from '../types/ticket';
 import type { BadgeAward, BadgeCode, SponsorReportData, AttendeeRosterItem } from '../types/attendance';
 import type { User, UserRole, ProfileVisibility } from '../types/user';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+/**
+ * Smart API Base URL Resolver:
+ * - When running in the browser on live sheebanet.com (or any subdomain), automatically route
+ *   requests to https://api.sheebanet.com/api even if the Docker image was built without explicit build args.
+ * - Respects explicit custom VITE_API_URL if provided and non-localhost.
+ * - Defaults to http://localhost:5000/api during local development.
+ */
+const resolveApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL;
+
+  if (typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
+
+    if (!isLocalhost) {
+      if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+        if (hostname.endsWith('sheebanet.com')) {
+          return 'https://api.sheebanet.com/api';
+        }
+        return `${window.location.protocol}//api.${hostname}/api`;
+      }
+    }
+  }
+
+  return envUrl || 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 export const getAuthToken = (): string | null => {
   return localStorage.getItem('sheba_auth_token');
