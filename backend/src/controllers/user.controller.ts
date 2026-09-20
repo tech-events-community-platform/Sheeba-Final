@@ -16,10 +16,12 @@ export class UserController {
     }
   }
 
-  static async getPublicProfile(req: Request, res: Response, next: NextFunction) {
+  static async getPublicProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const data = await UserService.getPublicProfile(id);
+      const viewerId = req.user?.userId;
+      const viewerRole = req.user?.role;
+      const data = await UserService.getPublicProfile(id, viewerId, viewerRole);
 
       return sendSuccess(res, data, 'Public profile retrieved.');
     } catch (error) {

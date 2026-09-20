@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 import bcrypt from 'bcryptjs';
 import http from 'http';
 import app from '../app';

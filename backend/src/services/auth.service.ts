@@ -92,6 +92,11 @@ export class AuthService {
     } = data;
 
     const normalizedRole = (data.role || 'attendee').toLowerCase();
+    if (normalizedRole === 'admin') {
+      const err: any = new Error('Administrator accounts cannot be created via public registration.');
+      err.statusCode = 403;
+      throw err;
+    }
     const isOrganizer = normalizedRole === 'organizer';
     const initialApprovalStatus = isOrganizer ? 'pending' : 'approved';
     const initialIsActive = !isOrganizer;
@@ -161,7 +166,7 @@ export class AuthService {
         user,
         token: '',
         isPendingApproval: true,
-        message: 'you will be using this sytem in 1 hour',
+        message: 'Your organizer application has been submitted and is under review by Sheeba Administration. It is typically reviewed within 1 hour.',
       };
     }
 
@@ -193,7 +198,7 @@ export class AuthService {
     const { email, password, role } = data;
 
     const result = await query<IUser>(
-      `SELECT id, email, password_hash, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, created_at, updated_at
+      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, created_at, updated_at
        FROM users WHERE LOWER(email) = LOWER($1)`,
       [email]
     );
@@ -205,6 +210,28 @@ export class AuthService {
     }
 
     const rawUser = result.rows[0];
+
+    // Ensure password is provided and of valid type
+    if (!password || typeof password !== 'string') {
+      const err: any = new Error('Password is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Check if account has a password set or was created via OAuth (Google)
+    if (!rawUser.password_hash) {
+      if (rawUser.google_id) {
+        const err: any = new Error(
+          'This account was registered using Google Sign-In. Please sign in using the "Continue with Google" button.'
+        );
+        err.statusCode = 401;
+        throw err;
+      }
+      const err: any = new Error('Invalid email or password.');
+      err.statusCode = 401;
+      throw err;
+    }
+
     const isMatch = await bcrypt.compare(password, rawUser.password_hash);
 
     if (!isMatch) {
@@ -231,7 +258,7 @@ export class AuthService {
         throw err;
       }
       if (rawUser.approval_status !== 'approved') {
-        const err: any = new Error('Your application will be reviewed shortly. Wait a few moments until Sheeba Administration approves you...');
+        const err: any = new Error('Your application will be reviewed shortly. Sheeba Administration is reviewing your sponsor account.');
         err.statusCode = 403;
         err.isPendingApproval = true;
         err.approvalStatus = rawUser.approval_status || 'pending';
@@ -264,7 +291,7 @@ export class AuthService {
         throw err;
       }
       if (organizerStatus !== 'approved') {
-        const err: any = new Error('you will be using this sytem in 1 hour');
+        const err: any = new Error('Your organizer application is under review by Sheeba Administration. It is typically reviewed within 1 hour.');
         err.statusCode = 403;
         err.isPendingApproval = true;
         err.approvalStatus = organizerStatus;
@@ -277,7 +304,7 @@ export class AuthService {
       // Unspecified role:
       if (rawUser.role?.toLowerCase() === 'sponsor') {
         if (rawUser.approval_status !== 'approved') {
-          const err: any = new Error('Your application will be reviewed shortly. Wait a few moments until Sheeba Administration approves you...');
+          const err: any = new Error('Your application will be reviewed shortly. Sheeba Administration is reviewing your sponsor account.');
           err.statusCode = 403;
           err.isPendingApproval = true;
           throw err;
@@ -285,7 +312,7 @@ export class AuthService {
         sessionRole = 'sponsor';
       } else if (rawUser.role?.toLowerCase() === 'organizer') {
         if (organizerStatus !== 'approved') {
-          const err: any = new Error('you will be using this sytem in 1 hour');
+          const err: any = new Error('Your organizer application is under review by Sheeba Administration. It is typically reviewed within 1 hour.');
           err.statusCode = 403;
           err.isPendingApproval = true;
           err.approvalStatus = organizerStatus;
@@ -617,14 +644,16 @@ export class AuthService {
 
     // If registering and user does not exist, create the account
     if (!user) {
-      const normalizedRole = (role || 'attendee').toLowerCase();
-      const isOrganizer = normalizedRole === 'organizer';
+      const requested = (role || 'attendee').toLowerCase();
+      // Ensure newly created Google users can only be attendee or organizer, never admin
+      const assignedRole = requested === 'organizer' ? 'organizer' : 'attendee';
+      const isOrganizer = assignedRole === 'organizer';
       const approvalStatus = isOrganizer ? 'pending' : 'approved';
       const insertRes = await query(
         `INSERT INTO users (email, full_name, role, avatar_url, google_id, approval_status, member_since, is_organizer, organizer_approval_status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
-        [email, fullName, normalizedRole, avatarUrl, googleId, approvalStatus, 'September 2026', isOrganizer, isOrganizer ? 'pending' : 'none']
+        [email, fullName, assignedRole, avatarUrl, googleId, approvalStatus, 'September 2026', isOrganizer, isOrganizer ? 'pending' : 'none']
       );
       user = insertRes.rows[0];
 
@@ -650,7 +679,7 @@ export class AuthService {
         throw err;
       }
       if (effOrganizerStatus !== 'approved') {
-        const err: any = new Error('you will be using this sytem in 1 hour');
+        const err: any = new Error('Your organizer application is under review by Sheeba Administration. It is typically reviewed within 1 hour.');
         err.statusCode = 403;
         err.isPendingApproval = true;
         err.approvalStatus = effOrganizerStatus;
@@ -803,7 +832,7 @@ export class AuthService {
 
       // Check admin approval
       if (user.approval_status !== 'approved') {
-        const err: any = new Error('Your application will be reviewed shortly. Wait a few moments until Sheeba Administration approves you...');
+        const err: any = new Error('Your application will be reviewed shortly. Sheeba Administration is reviewing your sponsor account.');
         err.statusCode = 403;
         err.isPendingApproval = true;
         err.approvalStatus = user.approval_status || 'pending';
@@ -855,7 +884,7 @@ export class AuthService {
     const newUser = insertRes.rows[0];
     EmailService.sendSponsorApplicationReceivedEmail(email, fullName, companyName).catch(console.warn);
 
-    const err: any = new Error('Your application will be reviewed shortly. Wait a few moments until Sheeba Administration approves you...');
+    const err: any = new Error('Your application will be reviewed shortly. Sheeba Administration is reviewing your sponsor account.');
     err.statusCode = 201;
     err.isPendingApproval = true;
     err.user = this.formatUserResponse(newUser);

@@ -160,7 +160,7 @@ export class EventController {
   static async getEventRoster(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const eventId = req.params.id as string;
-      const roster = await EventService.getEventRoster(eventId);
+      const roster = await EventService.getEventRoster(eventId, req.user?.userId, req.user?.role);
 
       return sendSuccess(res, roster, 'Event attendee roster retrieved.');
     } catch (error) {
@@ -172,7 +172,7 @@ export class EventController {
     try {
       const eventId = req.params.id as string;
       const queryText = (req.query.q || req.query.query || '') as string;
-      const attendee = await CheckinService.lookupAttendee(eventId, queryText);
+      const attendee = await CheckinService.lookupAttendee(eventId, queryText, req.user?.userId, req.user?.role);
 
       return sendSuccess(res, attendee, attendee ? 'Attendee record found.' : 'No matching record.');
     } catch (error) {

@@ -29,19 +29,53 @@ export const errorHandler = (
     return;
   }
 
+  // PostgreSQL invalid syntax / UUID format error
+  if (err.code === '22P02') {
+    sendError(res, 'Invalid request parameter or resource identifier format.', 400);
+    return;
+  }
+
+  // PostgreSQL string value too long
+  if (err.code === '22001') {
+    sendError(res, 'Input value exceeds the maximum allowed length.', 400);
+    return;
+  }
+
   // JWT Errors
   if (err.name === 'JsonWebTokenError') {
-    sendError(res, 'Invalid token provided.', 401);
+    sendError(res, 'Invalid authentication token provided.', 401);
+    return;
+  }
+  if (err.name === 'TokenExpiredError') {
+    sendError(res, 'Your session has expired. Please log in again.', 401);
+    return;
+  }
+
+  // Malformed JSON payload in HTTP request
+  if (err instanceof SyntaxError && (err as any).status === 400 && 'body' in err) {
+    sendError(res, 'Malformed JSON payload in request.', 400);
+    return;
+  }
+
+  // Bcrypt argument error fallback
+  if (err.message && typeof err.message === 'string' && err.message.includes('Illegal arguments')) {
+    sendError(res, 'Invalid credentials provided.', 400);
     return;
   }
 
   const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
+  const isProd = process.env.NODE_ENV === 'production';
+
+  // In production, mask unhandled 500 internal errors so database queries or internal traces never leak
+  const clientMessage =
+    isProd && statusCode === 500
+      ? 'An internal server error occurred. Please try again later.'
+      : err.message || 'Internal Server Error';
 
   if (err.isPendingApproval) {
     res.status(statusCode).json({
       success: false,
-      message,
+      message: clientMessage,
       isPendingApproval: true,
       approvalStatus: err.approvalStatus || 'pending',
     });
@@ -50,12 +84,12 @@ export const errorHandler = (
 
   res.status(statusCode).json({
     success: false,
-    message,
-    code: err.code || undefined,
-    error: err.code || err.message,
+    message: clientMessage,
+    code: isProd && statusCode === 500 ? undefined : (err.code || undefined),
+    error: isProd && statusCode === 500 ? 'INTERNAL_SERVER_ERROR' : (err.code || err.message),
     data: err.data || undefined,
     isPendingApproval: err.isPendingApproval,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(!isProd && { stack: err.stack }),
   });
 };
 

@@ -26,7 +26,10 @@ export class CheckinController {
   static async search(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { eventId, query: queryText } = req.body;
-      const result = await CheckinService.searchAttendees(eventId, queryText || '');
+      const organizerId = req.user!.userId;
+      const userRole = req.user!.role;
+
+      const result = await CheckinService.searchAttendees(eventId, queryText || '', organizerId, userRole);
 
       return sendSuccess(res, result, `Found ${result.length} matching attendees.`);
     } catch (error) {
@@ -37,7 +40,10 @@ export class CheckinController {
   static async lookup(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { eventId, query: queryText } = req.body;
-      const result = await CheckinService.lookupAttendee(eventId, queryText);
+      const organizerId = req.user!.userId;
+      const userRole = req.user!.role;
+
+      const result = await CheckinService.lookupAttendee(eventId, queryText, organizerId, userRole);
 
       return sendSuccess(res, result, result ? 'Attendee record found.' : 'No attendee record found.');
     } catch (error) {
