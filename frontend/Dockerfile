@@ -9,7 +9,7 @@ RUN npm ci
 COPY . .
 
 # Vite embeds env vars at build time
-ARG VITE_API_URL=http://localhost:5000/api
+ARG VITE_API_URL=https://api.sheebanet.com/api
 ARG VITE_GOOGLE_CLIENT_ID=415994350759-tfifv80t1u3efof3m136g0i0d9nkg4p6.apps.googleusercontent.com
 
 ENV VITE_API_URL=$VITE_API_URL
