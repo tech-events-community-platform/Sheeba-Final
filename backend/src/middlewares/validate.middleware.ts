@@ -24,9 +24,16 @@ export const validateRegistration = (
     return;
   }
 
-  if (role && !['attendee', 'organizer', 'admin', 'ATTENDEE', 'ORGANIZER', 'ADMIN'].includes(role)) {
-    sendError(res, 'Role must be either ATTENDEE, ORGANIZER, or ADMIN.', 400);
-    return;
+  if (role) {
+    const normalized = String(role).toLowerCase();
+    if (normalized === 'admin') {
+      sendError(res, 'Administrator accounts cannot be created via public registration.', 403);
+      return;
+    }
+    if (!['attendee', 'organizer'].includes(normalized)) {
+      sendError(res, 'Role must be either ATTENDEE or ORGANIZER.', 400);
+      return;
+    }
   }
 
   next();

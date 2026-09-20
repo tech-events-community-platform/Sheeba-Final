@@ -92,7 +92,7 @@ export class TicketService {
     return this.formatTicket(result.rows[0]);
   }
 
-  static async getTicketById(ticketId: string): Promise<any> {
+  static async getTicketById(ticketId: string, userId?: string, userRole?: string): Promise<any> {
     const sql = `
       SELECT 
         t.*,
@@ -104,6 +104,7 @@ export class TicketService {
         e.time_str,
         e.location AS event_location,
         e.venue_name,
+        e.organizer_id,
         u.full_name AS attendee_name,
         u.email AS attendee_email
       FROM tickets t
@@ -120,6 +121,15 @@ export class TicketService {
       throw err;
     }
 
-    return this.formatTicket(result.rows[0]);
+    const row = result.rows[0];
+
+    // Authorization check: Ticket owner, event organizer, or platform admin only
+    if (userId && row.user_id !== userId && row.organizer_id !== userId && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. You are not authorized to view this ticket.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    return this.formatTicket(row);
   }
 }

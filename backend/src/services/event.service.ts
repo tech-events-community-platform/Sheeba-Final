@@ -430,11 +430,17 @@ export class EventService {
     }
   }
 
-  static async getEventRoster(eventId: string): Promise<AttendeeRosterItem[]> {
+  static async getEventRoster(eventId: string, userId?: string, userRole?: string): Promise<AttendeeRosterItem[]> {
     const event = await this.getEventById(eventId);
     if (!event) {
       const err: any = new Error('Event not found.');
       err.statusCode = 404;
+      throw err;
+    }
+
+    if (userId && event.organizerId !== userId && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. You are not the organizer of this event.');
+      err.statusCode = 403;
       throw err;
     }
 

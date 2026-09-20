@@ -22,7 +22,12 @@ COPY package*.json ./
 RUN npm ci --only=production
 
 # Copy compiled JavaScript and DB migrations schema from builder
-COPY --from=builder /app/dist ./dist
+COPY --chown=node:node --from=builder /app/dist ./dist
+
+# Set ownership and drop root privileges
+RUN chown -R node:node /app
+
+USER node
 
 EXPOSE 5000
 

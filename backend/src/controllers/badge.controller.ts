@@ -80,6 +80,7 @@ export class BadgeController {
     try {
       const { eventId, attendeeRosterIds, attendeeUserIds, badgeCode } = req.body;
       const organizerId = req.user!.userId;
+      const userRole = req.user!.role;
 
       const userIds = attendeeUserIds || attendeeRosterIds || [];
       const result = await BadgeService.bulkAwardBadges({
@@ -87,6 +88,7 @@ export class BadgeController {
         attendeeUserIds: userIds,
         badgeCode: badgeCode as BadgeCode,
         awardedByOrganizerId: organizerId,
+        userRole,
       });
 
       return sendSuccess(res, result, `Successfully awarded ${result.awardedCount} badge(s).`);

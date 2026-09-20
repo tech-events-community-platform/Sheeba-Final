@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { UserController } from '../controllers/user.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, optionalAuthenticate } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -13,7 +13,7 @@ router.get('/me/export', authenticate, UserController.exportUserData);
 router.get('/me/tickets', authenticate, UserController.getMyTickets);
 router.get('/me/attendance', authenticate, UserController.getAttendanceHistory);
 
-// Public profile
-router.get('/:id/public', UserController.getPublicProfile);
+// Public profile (optionalAuth detects if the viewer is the profile owner or admin)
+router.get('/:id/public', optionalAuthenticate, UserController.getPublicProfile);
 
 export default router;

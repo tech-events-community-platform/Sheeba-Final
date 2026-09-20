@@ -35,7 +35,9 @@ export class TicketController {
   static async getTicketById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const ticketId = req.params.id as string;
-      const ticket = await TicketService.getTicketById(ticketId);
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+      const ticket = await TicketService.getTicketById(ticketId, userId, userRole);
 
       return sendSuccess(res, ticket, 'Ticket details retrieved successfully.');
     } catch (error) {

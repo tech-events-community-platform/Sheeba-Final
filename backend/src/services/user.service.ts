@@ -7,7 +7,7 @@ export class UserService {
     return AuthService.getCurrentUser(userId);
   }
 
-  static async getPublicProfile(userId: string) {
+  static async getPublicProfile(userId: string, viewerId?: string, viewerRole?: string) {
     const result = await query(
       `SELECT id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, created_at
        FROM users WHERE id = $1`,
@@ -21,11 +21,41 @@ export class UserService {
     }
 
     const user = result.rows[0];
+    const isOwner = viewerId === user.id;
+    const isAdmin = viewerRole?.toLowerCase() === 'admin';
+    const isPrivate = user.visibility === 'private';
+
+    // If profile is private and viewer is neither the owner nor admin, return restricted view without leaking PII or badges
+    if (isPrivate && !isOwner && !isAdmin) {
+      return {
+        isPrivate: true,
+        user: {
+          id: user.id,
+          name: user.full_name,
+          avatarUrl: user.avatar_url,
+          memberSince: user.member_since,
+          visibility: 'private',
+        },
+        badges: [],
+        message: 'This attendee has made their verified profile private.',
+      };
+    }
+
     const stats = await AuthService.computeUserStats(user.id);
     const badges = await BadgeService.getAttendeeBadges(user.id);
+    const formatted = AuthService.formatUserResponse(user, stats);
+
+    // Sanitize contact info from public exposure if viewer is not the user themselves or an admin
+    if (!isOwner && !isAdmin) {
+      formatted.email = undefined;
+      formatted.phone = undefined;
+      formatted.companyPhone = undefined;
+    }
 
     return {
-      user: AuthService.formatUserResponse(user, stats),
+      isPrivate: false,
+      isOwnerPreview: isOwner && isPrivate,
+      user: formatted,
       badges,
     };
   }

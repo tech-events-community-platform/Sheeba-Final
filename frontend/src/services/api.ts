@@ -55,10 +55,15 @@ export async function requestApi<T = any>(endpoint: string, options: RequestInit
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (netErr: any) {
+    throw new Error(`Unable to reach Sheeba server at ${API_BASE_URL}. Please check that the backend is running and reachable.`);
+  }
 
   const contentType = response.headers.get('content-type');
   let data: any = null;
@@ -90,43 +95,18 @@ export const api = {
   // Authentication
   auth: {
     login: async (creds: { email: string; password: string; role?: string }): Promise<{ user: User; token: string }> => {
-      try {
-        const res = await requestApi('/auth/login', {
-          method: 'POST',
-          body: JSON.stringify(creds),
-        });
+      const res = await requestApi('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(creds),
+      });
 
-        if (res.data?.token) {
-          setAuthToken(res.data.token);
-        }
-        return {
-          user: res.data.user,
-          token: res.data.token,
-        };
-      } catch (err: any) {
-        if (err.status === 401 || err.status === 403 || err.statusCode === 401 || err.statusCode === 403) {
-          throw err;
-        }
-        console.warn('Backend login fallback to local session:', err.message);
-        const lowerEmail = creds.email.toLowerCase();
-        const isAdmin = lowerEmail === 'admin@sheba.et' || lowerEmail.includes('admin');
-        const isOrganizer = creds.role?.toUpperCase() === 'ORGANIZER' || lowerEmail.includes('organizer');
-        const role: UserRole = isAdmin ? 'ADMIN' : isOrganizer ? 'ORGANIZER' : 'ATTENDEE';
-
-        const localUser: User = {
-          id: isAdmin ? '33333333-3333-3333-3333-333333333333' : `usr_${Date.now()}`,
-          name: isAdmin ? 'Sheba Super Admin' : creds.email.split('@')[0],
-          email: creds.email,
-          role,
-          avatarUrl: isAdmin
-            ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'
-            : `https://ui-avatars.com/api/?name=${encodeURIComponent(creds.email)}&background=63474D&color=fff`,
-          memberSince: 'August 2026',
-        };
-        const token = `local_jwt_${Date.now()}`;
-        setAuthToken(token);
-        return { user: localUser, token };
+      if (res.data?.token) {
+        setAuthToken(res.data.token);
       }
+      return {
+        user: res.data.user,
+        token: res.data.token,
+      };
     },
 
     applyOrganizer: async (data: {
@@ -186,47 +166,21 @@ export const api = {
       phone?: string;
       bio?: string;
     }): Promise<{ user: User; token?: string; isPendingApproval?: boolean; message?: string }> => {
-      try {
-        const res = await requestApi('/auth/register', {
-          method: 'POST',
-          body: JSON.stringify(data),
-        });
+      const res = await requestApi('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
 
-        if (res.data?.token) {
-          setAuthToken(res.data.token);
-        }
-
-        return {
-          user: res.data.user,
-          token: res.data.token,
-          isPendingApproval: res.data.isPendingApproval || false,
-          message: res.data.message || res.message,
-        };
-      } catch (err: any) {
-        if (err.status === 409 || err.statusCode === 409 || err.message?.includes('already registered')) {
-          throw err;
-        }
-        console.warn('Backend register fallback to local session:', err.message);
-        const localUser: User = {
-          id: `usr_${Date.now()}`,
-          name: data.full_name,
-          email: data.email,
-          role: data.role || 'ATTENDEE',
-          organization: data.organization,
-          phone: data.phone,
-          bio: data.bio,
-          avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.full_name)}&background=63474D&color=fff`,
-          memberSince: 'September 2026',
-        };
-        const token = `local_jwt_${Date.now()}`;
-        setAuthToken(token);
-        return {
-          user: localUser,
-          token,
-          isPendingApproval: data.role === 'ORGANIZER',
-          message: 'Account created successfully (Local Dev Mode)',
-        };
+      if (res.data?.token) {
+        setAuthToken(res.data.token);
       }
+
+      return {
+        user: res.data.user,
+        token: res.data.token,
+        isPendingApproval: res.data.isPendingApproval || false,
+        message: res.data.message || res.message,
+      };
     },
 
     getMe: async (): Promise<User | null> => {
@@ -234,13 +188,9 @@ export const api = {
         const res = await requestApi('/users/profile');
         return res.data;
       } catch (err: any) {
-        if (err.status === 401 || err.statusCode === 401) {
-          removeAuthToken();
-          localStorage.removeItem('sheba_auth_user');
-          return null;
-        }
-        const saved = localStorage.getItem('sheba_auth_user');
-        return saved ? JSON.parse(saved) : null;
+        removeAuthToken();
+        localStorage.removeItem('sheba_auth_user');
+        return null;
       }
     },
 

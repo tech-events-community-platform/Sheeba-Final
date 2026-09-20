@@ -12,6 +12,8 @@ import {
   Download,
   ArrowLeft,
   ExternalLink,
+  Lock,
+  Eye,
 } from 'lucide-react';
 
 export const PublicProfilePage: React.FC = () => {
@@ -20,6 +22,9 @@ export const PublicProfilePage: React.FC = () => {
   const [badges, setBadges] = useState<BadgeAward[]>([]);
   const [loading, setLoading] = useState(true);
   const [exportedMsg, setExportedMsg] = useState(false);
+  const [isPrivateProfile, setIsPrivateProfile] = useState(false);
+  const [isOwnerPreview, setIsOwnerPreview] = useState(false);
+  const [privateMessage, setPrivateMessage] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,9 +34,19 @@ export const PublicProfilePage: React.FC = () => {
         if (id) {
           const res = await requestApi(`/users/${id}/public`);
           if (res.data) {
-            setProfileUser(res.data);
-            const userBadges = await api.badges.getAttendeeBadges(id);
-            setBadges(userBadges);
+            const isPrivate = Boolean(res.data.isPrivate);
+            setIsPrivateProfile(isPrivate);
+            setIsOwnerPreview(Boolean(res.data.isOwnerPreview));
+            setPrivateMessage(res.data.message || null);
+
+            const userObj = res.data.user || res.data;
+            setProfileUser(userObj);
+
+            if (isPrivate) {
+              setBadges([]);
+            } else {
+              setBadges(res.data.badges || []);
+            }
           }
         }
       } catch (e) {
@@ -109,6 +124,35 @@ export const PublicProfilePage: React.FC = () => {
     );
   }
 
+  if (isPrivateProfile && profileUser) {
+    return (
+      <div className="max-w-xl mx-auto py-16 px-4 space-y-6 text-center">
+        <Link
+          to="/search"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#63474D] hover:underline mb-2"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Search
+        </Link>
+        <div className="bg-white rounded-3xl p-8 border border-[#E8DDD7] shadow-xs space-y-5">
+          <div className="w-16 h-16 rounded-full bg-[#FAF7F5] border border-[#E8DDD7] flex items-center justify-center mx-auto text-[#63474D]">
+            <Lock className="w-8 h-8 text-[#63474D]" />
+          </div>
+          <div className="space-y-1">
+            <h1 className="font-serif text-2xl font-bold text-[#2D1F23]">{profileUser.name}</h1>
+            <div className="inline-flex items-center gap-1 text-xs font-medium text-[#756366]">
+              <span>Private Profile</span>
+              {profileUser.memberSince && <span>• Member Since {profileUser.memberSince}</span>}
+            </div>
+          </div>
+          <p className="text-sm text-[#756366] max-w-md mx-auto">
+            {privateMessage || 'This attendee has configured their profile and credentials to be private.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!profileUser) return null;
 
   const stats = profileUser.stats || {
@@ -127,6 +171,15 @@ export const PublicProfilePage: React.FC = () => {
         <ArrowLeft className="w-4 h-4" />
         Search All Profiles
       </Link>
+
+      {isOwnerPreview && (
+        <div className="p-4 bg-[#FAF7F5] border border-[#63474D]/30 rounded-2xl flex items-center gap-3 text-xs text-[#63474D]">
+          <Eye className="w-4 h-4 shrink-0 text-[#63474D]" />
+          <span>
+            <strong>Owner Preview:</strong> Your profile visibility is currently set to <strong>Private</strong> in Settings. Only you can view this full credential dossier; anonymous visitors will see a restricted private card.
+          </span>
+        </div>
+      )}
 
       {/* Profile Header Block */}
       <div ref={cardRef} className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E8DDD7] shadow-xs space-y-6">

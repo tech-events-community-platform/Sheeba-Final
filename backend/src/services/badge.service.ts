@@ -155,7 +155,20 @@ export class BadgeService {
     userRole?: UserRole;
     notes?: string;
   }): Promise<any> {
-    const { eventId, attendeeId, badgeCode, awardedByOrganizerId, notes } = params;
+    const { eventId, attendeeId, badgeCode, awardedByOrganizerId, userRole, notes } = params;
+
+    const eventRes = await query('SELECT organizer_id FROM events WHERE id = $1', [eventId]);
+    if (!eventRes.rowCount || eventRes.rowCount === 0) {
+      const err: any = new Error('Event not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (eventRes.rows[0].organizer_id !== awardedByOrganizerId && userRole && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. You cannot award badges for an event you do not organize.');
+      err.statusCode = 403;
+      throw err;
+    }
 
     // Validate badge type: only participant, winner, speaker can be manually awarded
     const validHigherTierBadges = ['participant', 'winner', 'speaker'];
@@ -214,8 +227,22 @@ export class BadgeService {
     attendeeUserIds: string[];
     badgeCode: BadgeCode;
     awardedByOrganizerId: string;
+    userRole?: UserRole;
   }): Promise<{ awardedCount: number }> {
-    const { eventId, attendeeUserIds, badgeCode, awardedByOrganizerId } = params;
+    const { eventId, attendeeUserIds, badgeCode, awardedByOrganizerId, userRole } = params;
+
+    const eventRes = await query('SELECT organizer_id FROM events WHERE id = $1', [eventId]);
+    if (!eventRes.rowCount || eventRes.rowCount === 0) {
+      const err: any = new Error('Event not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (eventRes.rows[0].organizer_id !== awardedByOrganizerId && userRole && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. You cannot award badges for an event you do not organize.');
+      err.statusCode = 403;
+      throw err;
+    }
 
     let count = 0;
     for (const userId of attendeeUserIds) {
@@ -225,6 +252,7 @@ export class BadgeService {
           attendeeId: userId,
           badgeCode,
           awardedByOrganizerId,
+          userRole,
         });
         count++;
       } catch (err) {

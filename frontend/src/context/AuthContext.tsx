@@ -56,16 +56,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshUser = async () => {
     const token = getAuthToken();
     if (!token) {
-      const savedUser = localStorage.getItem('sheba_auth_user');
-      if (savedUser) {
-        try {
-          setUser(JSON.parse(savedUser));
-        } catch {
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
+      setUser(null);
+      localStorage.removeItem('sheba_auth_user');
       setIsLoading(false);
       return;
     }

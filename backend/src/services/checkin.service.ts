@@ -5,10 +5,16 @@ import { BadgeService } from './badge.service';
 import { EventService } from './event.service';
 
 export class CheckinService {
-  static async lookupAttendee(eventIdOrToken: string, queryText: string) {
+  static async lookupAttendee(eventIdOrToken: string, queryText: string, organizerId?: string, userRole?: string) {
     const event = await EventService.getEventById(eventIdOrToken);
     if (!event) return null;
     const realEventId = event.id;
+
+    if (organizerId && event.organizerId !== organizerId && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. You are not the organizer of this event.');
+      err.statusCode = 403;
+      throw err;
+    }
 
     const cleanQuery = queryText.trim();
     const isToken = cleanQuery.startsWith('eyJ') || cleanQuery.includes('shb_');
@@ -106,9 +112,15 @@ export class CheckinService {
   }
 
   // Live autocomplete search for fallback search tab
-  static async searchAttendees(eventId: string, queryText: string) {
+  static async searchAttendees(eventId: string, queryText: string, organizerId?: string, userRole?: string) {
     const event = await EventService.getEventById(eventId);
     if (!event) return [];
+
+    if (organizerId && event.organizerId !== organizerId && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. You are not the organizer of this event.');
+      err.statusCode = 403;
+      throw err;
+    }
 
     const clean = queryText.trim();
     if (!clean) return [];
