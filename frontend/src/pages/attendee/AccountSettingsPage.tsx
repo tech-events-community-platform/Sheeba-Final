@@ -178,7 +178,7 @@ export const AccountSettingsPage: React.FC = () => {
     : 'Provide your community social links. These will appear beside your organizer name below event posters on public registration pages.';
 
   return (
-    <div className="w-full max-w-5xl py-6 px-2 sm:px-4 space-y-8 pb-20">
+    <div className="w-full max-w-5xl mx-auto py-6 px-2 sm:px-4 space-y-8 pb-20">
       {/* Page Heading (Unboxed, expanded to left & right) */}
       <div className="space-y-1">
         <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23]">
@@ -191,7 +191,7 @@ export const AccountSettingsPage: React.FC = () => {
 
       {saveMsg && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 flex items-center gap-2 animate-fade-in max-w-xl">
-          <img src="/tick.png" alt="Success" className="w-4 h-4 object-contain shrink-0" />
+          <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0" />
           <span>{saveMsg}</span>
         </div>
       )}
@@ -241,7 +241,7 @@ export const AccountSettingsPage: React.FC = () => {
           {/* Email input brought halfway to the left */}
           <div className="max-w-xs sm:max-w-sm">
             <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-              <img src="/mail-icon.jpg" alt="Email" className="w-3.5 h-3.5 object-contain" />
+              <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
               Contact Email
             </label>
             <input

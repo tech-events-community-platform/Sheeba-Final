@@ -23,7 +23,7 @@ export const RoleSpotlightSection: React.FC = () => {
 
       {/* Alternating Layout: Matching Screenshot 1 */}
       <div className="space-y-16 lg:space-y-24">
-        {/* ROW 1: Attendees (Text Left, Badge Right) */}
+        {/* ROW 1: Attendees (Text Left, Image Right) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center">
           <FadeIn direction="right">
             <div className="space-y-4">
@@ -35,7 +35,7 @@ export const RoleSpotlightSection: React.FC = () => {
                 Verifiable Proof of Attendance & Digital Badges
               </h3>
               <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
-                Every time you attend a gathering that matters, your participation is preserved as authentic, tamper-proof proof. No more digging through inbox clutter for paper tickets or lost confirmation emails. Attendees carry a permanent digital pass wallet and earn official participation badges—from Attended and Participant to Speaker and Winner—recognized by organizations and peers across Ethiopia.
+                Every time you attend a gathering that matters, your participation is preserved as authentic, tamper-proof proof. No more digging through inbox clutter for paper tickets or lost confirmation emails. Attendees carry a permanent digital pass wallet and earn official participation badges (from Attended and Participant to Speaker and Winner) recognized by organizations and peers across Ethiopia.
               </p>
               <div className="pt-2">
                 <Link
@@ -51,37 +51,31 @@ export const RoleSpotlightSection: React.FC = () => {
 
           <FadeIn direction="left">
             <div className="flex justify-center md:justify-end">
-              {/* Badge directly on main background, smaller, fully visible, no circular container */}
-              <div className="flex flex-col items-center group">
+              <div className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-gray-200/80 shadow-lg hover:shadow-2xl transition-all duration-300 max-w-lg w-full bg-white">
                 <img
-                  src="/badges/attended-badge.jpg"
-                  alt="Attended Badge"
-                  className="w-32 h-32 sm:w-40 sm:h-40 object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
+                  src="/landing-attendee.webp"
+                  alt="Attendees collecting verified digital credentials"
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <div className="mt-3 bg-[#63474D] text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-md flex items-center gap-1.5 whitespace-nowrap">
-                  <Award className="w-3.5 h-3.5 text-[#FFA686]" />
-                  <span>Attended Badge</span>
-                </div>
               </div>
             </div>
           </FadeIn>
         </div>
 
-        {/* ROW 2: Organizers (Badge Left, Text Right) */}
+        {/* ROW 2: Organizers (Image Left, Text Right) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center">
           <FadeIn direction="right" className="order-2 md:order-1">
             <div className="flex justify-center md:justify-start">
-              {/* Badge directly on main background, smaller, fully visible, no circular container */}
-              <div className="flex flex-col items-center group">
+              <div className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-gray-200/80 shadow-lg hover:shadow-2xl transition-all duration-300 max-w-lg w-full bg-white">
                 <img
-                  src="/badges/speaker-badge.jpg"
-                  alt="Speaker & Organizer Badge"
-                  className="w-32 h-32 sm:w-40 sm:h-40 object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
+                  src="/landing-organizers.webp"
+                  alt="Organizers managing door check-in and attendee lists"
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <div className="mt-3 bg-[#2D1F23] text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-md flex items-center gap-1.5 whitespace-nowrap">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#FFA686]" />
-                  <span>Verified Organizer</span>
-                </div>
               </div>
             </div>
           </FadeIn>
@@ -111,7 +105,7 @@ export const RoleSpotlightSection: React.FC = () => {
           </FadeIn>
         </div>
 
-        {/* ROW 3: Sponsors (Text Left, Badge Right) */}
+        {/* ROW 3: Sponsors (Text Left, Image Right) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center">
           <FadeIn direction="right">
             <div className="space-y-4">
@@ -123,7 +117,7 @@ export const RoleSpotlightSection: React.FC = () => {
                 Marketplace Discovery & Transparent Turnout Metrics
               </h3>
               <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
-                Back initiatives with absolute confidence. Corporate partners and brands browse upcoming event applications across categories, review expected demographics, and reach out directly to organizers off-platform. Manage active pledges cleanly in Deals & Pledges as Interested or Declined, configure brand deliverables, and receive verifiable post-event metrics backed by real door scans.
+                Fund premier community organizers and get your products, goods, and services directly promoted to engaged audiences. Through the Sheeba Marketplace, corporate sponsors discover upcoming gatherings, back organizers with financial sponsorship, and secure tangible brand promotion including dedicated product booths, on-stage spotlights, live product demos, and official co-branding. Track every pledge transparently in Deals and Pledges, coordinate custom deliverables, and receive verifiable post-event turnout proof backed by real door scans.
               </p>
               <div className="pt-2">
                 <Link
@@ -139,17 +133,14 @@ export const RoleSpotlightSection: React.FC = () => {
 
           <FadeIn direction="left">
             <div className="flex justify-center md:justify-end">
-              {/* Badge directly on main background, smaller, fully visible, no circular container */}
-              <div className="flex flex-col items-center group">
+              <div className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-gray-200/80 shadow-lg hover:shadow-2xl transition-all duration-300 max-w-lg w-full bg-white">
                 <img
-                  src="/badges/hackathon-winner-badge.jpg"
-                  alt="Recognized Excellence Badge"
-                  className="w-32 h-32 sm:w-40 sm:h-40 object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-300"
+                  src="/landing-sponsor.webp"
+                  alt="Sponsors promoting products and discovering upcoming event pitches"
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
                 />
-                <div className="mt-3 bg-[#63474D] text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-md flex items-center gap-1.5 whitespace-nowrap">
-                  <Award className="w-3.5 h-3.5 text-[#FFA686]" />
-                  <span>Recognized Excellence</span>
-                </div>
               </div>
             </div>
           </FadeIn>

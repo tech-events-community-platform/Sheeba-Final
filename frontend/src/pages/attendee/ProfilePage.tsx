@@ -37,7 +37,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-16">
+    <div className="w-full max-w-3xl mx-auto space-y-6 pb-16">
       {/* Profile Header Card */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E8DDD7] shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
@@ -155,10 +155,10 @@ export const ProfilePage: React.FC = () => {
 
               <div className="text-[11px] text-[#756366] pt-1 border-t border-[#E8DDD7] flex items-center justify-between">
                 <span className="flex items-center gap-1">
-                  <img src="/calendar.png" alt="Calendar" className="w-3 h-3 object-contain shrink-0" /> {b.eventDate}
+                  <img src="/calendar.webp" alt="Calendar" className="w-3 h-3 object-contain shrink-0" /> {b.eventDate}
                 </span>
                 <span className="flex items-center gap-1">
-                  <img src="/location.png" alt="Location" className="w-3 h-3 object-contain shrink-0" /> {b.eventLocation.split(',')[0]}
+                  <img src="/location.webp" alt="Location" className="w-3 h-3 object-contain shrink-0" /> {b.eventLocation.split(',')[0]}
                 </span>
               </div>
             </Link>

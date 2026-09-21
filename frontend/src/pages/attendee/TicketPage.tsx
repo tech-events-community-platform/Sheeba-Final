@@ -7,6 +7,7 @@ import type { Event } from '../../types/event';
 import { TicketCard } from '../../components/ticket/TicketCard';
 import { Button } from '../../components/ui/Button';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { printTicketPass } from '../../utils/printTicket';
 
 export const TicketPage: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
@@ -34,7 +35,8 @@ export const TicketPage: React.FC = () => {
   }, [eventId, user]);
 
   const handleDownload = () => {
-    window.print();
+    if (!ticket) return;
+    printTicketPass(`ticket-card-${ticket.id}`);
   };
 
   if (loading) {
@@ -46,8 +48,8 @@ export const TicketPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-md mx-auto space-y-6 pb-16">
-      <div className="flex items-center justify-between">
+    <div className="max-w-md mx-auto w-full space-y-6 pb-16">
+      <div className="flex items-center justify-between no-print">
         <Link
           to="/app/events"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#63474D] hover:underline"

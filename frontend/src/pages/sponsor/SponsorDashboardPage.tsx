@@ -52,7 +52,7 @@ export const SponsorDashboardPage: React.FC = () => {
                 <span>Lead Contact: {user?.name}</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <img src="/mail-icon.jpg" alt="Email" className="w-3.5 h-3.5 object-contain" />
+                <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
                 <span>{user?.email}</span>
               </span>
               {user?.industryCategory && (

@@ -93,7 +93,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ event, isOpe
               <tbody className="divide-y divide-gray-100">
                 <tr className="hover:bg-gray-50/70">
                   <td className="py-3 px-4 font-semibold text-sheeba-dark flex items-center gap-1.5">
-                    <img src="/calendar.png" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" /> Schedule & Time
+                    <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" /> Schedule & Time
                   </td>
                   <td className="py-3 px-4 font-medium text-gray-800">
                     {event.date} • {event.time || `${event.startTime} - ${event.endTime}`}
@@ -105,7 +105,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ event, isOpe
 
                 <tr className="hover:bg-gray-50/70">
                   <td className="py-3 px-4 font-semibold text-sheeba-dark flex items-center gap-1.5">
-                    <img src="/location.png" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" /> Venue & Hall
+                    <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" /> Venue & Hall
                   </td>
                   <td className="py-3 px-4 font-medium text-gray-800">
                     {event.venueName || event.location}
@@ -170,7 +170,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ event, isOpe
               onClick={handleCopyLink}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200 hover:bg-gray-100 text-sheeba-dark text-xs font-semibold transition-colors cursor-pointer"
             >
-              {copied ? <img src="/tick.png" alt="Copied" className="w-3.5 h-3.5 object-contain shrink-0" /> : <Copy className="w-3.5 h-3.5 text-[#C84B18]" />}
+              {copied ? <img src="/tick.webp" alt="Copied" className="w-3.5 h-3.5 object-contain shrink-0" /> : <Copy className="w-3.5 h-3.5 text-[#C84B18]" />}
               <span>{copied ? 'Copied' : 'Copy Link'}</span>
             </button>
             <Link

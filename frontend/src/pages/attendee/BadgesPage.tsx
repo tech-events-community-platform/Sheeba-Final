@@ -37,10 +37,10 @@ export const BadgesPage: React.FC = () => {
 
   const getBadgeImage = (type?: string) => {
     const t = (type || '').toLowerCase();
-    if (t.includes('hackathon')) return '/badges/hackathon-badge.jpg';
-    if (t.includes('workshop')) return '/badges/workshop-badge.jpg';
-    if (t.includes('meetup')) return '/badges/meetup-badge.jpg';
-    return '/badges/other.jpg';
+    if (t.includes('hackathon')) return '/badges/hackathon-badge.webp';
+    if (t.includes('workshop')) return '/badges/workshop-badge.webp';
+    if (t.includes('meetup')) return '/badges/meetup-badge.webp';
+    return '/badges/other.webp';
   };
 
   const getStatusLabel = (code: string) => {
@@ -84,7 +84,7 @@ export const BadgesPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 space-y-8 pb-24">
+    <div className="w-full max-w-5xl mx-auto py-8 px-4 space-y-8 pb-24">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 border-b border-gray-100 pb-5">
         <div>
@@ -101,7 +101,7 @@ export const BadgesPage: React.FC = () => {
 
         {badges.length > 0 && (
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
-            <img src="/tick.png" alt="Success" className="w-4 h-4 object-contain shrink-0" />
+            <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0" />
             <span>{badges.length} Verified Badges Earned</span>
           </div>
         )}
@@ -126,7 +126,7 @@ export const BadgesPage: React.FC = () => {
           {/* Educational 4-Badge Tier Preview Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-left">
             <div className="p-3.5 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] space-y-2">
-              <img src="/badges/attended-badge.jpg" alt="Attended" className="w-10 h-10 object-contain rounded-lg" />
+              <img src="/badges/attended-badge.webp" loading="lazy" alt="Attended" className="w-10 h-10 object-contain rounded-lg" />
               <p className="font-bold text-xs text-[#2D1F23]">Attended</p>
               <p className="text-[10px] text-[#756366] leading-tight">
                 Awarded instantly upon door check-in scan.
@@ -134,7 +134,7 @@ export const BadgesPage: React.FC = () => {
             </div>
 
             <div className="p-3.5 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] space-y-2">
-              <img src="/badges/participant-badge.jpg" alt="Participant" className="w-10 h-10 object-contain rounded-lg" />
+              <img src="/badges/participant-badge.webp" loading="lazy" alt="Participant" className="w-10 h-10 object-contain rounded-lg" />
               <p className="font-bold text-xs text-[#2D1F23]">Participant</p>
               <p className="text-[10px] text-[#756366] leading-tight">
                 Awarded for active project submission.
@@ -142,7 +142,7 @@ export const BadgesPage: React.FC = () => {
             </div>
 
             <div className="p-3.5 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] space-y-2">
-              <img src="/badges/hackathon-winner-badge.jpg" alt="Winner" className="w-10 h-10 object-contain rounded-lg" />
+              <img src="/badges/hackathon-winner-badge.webp" loading="lazy" alt="Winner" className="w-10 h-10 object-contain rounded-lg" />
               <p className="font-bold text-xs text-[#2D1F23]">Winner</p>
               <p className="text-[10px] text-[#756366] leading-tight">
                 Awarded for podium and track achievements.
@@ -150,7 +150,7 @@ export const BadgesPage: React.FC = () => {
             </div>
 
             <div className="p-3.5 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] space-y-2">
-              <img src="/badges/speaker-badge.jpg" alt="Speaker" className="w-10 h-10 object-contain rounded-lg" />
+              <img src="/badges/speaker-badge.webp" loading="lazy" alt="Speaker" className="w-10 h-10 object-contain rounded-lg" />
               <p className="font-bold text-xs text-[#2D1F23]">Speaker</p>
               <p className="text-[10px] text-[#756366] leading-tight">
                 Awarded to keynote speakers & mentors.
@@ -202,7 +202,7 @@ export const BadgesPage: React.FC = () => {
                       </span>
 
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        <img src="/tick.png" alt="Verified" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        <img src="/tick.webp" alt="Verified" className="w-3.5 h-3.5 object-contain shrink-0" />
                         Verified
                       </span>
 
@@ -236,7 +236,7 @@ export const BadgesPage: React.FC = () => {
                   {/* Bottom Row: Date and Location (when and where it took place) */}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#756366] font-normal pt-1.5 border-t border-gray-100">
                     <span className="flex items-center gap-1">
-                      <img src="/calendar.png" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
+                      <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
                       {b.eventDate}
                     </span>
                     {b.eventTime && (
@@ -246,7 +246,7 @@ export const BadgesPage: React.FC = () => {
                       </span>
                     )}
                     <span className="flex items-center gap-1 truncate">
-                      <img src="/location.png" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
+                      <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
                       {b.eventLocation}
                     </span>
                   </div>

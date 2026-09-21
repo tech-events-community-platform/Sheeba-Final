@@ -189,7 +189,7 @@ export const PublicRegisterPage: React.FC = () => {
               {/* Location (in the space to the right of date in the same row) */}
               <div className="flex items-center gap-3">
                 <div className="w-6 flex items-center justify-center shrink-0">
-                  <img src="/location.png" alt="Location" className="w-5 h-5 object-contain" />
+                  <img src="/location.webp" alt="Location" className="w-5 h-5 object-contain" />
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-xs font-bold text-[#2D1F23]">{event.venueName || event.location}</p>
@@ -215,7 +215,7 @@ export const PublicRegisterPage: React.FC = () => {
               {isAlreadyRegistered ? (
                 <div className="space-y-3 pt-2 text-left">
                   <div className="flex items-center justify-start gap-2 text-xs font-semibold text-emerald-800">
-                    <img src="/tick.png" alt="Done" className="w-5 h-5 object-contain shrink-0" />
+                    <img src="/tick.webp" alt="Done" className="w-5 h-5 object-contain shrink-0" />
                     <span>You are registered for this event!</span>
                   </div>
                   <div className="flex justify-start gap-3 pt-1">

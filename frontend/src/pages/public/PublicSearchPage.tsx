@@ -114,7 +114,7 @@ export const PublicSearchPage: React.FC = () => {
                 : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
             }`}
           >
-            <img src="/calendar.png" alt="Calendar" className="w-4 h-4 object-contain" />
+            <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain" />
             All Events ({events.length})
           </button>
           <button
@@ -161,7 +161,7 @@ export const PublicSearchPage: React.FC = () => {
       ) : activeTab === 'events' ? (
         filteredEvents.length === 0 ? (
           <div className="bg-white rounded-3xl p-12 text-center border border-[#E8DDD7] space-y-3 shadow-xs">
-            <img src="/calendar.png" alt="Calendar" className="w-12 h-12 object-contain mx-auto" />
+            <img src="/calendar.webp" alt="Calendar" className="w-12 h-12 object-contain mx-auto" />
             <h3 className="font-serif text-lg font-bold text-[#2D1F23]">No Events Found</h3>
             <p className="text-xs text-[#756366]">
               Try adjusting your search terms or filter criteria.
@@ -212,7 +212,7 @@ export const PublicSearchPage: React.FC = () => {
                   <div className="space-y-3 pt-3 border-t border-[#E8DDD7]">
                     <div className="grid grid-cols-2 gap-2 text-xs text-[#756366]">
                       <div className="flex items-center gap-1.5">
-                        <img src="/calendar.png" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
                         <span>{ev.date}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -220,7 +220,7 @@ export const PublicSearchPage: React.FC = () => {
                         <span>{ev.time || `${ev.startTime} - ${ev.endTime}`}</span>
                       </div>
                       <div className="flex items-center gap-1.5 col-span-2">
-                        <img src="/location.png" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
                         <span className="truncate">{ev.venueName || ev.location}</span>
                       </div>
                     </div>
@@ -236,7 +236,7 @@ export const PublicSearchPage: React.FC = () => {
                             type="button"
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2A7B5F] text-white text-xs font-bold hover:bg-[#22634d] transition-all shadow-xs cursor-pointer"
                           >
-                            <img src="/tick.png" alt="Registered" className="w-3.5 h-3.5 object-contain" />
+                            <img src="/tick.webp" alt="Registered" className="w-3.5 h-3.5 object-contain" />
                             <span>Registered</span>
                           </button>
                         </Link>

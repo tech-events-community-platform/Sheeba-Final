@@ -534,7 +534,7 @@ export const ApplyToSponsorsPage: React.FC = () => {
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#AA767C]/15 shadow-sm space-y-6">
             <div className="border-b border-gray-100 pb-4">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <img src="/phone-icon.jpg" alt="Phone" className="w-5 h-5 object-contain" />
+                <img src="/phone-icon.webp" alt="Phone" className="w-5 h-5 object-contain" />
                 3. Direct Organizer Contact Channels
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 mt-1">
@@ -559,7 +559,7 @@ export const ApplyToSponsorsPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5 flex items-center gap-1.5">
-                  <img src="/phone-icon.jpg" alt="Phone" className="w-3.5 h-3.5 object-contain" />
+                  <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain" />
                   Direct Phone Number (Callable) *
                 </label>
                 <input
@@ -574,7 +574,7 @@ export const ApplyToSponsorsPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5 flex items-center gap-1.5">
-                  <img src="/mail-icon.jpg" alt="Email" className="w-3.5 h-3.5 object-contain" />
+                  <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
                   Official Contact Email *
                 </label>
                 <input

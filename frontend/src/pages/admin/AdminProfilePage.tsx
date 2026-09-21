@@ -36,7 +36,7 @@ export const AdminProfilePage: React.FC = () => {
             </div>
 
             <p className="text-xs text-[#756366] flex items-center justify-center sm:justify-start gap-1">
-              <img src="/mail-icon.jpg" alt="Email" className="w-3.5 h-3.5 object-contain" />
+              <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
               {user?.email || 'admin@sheeba.et'}
             </p>
 

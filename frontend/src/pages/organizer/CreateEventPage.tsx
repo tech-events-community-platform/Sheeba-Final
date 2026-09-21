@@ -210,7 +210,7 @@ export const CreateEventPage: React.FC = () => {
     return (
       <div className="max-w-xl mx-auto py-16 px-4 space-y-6 text-center animate-fade-in">
         <img
-          src="/tick.png"
+          src="/tick.webp"
           alt="Success"
           className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto"
         />
@@ -240,7 +240,7 @@ export const CreateEventPage: React.FC = () => {
               variant="accent"
               size="sm"
               onClick={handleCopyShareLink}
-              icon={copiedLink ? <img src="/tick.png" alt="Copied" className="w-4 h-4 object-contain" /> : <Copy className="w-4 h-4" />}
+              icon={copiedLink ? <img src="/tick.webp" alt="Copied" className="w-4 h-4 object-contain" /> : <Copy className="w-4 h-4" />}
             >
               {copiedLink ? 'Copied' : 'Copy'}
             </Button>

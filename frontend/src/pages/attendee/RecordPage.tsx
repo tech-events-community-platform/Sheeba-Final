@@ -78,7 +78,7 @@ export const RecordPage: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-20">
+    <div className="w-full max-w-5xl mx-auto space-y-8 pb-20">
       {/* 1. Header Overview */}
       <div className="space-y-2">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-gray-100 pb-4">

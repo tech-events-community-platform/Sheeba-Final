@@ -80,3 +80,77 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #631a86;
 }
+
+/* Hide scrollbar / teller on landing page */
+html.home-page,
+body.home-page {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+html.home-page::-webkit-scrollbar,
+body.home-page::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Print optimization for Attendee Ticket Passes: exactly 1 page, no tabs/headers/footers */
+@media print {
+  @page {
+    size: portrait;
+    margin: 10mm auto;
+  }
+
+  /* When printing-ticket is active, hide everything on body except our dedicated portal */
+  body.printing-ticket > *:not(#sheeba-print-pass-portal) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-ticket {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #sheeba-print-pass-portal {
+    display: block !important;
+    margin: 0 auto !important;
+    max-width: 580px !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+  }
+
+  #sheeba-print-pass-portal * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #sheeba-print-pass-portal .no-print,
+  #sheeba-print-pass-portal button,
+  #sheeba-print-pass-portal a {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* General print hides when not using portal */
+  header,
+  footer,
+  aside,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+}

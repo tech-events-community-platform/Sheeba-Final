@@ -23,10 +23,10 @@ export const BadgeDetailPage: React.FC = () => {
 
   const getBadgeImage = (type?: string) => {
     const t = (type || '').toLowerCase();
-    if (t.includes('hackathon')) return '/badges/hackathon-badge.jpg';
-    if (t.includes('workshop')) return '/badges/workshop-badge.jpg';
-    if (t.includes('meetup')) return '/badges/meetup-badge.jpg';
-    return '/badges/other.jpg';
+    if (t.includes('hackathon')) return '/badges/hackathon-badge.webp';
+    if (t.includes('workshop')) return '/badges/workshop-badge.webp';
+    if (t.includes('meetup')) return '/badges/meetup-badge.webp';
+    return '/badges/other.webp';
   };
 
   const getStatusLabel = (code: string) => {
@@ -121,7 +121,7 @@ export const BadgeDetailPage: React.FC = () => {
           className="w-52 h-52 sm:w-60 sm:h-60 object-contain rounded-2xl drop-shadow-md"
         />
         <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#63474D] uppercase tracking-wider">
-          <img src="/tick.png" alt="Verified" className="w-4 h-4 object-contain" />
+          <img src="/tick.webp" alt="Verified" className="w-4 h-4 object-contain" />
           <span>{statusLabel} • Verified Official Credential</span>
         </div>
       </div>
@@ -168,14 +168,14 @@ export const BadgeDetailPage: React.FC = () => {
             When &amp; Where It Took Place
           </h2>
           <p className="text-sm text-[#2D1F23] flex items-center gap-2">
-            <img src="/calendar.png" alt="When" className="w-4 h-4 object-contain shrink-0" />
+            <img src="/calendar.webp" alt="When" className="w-4 h-4 object-contain shrink-0" />
             <span>
               {badge.eventDate}
               {badge.eventTime ? ` • ${badge.eventTime}` : ''}
             </span>
           </p>
           <p className="text-sm text-[#2D1F23] flex items-center gap-2">
-            <img src="/location.png" alt="Where" className="w-4 h-4 object-contain shrink-0" />
+            <img src="/location.webp" alt="Where" className="w-4 h-4 object-contain shrink-0" />
             <span>{badge.eventLocation}</span>
           </p>
         </div>

@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Sparkles,
 } from 'lucide-react';
+import { printTicketPass } from '../../utils/printTicket';
 
 export const MyEventsPage: React.FC = () => {
   const { user } = useAuth();
@@ -75,12 +76,16 @@ export const MyEventsPage: React.FC = () => {
     }, 100);
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = (ticketId?: string) => {
+    if (!ticketId) {
+      window.print();
+      return;
+    }
+    printTicketPass(`ticket-card-${ticketId}`);
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-16">
+    <div className="space-y-6 max-w-5xl mx-auto pb-16 w-full">
       {/* Page Header */}
       <div className="space-y-1">
         <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23]">
@@ -102,7 +107,7 @@ export const MyEventsPage: React.FC = () => {
               : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
           }`}
         >
-          <img src="/calendar.png" alt="Calendar" className="w-4 h-4 object-contain" />
+          <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain" />
           <span>Upcoming ({registeredEvents.length})</span>
         </button>
 
@@ -132,7 +137,7 @@ export const MyEventsPage: React.FC = () => {
         <div className="space-y-4">
           {registeredEvents.length === 0 ? (
             <div className="bg-white rounded-3xl p-10 text-center border border-[#E8DDD7] space-y-3 shadow-xs">
-              <img src="/calendar.png" alt="Calendar" className="w-10 h-10 object-contain mx-auto" />
+              <img src="/calendar.webp" alt="Calendar" className="w-10 h-10 object-contain mx-auto" />
               <h3 className="font-serif text-base font-bold text-[#2D1F23]">No Upcoming Registrations</h3>
               <p className="text-xs text-[#756366] font-light max-w-md mx-auto">
                 You haven't registered for any upcoming events yet. Once you register for workshops, hackathons, or meetups, they will appear here so you can prepare to attend.
@@ -172,7 +177,7 @@ export const MyEventsPage: React.FC = () => {
 
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[#756366] pt-1">
                       <div className="flex items-center gap-1.5">
-                        <img src="/calendar.png" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
                         <span className="font-medium text-[#2D1F23]">{event.date || ticket.eventDate}</span>
                       </div>
 
@@ -182,7 +187,7 @@ export const MyEventsPage: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-1.5">
-                        <img src="/location.png" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
                         <span className="truncate">{event.venueName || event.location || ticket.eventLocation}</span>
                       </div>
                     </div>
@@ -250,7 +255,7 @@ export const MyEventsPage: React.FC = () => {
                     <div className="bg-[#63474D] text-white px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5">
                         <img
-                          src="/logo.jpg"
+                          src="/logo.webp"
                           alt="Sheeba Logo"
                           className="h-7 sm:h-8 w-auto object-contain shrink-0"
                         />
@@ -311,7 +316,7 @@ export const MyEventsPage: React.FC = () => {
                           {/* Event Date & Location */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-[#2D1F23] pt-1">
                             <div className="flex items-start gap-2">
-                              <img src="/calendar.png" alt="Calendar" className="w-4 h-4 object-contain mt-0.5 shrink-0" />
+                              <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain mt-0.5 shrink-0" />
                               <div>
                                 <p className="font-semibold">{ticket.eventDate}</p>
                                 <p className="text-[#756366] text-[11px]">{ticket.eventTime}</p>
@@ -319,7 +324,7 @@ export const MyEventsPage: React.FC = () => {
                             </div>
 
                             <div className="flex items-start gap-2">
-                              <img src="/location.png" alt="Location" className="w-4 h-4 object-contain mt-0.5 shrink-0" />
+                              <img src="/location.webp" alt="Location" className="w-4 h-4 object-contain mt-0.5 shrink-0" />
                               <div>
                                 <p className="font-semibold">{ticket.eventLocation}</p>
                               </div>
@@ -340,7 +345,7 @@ export const MyEventsPage: React.FC = () => {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="pt-2 border-t border-[#E8DDD7] flex flex-wrap items-center justify-between gap-3">
+                        <div className="pt-2 border-t border-[#E8DDD7] flex flex-wrap items-center justify-between gap-3 no-print">
                           <div className="flex items-center gap-1.5 text-xs text-[#2A7B5F] font-semibold">
                             <CheckCircle2 className="w-4 h-4" />
                             <span>Present live QR at the door for badge accreditation</span>
@@ -362,10 +367,10 @@ export const MyEventsPage: React.FC = () => {
                               type="button"
                               variant="accent"
                               size="sm"
-                              onClick={handlePrint}
+                              onClick={() => handlePrint(ticket.id)}
                               icon={<Printer className="w-3.5 h-3.5" />}
                             >
-                              Print / Save
+                              Print / Save Pass
                             </Button>
                           </div>
                         </div>

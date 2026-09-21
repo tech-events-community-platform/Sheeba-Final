@@ -24,7 +24,7 @@ export const AttendanceHistoryPage: React.FC = () => {
   }, [user]);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-16">
+    <div className="w-full max-w-4xl mx-auto space-y-6 pb-16">
       <Link
         to="/app/profile"
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-sheeba-purple hover:underline"
@@ -93,11 +93,11 @@ export const AttendanceHistoryPage: React.FC = () => {
 
                 <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 font-light">
                   <span className="flex items-center gap-1">
-                    <img src="/calendar.png" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
+                    <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
                     Event Date: {record.eventDate}
                   </span>
                   <span className="flex items-center gap-1">
-                    <img src="/location.png" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
+                    <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
                     {record.eventLocation.split(',')[0]}
                   </span>
                 </div>

@@ -48,13 +48,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAttendeeDrawer: _onOpenAtt
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="sticky top-0 z-30 px-3 sm:px-6 lg:px-8 pt-2.5 sm:pt-3 pointer-events-none transition-all duration-300">
+      <div className="pointer-events-auto max-w-7xl mx-auto rounded-full bg-white/15 backdrop-blur-xl border border-white/25 shadow-md shadow-black/5 px-4 sm:px-6">
+        <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Brand Logo */}
           <Link to="/" className="flex items-center gap-2.5 group">
             <img
-              src="/logo.jpg"
+              src="/logo.webp"
               alt="Sheeba Logo"
               className="h-10 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105"
             />
@@ -197,7 +197,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAttendeeDrawer: _onOpenAtt
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-[#E8DDD7] bg-[#FAF7F5] px-4 pt-3 pb-6 space-y-3 animate-fade-in shadow-md">
+        <div className="pointer-events-auto md:hidden mt-2 mx-auto max-w-lg w-full rounded-3xl border border-[#E8DDD7] bg-[#FAF7F5]/98 backdrop-blur-xl px-5 pt-4 pb-6 space-y-3 animate-fade-in shadow-2xl">
           <nav className="flex flex-col space-y-1">
             {!isAuthenticated ? (
               <>

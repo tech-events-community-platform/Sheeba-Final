@@ -29,7 +29,7 @@ export const TelegramAuthModal: React.FC<TelegramAuthModalProps> = ({
         </div>
 
         <Link to="/login" onClick={onClose} className="block">
-          <Button fullWidth variant="primary" icon={<img src="/mail-icon.jpg" alt="Email" className="w-4 h-4 object-contain" />}>
+          <Button fullWidth variant="primary" icon={<img src="/mail-icon.webp" alt="Email" className="w-4 h-4 object-contain" />}>
             Go to Email Sign In
           </Button>
         </Link>

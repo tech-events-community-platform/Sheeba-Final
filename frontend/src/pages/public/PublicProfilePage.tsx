@@ -256,7 +256,7 @@ export const PublicProfilePage: React.FC = () => {
 
         {exportedMsg && (
           <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 flex items-center gap-2 animate-fade-in">
-            <img src="/tick.png" alt="Success" className="w-4 h-4 object-contain shrink-0" />
+            <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0" />
             <span>Profile credential image generated and saved to your device.</span>
           </div>
         )}
@@ -311,10 +311,10 @@ export const PublicProfilePage: React.FC = () => {
 
               <div className="text-[11px] text-[#756366] pt-1 border-t border-[#E8DDD7] flex items-center justify-between">
                 <span className="flex items-center gap-1">
-                  <img src="/calendar.png" alt="Calendar" className="w-3 h-3 object-contain shrink-0" /> {b.eventDate}
+                  <img src="/calendar.webp" alt="Calendar" className="w-3 h-3 object-contain shrink-0" /> {b.eventDate}
                 </span>
                 <span className="flex items-center gap-1">
-                  <img src="/location.png" alt="Location" className="w-3 h-3 object-contain shrink-0" /> {b.eventLocation.split(',')[0]}
+                  <img src="/location.webp" alt="Location" className="w-3 h-3 object-contain shrink-0" /> {b.eventLocation.split(',')[0]}
                 </span>
               </div>
             </Link>

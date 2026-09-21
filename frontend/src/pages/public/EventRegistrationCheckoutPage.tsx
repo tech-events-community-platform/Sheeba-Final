@@ -289,7 +289,7 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
       <div className="w-full py-16 px-4 flex items-center justify-center animate-fade-in">
         <div className="max-w-xl w-full mx-auto space-y-6 text-center">
           <img
-            src="/tick.png"
+            src="/tick.webp"
             alt="Success"
             className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto"
           />
@@ -309,11 +309,11 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
           {/* Logistics Line (Unboxed, location icon uses location.png, text black) */}
           <div className="pt-2 space-y-1 text-xs sm:text-sm text-black max-w-sm mx-auto">
             <p className="font-semibold text-black flex items-center justify-center gap-1.5">
-              <img src="/calendar.png" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
+              <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
               <span>{cal.weekday ? `${cal.weekday}, ${cal.fullDate}` : event.date} • {event.time || `${event.startTime} - ${event.endTime}`}</span>
             </p>
             <p className="flex items-center justify-center gap-1.5 text-black">
-              <img src="/location.png" alt="Location" className="w-4 h-4 object-contain shrink-0" />
+              <img src="/location.webp" alt="Location" className="w-4 h-4 object-contain shrink-0" />
               <span>{event.venueName ? `${event.venueName}, ` : ''}{event.location}</span>
             </p>
           </div>
@@ -357,7 +357,7 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
           </p>
           <p className="text-xs text-gray-700 flex items-center gap-2 pt-0.5">
             <span className="flex items-center gap-1">
-              <img src="/calendar.png" alt="Date" className="w-3.5 h-3.5 object-contain shrink-0" />
+              <img src="/calendar.webp" alt="Date" className="w-3.5 h-3.5 object-contain shrink-0" />
               <span>{cal.weekday ? `${cal.weekday}, ${cal.fullDate}` : event.date}</span>
             </span>
             <span>•</span>
@@ -367,7 +367,7 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
             </span>
             <span>•</span>
             <span className="flex items-center gap-1">
-              <img src="/location.png" alt="Location" className="w-3.5 h-3.5 object-contain" />
+              <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain" />
               <span>{event.venueName || event.location}</span>
             </span>
           </p>
