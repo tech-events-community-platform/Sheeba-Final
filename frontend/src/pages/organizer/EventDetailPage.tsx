@@ -202,7 +202,7 @@ export const EventDetailPage: React.FC = () => {
       {awardSuccessMsg && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-2xs animate-fade-in">
           <div className="flex items-center gap-2">
-            <img src="/tick.png" alt="Success" className="w-4 h-4 object-contain shrink-0" />
+            <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0" />
             <span>{awardSuccessMsg}</span>
           </div>
         </div>
@@ -254,7 +254,7 @@ export const EventDetailPage: React.FC = () => {
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs text-[#756366]">
               <span className="flex items-center gap-1.5">
-                <img src="/calendar.png" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
+                <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
                 {event.date}
               </span>
               <span className="flex items-center gap-1.5">
@@ -262,7 +262,7 @@ export const EventDetailPage: React.FC = () => {
                 {event.time || `${event.startTime} - ${event.endTime}`}
               </span>
               <span className="flex items-center gap-1.5">
-                <img src="/location.png" alt="Location" className="w-4 h-4 object-contain shrink-0" />
+                <img src="/location.webp" alt="Location" className="w-4 h-4 object-contain shrink-0" />
                 {event.location} {event.venueName && `(${event.venueName})`}
               </span>
             </div>
@@ -306,7 +306,7 @@ export const EventDetailPage: React.FC = () => {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-xs font-semibold text-[#2D1F23] transition-colors cursor-pointer"
             >
               {copiedLink ? (
-                <img src="/tick.png" alt="Copied" className="w-3.5 h-3.5 object-contain shrink-0" />
+                <img src="/tick.webp" alt="Copied" className="w-3.5 h-3.5 object-contain shrink-0" />
               ) : (
                 <Copy className="w-3.5 h-3.5 text-[#AA767C]" />
               )}
@@ -642,7 +642,7 @@ export const EventDetailPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <img src="/mail-icon.jpg" alt="Email" className="w-3.5 h-3.5 object-contain" />
+                  <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
                   Email Address *
                 </label>
                 <input
@@ -657,7 +657,7 @@ export const EventDetailPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <img src="/phone-icon.jpg" alt="Phone" className="w-3.5 h-3.5 object-contain" />
+                  <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain" />
                   Phone Number
                 </label>
                 <input
@@ -670,7 +670,7 @@ export const EventDetailPage: React.FC = () => {
               </div>
 
               <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-[11px] text-emerald-900 flex items-start gap-2">
-                <img src="/tick.png" alt="Success" className="w-4 h-4 object-contain shrink-0 mt-0.5" />
+                <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0 mt-0.5" />
                 <span>
                   Adding this attendee will instantly create their registration, record their door check-in, and award them the official <strong>Attended</strong> badge.
                 </span>

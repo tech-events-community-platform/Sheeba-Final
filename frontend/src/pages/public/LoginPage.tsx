@@ -31,11 +31,26 @@ export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [organization, setOrganization] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isPendingNotice, setIsPendingNotice] = useState(false);
+
+  // Sync mode and role with URL changes
+  useEffect(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'signup' || location.pathname === '/register') {
+      setAuthMode('signup');
+    } else if (mode === 'login') {
+      setAuthMode('login');
+    }
+    const roleParam = searchParams.get('role');
+    if (roleParam?.toUpperCase() === 'ORGANIZER' || searchParams.get('portal') === 'organizer') {
+      setLoginRole('ORGANIZER');
+    }
+  }, [searchParams, location.pathname]);
 
   // Forgot password modal state
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -77,22 +92,29 @@ export const LoginPage: React.FC = () => {
           navigate('/app');
         }
       } else {
-        // Create attendee account
         if (!fullName.trim()) {
           setErrorMsg('Please enter your full name.');
           setIsLoading(false);
           return;
         }
 
-        await register({
+        const res = await register({
           email: email.trim(),
           password,
           full_name: fullName.trim(),
-          role: 'ATTENDEE',
+          role: loginRole,
+          organization: loginRole === 'ORGANIZER' ? organization.trim() || undefined : undefined,
         });
 
-        // Context preserved: redirect right back to event registration form
-        if (redirectTarget) {
+        if (res?.isPendingApproval || loginRole === 'ORGANIZER') {
+          navigate('/pending-approval', {
+            state: {
+              email: email.trim(),
+              name: fullName.trim(),
+              organization: organization.trim(),
+            },
+          });
+        } else if (redirectTarget) {
           navigate(redirectTarget);
         } else {
           navigate('/app');
@@ -132,128 +154,110 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[85vh] flex flex-col justify-center max-w-md mx-auto pt-24 sm:pt-28 pb-20 px-4 space-y-6">
+    <div className="w-full max-w-[420px] mx-auto px-4 py-2 sm:py-3 space-y-2.5">
       {/* Header */}
-      <div className="text-center space-y-2">
-        <Link to="/" className="inline-block group mx-auto">
-          <img
-            src="/logo.jpg"
-            alt="Sheeba Logo"
-            className="h-14 sm:h-16 w-auto object-contain mx-auto group-hover:scale-105 transition-transform duration-200 drop-shadow-sm"
-          />
-        </Link>
-        <h1 className="font-serif text-3xl font-extrabold text-[#2D1F23]">
+      <div className="text-center space-y-1">
+        <h1 className="font-serif text-2xl sm:text-[26px] font-extrabold text-[#2D1F23] tracking-tight leading-tight">
           {authMode === 'login'
             ? loginRole === 'ORGANIZER'
               ? 'Organizer Portal'
               : 'Attendee Portal'
+            : loginRole === 'ORGANIZER'
+            ? 'Create Organizer Account'
             : 'Create Attendee Account'}
         </h1>
-        <p className="text-xs text-[#756366]">
+        <p className="text-xs text-[#756366] max-w-xs mx-auto leading-snug">
           {redirectTarget
-            ? 'Sign in or create your account to proceed directly with your event registration.'
+            ? 'Sign in or create your account to proceed with your registration.'
             : authMode === 'login'
             ? loginRole === 'ORGANIZER'
-              ? 'Sign in to access your event dashboard, attendee check-ins, and credentials.'
-              : 'Sign in to view your registered events, attendance history, and verifiable badges.'
-            : 'Verifiable attendance credentials and community tech events in Ethiopia.'}
+              ? 'Sign in to access your event dashboard and check-ins.'
+              : 'Sign in to view your events and verifiable badges.'
+            : loginRole === 'ORGANIZER'
+            ? 'Host community events and issue tamper-proof badges in Ethiopia.'
+            : 'Verifiable credentials and tech events in Ethiopia.'}
         </p>
       </div>
 
+      {/* Blue lines position: Sign In / Create Account Navigation Links */}
+      <div className="flex items-center justify-center gap-8 text-xs sm:text-sm font-semibold pt-0.5">
+        <button
+          type="button"
+          onClick={() => {
+            setAuthMode('login');
+            setErrorMsg(null);
+          }}
+          className={`pb-1 cursor-pointer transition-all ${
+            authMode === 'login'
+              ? 'text-[#63474D] font-bold border-b-2 border-[#63474D]'
+              : 'text-[#756366] hover:text-[#2D1F23]'
+          }`}
+        >
+          Sign In
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setAuthMode('signup');
+            setErrorMsg(null);
+          }}
+          className={`pb-1 cursor-pointer transition-all ${
+            authMode === 'signup'
+              ? 'text-[#63474D] font-bold border-b-2 border-[#63474D]'
+              : 'text-[#756366] hover:text-[#2D1F23]'
+          }`}
+        >
+          Create Account
+        </button>
+      </div>
+
       {/* Form Card */}
-      <div className="bg-white p-6 rounded-3xl border border-[#E8DDD7] shadow-sm space-y-4">
-        {/* Toggle Switch between Login and Sign Up */}
-        <div className="flex bg-[#FAF7F5] p-1 rounded-2xl border border-[#E8DDD7]">
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E8DDD7] shadow-sm space-y-3 sm:space-y-3.5">
+        {/* Yellow circle position: Attendee / Organizer Role Toggle */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#FAF7F5] rounded-xl border border-[#E8DDD7]">
           <button
             type="button"
             onClick={() => {
-              setAuthMode('login');
+              setLoginRole('ATTENDEE');
               setErrorMsg(null);
+              setIsPendingNotice(false);
             }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              authMode === 'login'
-                ? 'bg-white text-[#2D1F23] shadow-xs'
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              loginRole === 'ATTENDEE'
+                ? 'bg-[#63474D] text-white shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
             }`}
           >
-            Sign In
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>Attendee</span>
           </button>
           <button
             type="button"
             onClick={() => {
-              setAuthMode('signup');
+              setLoginRole('ORGANIZER');
               setErrorMsg(null);
+              setIsPendingNotice(false);
             }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              authMode === 'signup'
-                ? 'bg-white text-[#2D1F23] shadow-xs'
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              loginRole === 'ORGANIZER'
+                ? 'bg-[#63474D] text-white shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
             }`}
           >
-            Create Account
+            <Briefcase className="w-3.5 h-3.5" />
+            <span>Organizer</span>
           </button>
         </div>
 
-        {/* Portal Switcher when in Login Mode */}
-        {authMode === 'login' && (
-          <div className="space-y-1.5 pt-0.5">
-            <label className="block text-[11px] font-bold text-[#756366] uppercase tracking-wider">
-              Account Role
-            </label>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7]">
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginRole('ATTENDEE');
-                  setErrorMsg(null);
-                  setIsPendingNotice(false);
-                }}
-                className={`flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold rounded-xl transition-all ${
-                  loginRole === 'ATTENDEE'
-                    ? 'bg-[#63474D] text-white shadow-xs'
-                    : 'text-[#756366] hover:text-[#2D1F23]'
-                }`}
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>Attendee</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginRole('ORGANIZER');
-                  setErrorMsg(null);
-                  setIsPendingNotice(false);
-                }}
-                className={`flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold rounded-xl transition-all ${
-                  loginRole === 'ORGANIZER'
-                    ? 'bg-[#63474D] text-white shadow-xs'
-                    : 'text-[#756366] hover:text-[#2D1F23]'
-                }`}
-              >
-                <Briefcase className="w-3.5 h-3.5" />
-                <span>Organizer</span>
-              </button>
-            </div>
-            <p className="text-[11px] text-[#756366] px-1">
-              {loginRole === 'ORGANIZER'
-                ? 'Requires admin-approved organizer status. Attendees can apply in their Settings.'
-                : 'Sign in to your personal attendee profile using your email and password.'}
-            </p>
-          </div>
-        )}
-
         {/* Pending Approval Notice Banner */}
         {isPendingNotice && (
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 space-y-2.5">
-            <div className="flex items-center gap-2 font-bold">
-              <Clock className="w-4 h-4 text-amber-700 animate-pulse" />
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold">
+              <Clock className="w-3.5 h-3.5 text-amber-700 animate-pulse" />
               <span>Organizer Approval Pending</span>
             </div>
-            <p className="text-[11px] text-amber-800">
-              Your organizer application has been submitted and is currently in the admin verification queue.
-            </p>
-            <p className="font-extrabold text-xs text-[#63474D]">
-              You will be able to access the organizer workspace as soon as admin approves your profile.
+            <p className="text-[11px] text-amber-800 leading-snug">
+              Your application has been submitted and is currently in review.
             </p>
             <Button
               type="button"
@@ -265,7 +269,7 @@ export const LoginPage: React.FC = () => {
                 setIsPendingNotice(false);
                 setErrorMsg(null);
               }}
-              className="mt-1"
+              className="py-1.5 text-xs font-bold"
             >
               Sign In as Attendee Instead
             </Button>
@@ -273,12 +277,12 @@ export const LoginPage: React.FC = () => {
         )}
 
         {errorMsg && !isPendingNotice && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <span>{errorMsg}</span>
               {loginRole === 'ORGANIZER' && errorMsg.includes('Settings') && (
-                <div className="mt-2">
+                <div className="mt-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -296,97 +300,67 @@ export const LoginPage: React.FC = () => {
         )}
 
         {successMsg && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-600" />
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
+            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-600" />
             <span>{successMsg}</span>
           </div>
         )}
 
-        {/* Google Sign-In Button */}
-        <div className="flex justify-center w-full my-3">
-          <GoogleLogin
-            onSuccess={async (credentialResponse) => {
-              if (credentialResponse.credential) {
-                try {
-                  setIsLoading(true);
-                  setErrorMsg(null);
-                  const loggedUser = await loginWithGoogle(
-                    credentialResponse.credential,
-                    loginRole,
-                    authMode === 'signup' ? 'register' : 'login'
-                  );
-                  if (redirectTarget) {
-                    navigate(redirectTarget);
-                  } else if (loggedUser.role === 'ORGANIZER') {
-                    navigate('/organizer');
-                  } else if (loggedUser.role === 'ADMIN') {
-                    navigate('/admin');
-                  } else {
-                    navigate('/app');
-                  }
-                } catch (err: any) {
-                  console.error('Google Auth Error:', err);
-                  setErrorMsg(err.message || 'Google authentication failed.');
-                } finally {
-                  setIsLoading(false);
-                }
-              }
-            }}
-            onError={() => {
-              setErrorMsg('Google login was cancelled or failed.');
-            }}
-            text={authMode === 'login' ? 'signin_with' : 'signup_with'}
-            shape="pill"
-            width="100%"
-          />
-        </div>
-
-        {/* Divider */}
-        <div className="relative my-3 text-center">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-[#E8DDD7]" />
-          </div>
-          <span className="relative bg-white px-3 text-[11px] text-[#756366] uppercase font-bold tracking-wider">
-            Or continue with email
-          </span>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        {/* Red lines: Form Inputs (Email & Password, with Full Name on signup) */}
+        <form onSubmit={handleSubmit} className="space-y-3">
           {authMode === 'signup' && (
             <div>
-              <label className="block text-xs font-bold text-[#2D1F23] mb-1">Full Name</label>
+              <label className="block text-xs font-semibold text-[#2D1F23] mb-1">Full Name</label>
               <div className="relative">
-                <UserIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#756366]" />
+                <UserIcon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366]" />
                 <input
                   type="text"
                   required
                   placeholder="Abebe Bikila"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          {authMode === 'signup' && loginRole === 'ORGANIZER' && (
+            <div>
+              <label className="block text-xs font-semibold text-[#2D1F23] mb-1">
+                Organization / Community Name
+              </label>
+              <div className="relative">
+                <Briefcase className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366]" />
+                <input
+                  type="text"
+                  placeholder="e.g. GDG Addis, ALX Tech Community"
+                  value={organization}
+                  onChange={(e) => setOrganization(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold text-[#2D1F23] mb-1">Email Address</label>
+            <label className="block text-xs font-semibold text-[#2D1F23] mb-1">Email Address</label>
             <div className="relative">
-              <img src="/mail-icon.jpg" alt="Email" className="w-4 h-4 object-contain absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
                 required
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-3 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
               />
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-[#2D1F23]">Password</label>
+              <label className="block text-xs font-semibold text-[#2D1F23]">Password</label>
               {authMode === 'login' && (
                 <button
                   type="button"
@@ -394,45 +368,124 @@ export const LoginPage: React.FC = () => {
                     setForgotEmail(email);
                     setShowForgotModal(true);
                   }}
-                  className="text-[11px] font-semibold text-[#63474D] hover:underline cursor-pointer"
+                  className="text-xs font-semibold text-[#63474D] hover:underline cursor-pointer"
                 >
                   Forgot password?
                 </button>
               )}
             </div>
             <div className="relative">
-              <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#756366]" />
+              <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366]" />
               <input
                 type="password"
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-3 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
               />
             </div>
           </div>
 
+          {/* Red box: Sign In Button */}
           <Button
             type="submit"
             fullWidth
             variant="primary"
             isLoading={isLoading}
-            className="mt-2 py-3"
+            className="mt-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl shadow-xs hover:shadow-sm transition-all cursor-pointer"
           >
-            {authMode === 'login' ? 'Sign In' : 'Create Account & Continue'}
+            {authMode === 'login'
+              ? 'Sign In'
+              : loginRole === 'ORGANIZER'
+              ? 'Register as Organizer'
+              : 'Create Attendee Account'}
           </Button>
         </form>
 
-        <div className="pt-3 text-center border-t border-[#E8DDD7] space-y-2">
+        {/* Green line position: Continue with Google */}
+        <div className="space-y-2.5 pt-1">
+          <div className="relative text-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[#E8DDD7]" />
+            </div>
+            <span className="relative bg-white px-2.5 text-[11px] text-[#756366] uppercase font-bold tracking-wider">
+              Or continue with
+            </span>
+          </div>
+
+          <div className="flex justify-center w-full">
+            <GoogleLogin
+              onSuccess={async (credentialResponse) => {
+                if (credentialResponse.credential) {
+                  try {
+                    setIsLoading(true);
+                    setErrorMsg(null);
+                    const loggedUser = await loginWithGoogle(
+                      credentialResponse.credential,
+                      loginRole,
+                      authMode === 'signup' ? 'register' : 'login'
+                    );
+                    if (redirectTarget) {
+                      navigate(redirectTarget);
+                    } else if (loggedUser.role === 'ORGANIZER') {
+                      navigate('/organizer');
+                    } else if (loggedUser.role === 'ADMIN') {
+                      navigate('/admin');
+                    } else {
+                      navigate('/app');
+                    }
+                  } catch (err: any) {
+                    console.error('Google Auth Error:', err);
+                    setErrorMsg(err.message || 'Google authentication failed.');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }
+              }}
+              onError={() => {
+                setErrorMsg('Google login was cancelled or failed.');
+              }}
+              text={authMode === 'login' ? 'signin_with' : 'signup_with'}
+              shape="pill"
+              width="100%"
+            />
+          </div>
+        </div>
+
+        {/* Footer: Register as Organizer / Sign In and Back to Home */}
+        <div className="pt-3 text-center border-t border-[#E8DDD7] space-y-1.5">
           <p className="text-xs text-[#756366]">
-            Organizing an event?{' '}
-            <Link
-              to={`/register?role=ORGANIZER${redirectTarget ? `&redirect=${encodeURIComponent(redirectTarget)}` : ''}`}
-              className="font-bold text-[#63474D] hover:underline"
-            >
-              Register as Organizer
-            </Link>
+            {authMode === 'login' ? (
+              <>
+                Organizing an event?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('signup');
+                    setLoginRole('ORGANIZER');
+                    setErrorMsg(null);
+                  }}
+                  className="font-bold text-[#63474D] hover:underline cursor-pointer"
+                >
+                  Register as Organizer
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setErrorMsg(null);
+                  }}
+                  className="font-bold text-[#63474D] hover:underline cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </>
+            )}
           </p>
           <div>
             <Link

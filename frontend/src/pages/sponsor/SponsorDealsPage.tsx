@@ -257,7 +257,7 @@ export const SponsorDealsPage: React.FC = () => {
                 <div className="bg-[#FAF7F5] border border-[#63474D]/20 rounded-2xl p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                      <img src="/phone-icon.jpg" alt="Phone" className="w-3.5 h-3.5 object-contain" />
+                      <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain" />
                       Direct Organizer Contact
                     </p>
                     <span className="text-[11px] text-gray-500 font-medium">{app.contact_name}</span>
@@ -268,7 +268,7 @@ export const SponsorDealsPage: React.FC = () => {
                       href={`tel:${app.contact_phone}`}
                       className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-[#63474D] text-xs font-semibold text-gray-800 flex items-center gap-1.5 transition-colors"
                     >
-                      <img src="/phone-icon.jpg" alt="Phone" className="w-3.5 h-3.5 object-contain" />
+                      <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain" />
                       <span>{app.contact_phone}</span>
                     </a>
 
@@ -276,7 +276,7 @@ export const SponsorDealsPage: React.FC = () => {
                       href={`mailto:${app.contact_email}?subject=Sponsorship%20Confirmation%20-%20${encodeURIComponent(app.event_title)}`}
                       className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-[#63474D] text-xs font-semibold text-gray-800 flex items-center gap-1.5 transition-colors"
                     >
-                      <img src="/mail-icon.jpg" alt="Email" className="w-3.5 h-3.5 object-contain" />
+                      <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
                       <span>{app.contact_email}</span>
                     </a>
 

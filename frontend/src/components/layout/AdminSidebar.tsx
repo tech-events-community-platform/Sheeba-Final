@@ -50,9 +50,9 @@ export const AdminSidebar: React.FC = () => {
     <aside
       className={`${
         isCollapsed ? 'w-16' : 'w-64'
-      } bg-[#63474D] text-white flex flex-col hidden md:flex sticky top-16 h-[calc(100vh-4rem)] border-r border-[#AA767C]/40 shrink-0 self-start overflow-y-auto transition-all duration-300`}
+      } bg-[#63474D] text-white flex flex-col hidden md:flex sticky top-0 h-screen border-r border-[#AA767C]/40 shrink-0 self-start overflow-y-auto transition-all duration-300 z-20`}
     >
-      <div className={`${isCollapsed ? 'p-2' : 'p-4'} space-y-4`}>
+      <div className={`${isCollapsed ? 'p-2 pt-3' : 'p-4 pt-3.5'} space-y-4`}>
         {/* Console Header & Minimizer */}
         {!isCollapsed ? (
           <div className="bg-[#523a3f] rounded-xl p-3 border border-[#FFA686]/30 flex items-center justify-between">

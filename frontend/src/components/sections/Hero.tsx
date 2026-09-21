@@ -8,8 +8,10 @@ export default function Hero() {
       {/*Background Image Layer with Tapered Gradient Overlay */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img
-          src="/hero.jpg"
+          src="/hero.webp"
           alt="Ethiopian Community Ecosystem"
+          fetchPriority="high"
+          decoding="async"
           className="w-full h-full object-cover object-right lg:object-[82%_center] opacity-85"
         />
         {/* Soft Horizontal Fade: Leaves the middle and right wide open and clear */}
@@ -28,7 +30,7 @@ export default function Hero() {
           </FadeIn>
 
           <FadeIn delay={200}>
-            <p className="font-sans text-sm sm:text-base text-gray-600 leading-relaxed max-w-2xl font-normal">
+            <p className="font-sans text-sm sm:text-base text-gray-900 leading-relaxed max-w-2xl font-normal">
               Sheeba turns every attendance that matters into lasting proof. Attendees collect verified credentials of
               everywhere they show up. Organizers publish events with simple registration links, instant QR door check-in,
               and tamper-proof badges. Sponsors discover impactful upcoming gatherings to back with transparent, verified data.
@@ -50,7 +52,7 @@ export default function Hero() {
 
           {/* Sponsor Portal Entry - Transparent / Glassmorphic */}
           <FadeIn delay={400}>
-            <div className="pt-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-700">
+            <div className="pt-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-900">
               <span className="font-normal">Looking to sponsor premier gatherings & back upcoming initiatives?</span>
               <Link
                 to="/sponsor/auth"

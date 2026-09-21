@@ -37,7 +37,7 @@ export const HowItWorksSection: React.FC = () => {
       step: '02',
       title: 'Scan at the Door',
       subtitle: 'Instant Door Check-In',
-      desc: 'Attendees present dynamic QR passes at venue entry. Staff verify tickets in < 0.5s with any camera phone. Zero duplicate entries.',
+      desc: 'Attendees present dynamic QR passes at venue entry. Staff verify tickets in under 0.5 seconds with any camera phone. Zero duplicate entries.',
       screenHeader: 'sheeba.et/organizer/scanner',
       badgeText: 'Dynamic QR Scanner',
       mockContent: (
@@ -135,7 +135,7 @@ export const HowItWorksSection: React.FC = () => {
                   </div>
 
                   {/* Screen Content Body */}
-                  <div className="p-4 space-y-3 bg-gradient-to-b from-white to-stone-50 min-h-[190px] flex flex-col justify-between">
+                  <div className="p-4 bg-gradient-to-b from-white to-stone-50 h-[210px] flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-[10px] font-bold text-[#63474D] uppercase tracking-wider bg-[#FFA686]/20 px-2 py-0.5 rounded">
@@ -169,14 +169,18 @@ export const HowItWorksSection: React.FC = () => {
               {/* Monitor Stand Base / Leg */}
               <div className="w-32 sm:w-40 h-2.5 bg-gradient-to-r from-gray-600 via-gray-400 to-gray-600 rounded-full shadow-lg border-t border-white/20" />
 
-              {/* Step Description Below PC */}
-              <div className="mt-5 text-center px-3 space-y-1">
-                <p className="text-xs font-bold uppercase tracking-wider text-[#63474D]">
-                  {item.subtitle}
-                </p>
-                <p className="text-xs sm:text-sm text-[#2D1F23] leading-relaxed font-medium">
-                  {item.desc}
-                </p>
+              {/* Step Description Below PC (Strictly Aligned) */}
+              <div className="mt-5 text-center px-2 flex flex-col items-center w-full">
+                <div className="h-7 flex items-center justify-center">
+                  <p className="text-xs font-bold uppercase tracking-wider text-[#63474D]">
+                    {item.subtitle}
+                  </p>
+                </div>
+                <div className="mt-1 min-h-[4.5rem] flex items-start justify-center">
+                  <p className="text-xs sm:text-sm text-[#2D1F23] leading-relaxed font-medium">
+                    {item.desc}
+                  </p>
+                </div>
               </div>
             </div>
 

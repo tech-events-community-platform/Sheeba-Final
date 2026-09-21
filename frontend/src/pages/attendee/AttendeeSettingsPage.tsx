@@ -215,7 +215,7 @@ export const AttendeeSettingsPage: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="w-full max-w-4xl py-4 px-2 sm:px-4 space-y-8 pb-20">
+    <div className="w-full max-w-4xl mx-auto py-4 px-2 sm:px-4 space-y-8 pb-20">
       {/* Page Heading */}
       <div className="space-y-1">
         <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23]">
@@ -281,7 +281,7 @@ export const AttendeeSettingsPage: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                <img src="/phone-icon.jpg" alt="Phone" className="w-3.5 h-3.5 object-contain" />
+                <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain" />
                 Phone Number
               </label>
               <input
@@ -296,7 +296,7 @@ export const AttendeeSettingsPage: React.FC = () => {
 
           <div>
             <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-              <img src="/mail-icon.jpg" alt="Email" className="w-3.5 h-3.5 object-contain" />
+              <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
               Email Address
             </label>
             <input

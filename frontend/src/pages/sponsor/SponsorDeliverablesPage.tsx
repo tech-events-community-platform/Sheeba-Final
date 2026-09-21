@@ -300,7 +300,7 @@ export const SponsorDeliverablesPage: React.FC = () => {
 
             <div className="space-y-1.5">
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
-                <img src="/phone-icon.jpg" alt="Phone" className="w-3.5 h-3.5 object-contain" />
+                <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain" />
                 Direct Contact Phone <span className="text-red-500">*</span>
               </label>
               <input
@@ -315,7 +315,7 @@ export const SponsorDeliverablesPage: React.FC = () => {
 
             <div className="space-y-1.5">
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
-                <img src="/mail-icon.jpg" alt="Email" className="w-3.5 h-3.5 object-contain" />
+                <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
                 Official Work Email <span className="text-red-500">*</span>
               </label>
               <input

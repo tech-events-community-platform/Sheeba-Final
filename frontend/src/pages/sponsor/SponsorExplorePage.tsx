@@ -195,10 +195,11 @@ export const SponsorExplorePage: React.FC = () => {
               onClick={() => navigate(`/sponsor/applications/${app.id}`)}
               className="bg-white rounded-2xl border border-gray-200 shadow-2xs hover:border-[#63474D] hover:shadow-xs transition-all overflow-hidden flex flex-row items-stretch cursor-pointer group h-32 sm:h-32"
             >
-              {/* Left Cover Image Container with coming-soon.jpg (Flush Slot) */}
+              {/* Left Cover Image Container with coming-soon.webp (Flush Slot) */}
               <div className="w-28 sm:w-36 h-full shrink-0 overflow-hidden bg-stone-100 border-r border-gray-200/80 relative">
                 <img
-                  src="/coming-soon.jpg"
+                  src="/coming-soon.webp"
+                  loading="lazy"
                   alt={app.event_title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
@@ -249,11 +250,11 @@ export const SponsorExplorePage: React.FC = () => {
                 <div className="flex items-center justify-between gap-x-3 text-[11px] text-[#756366] pt-1.5 border-t border-gray-100">
                   <div className="flex items-center gap-x-3 gap-y-1 truncate">
                     <span className="flex items-center gap-1 font-medium shrink-0">
-                      <img src="/calendar.png" alt="Calendar" className="w-3 h-3 object-contain shrink-0" />
+                      <img src="/calendar.webp" alt="Calendar" className="w-3 h-3 object-contain shrink-0" />
                       <span>{app.expected_date}</span>
                     </span>
                     <span className="flex items-center gap-1 font-medium truncate max-w-[160px] sm:max-w-[220px]">
-                      <img src="/location.png" alt="Location" className="w-3 h-3 object-contain shrink-0" />
+                      <img src="/location.webp" alt="Location" className="w-3 h-3 object-contain shrink-0" />
                       <span className="truncate">{app.location}</span>
                     </span>
                     <span className="hidden sm:flex items-center gap-1 font-medium shrink-0">

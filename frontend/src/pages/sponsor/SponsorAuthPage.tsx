@@ -120,7 +120,7 @@ export const SponsorAuthPage: React.FC = () => {
       {/* Header */}
       <div className="text-center space-y-2">
         <img
-          src="/logo.jpg"
+          src="/logo.webp"
           alt="Sheeba Logo"
           className="h-14 sm:h-16 w-auto object-contain mx-auto"
         />
@@ -349,7 +349,7 @@ export const SponsorAuthPage: React.FC = () => {
                         Company Phone Number <span className="text-red-500">*</span>
                       </label>
                       <div className="relative">
-                        <img src="/phone-icon.jpg" alt="Phone" className="w-4 h-4 object-contain absolute left-3 top-3" />
+                        <img src="/phone-icon.webp" alt="Phone" className="w-4 h-4 object-contain absolute left-3 top-3" />
                         <input
                           type="tel"
                           required
@@ -387,7 +387,7 @@ export const SponsorAuthPage: React.FC = () => {
                   Corporate Work Email <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <img src="/mail-icon.jpg" alt="Email" className="w-4 h-4 object-contain absolute left-3 top-3" />
+                  <img src="/mail-icon.webp" alt="Email" className="w-4 h-4 object-contain absolute left-3 top-3" />
                   <input
                     type="email"
                     required

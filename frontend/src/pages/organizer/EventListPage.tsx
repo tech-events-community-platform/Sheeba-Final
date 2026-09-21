@@ -150,7 +150,7 @@ export const EventListPage: React.FC = () => {
         </div>
       ) : filteredEvents.length === 0 ? (
         <div className="bg-white rounded-3xl p-10 text-center border border-gray-200 space-y-3 shadow-2xs">
-          <img src="/calendar.png" alt="Calendar" className="w-10 h-10 object-contain mx-auto" />
+          <img src="/calendar.webp" alt="Calendar" className="w-10 h-10 object-contain mx-auto" />
           <h3 className="font-serif text-base font-bold text-[#2D1F23]">No events found</h3>
           <p className="text-xs text-gray-500 font-light">Set up registration, door QR scanner, and sponsor reports.</p>
           <Link to="/organizer/events/create">
@@ -184,11 +184,11 @@ export const EventListPage: React.FC = () => {
                 </h3>
                 <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 font-light">
                   <span className="flex items-center gap-1">
-                    <img src="/calendar.png" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
+                    <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
                     {evt.date} • {evt.time}
                   </span>
                   <span className="flex items-center gap-1">
-                    <img src="/location.png" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
+                    <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
                     {evt.location}
                   </span>
                 </div>
@@ -220,7 +220,7 @@ export const EventListPage: React.FC = () => {
                     title="Copy Registration Link"
                   >
                     {copiedId === evt.shareLinkToken ? (
-                      <img src="/tick.png" alt="Copied" className="w-4 h-4 object-contain shrink-0" />
+                      <img src="/tick.webp" alt="Copied" className="w-4 h-4 object-contain shrink-0" />
                     ) : (
                       <Copy className="w-4 h-4" />
                     )}

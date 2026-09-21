@@ -166,7 +166,8 @@ export const SponsorApplicationDetailPage: React.FC = () => {
         {/* Left: Picture by itself */}
         <div className="w-full sm:w-64 h-44 sm:h-48 rounded-2xl overflow-hidden bg-stone-100 shadow-sm shrink-0">
           <img
-            src="/coming-soon.jpg"
+            src="/coming-soon.webp"
+            loading="lazy"
             alt={application.event_title}
             className="w-full h-full object-cover"
           />
@@ -191,7 +192,7 @@ export const SponsorApplicationDetailPage: React.FC = () => {
           {/* Date, Time, Location with clean icons */}
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[#594246] pt-1">
             <span className="flex items-center gap-1.5 font-medium">
-              <img src="/calendar.png" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
+              <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
               <span>{application.expected_date}</span>
             </span>
             <span className="flex items-center gap-1.5 font-medium">
@@ -199,7 +200,7 @@ export const SponsorApplicationDetailPage: React.FC = () => {
               <span>Full Day Session</span>
             </span>
             <span className="flex items-center gap-1.5 font-medium text-[#C44536]">
-              <img src="/location.png" alt="Location" className="w-4 h-4 object-contain shrink-0" />
+              <img src="/location.webp" alt="Location" className="w-4 h-4 object-contain shrink-0" />
               <span>{application.location}</span>
             </span>
           </div>
@@ -322,7 +323,7 @@ export const SponsorApplicationDetailPage: React.FC = () => {
                 href={`tel:${application.contact_phone}`}
                 className="flex items-center gap-2.5 text-gray-900 hover:text-[#63474D] transition-colors"
               >
-                <img src="/phone-icon.jpg" alt="Phone" className="w-4 h-4 object-contain shrink-0" />
+                <img src="/phone-icon.webp" alt="Phone" className="w-4 h-4 object-contain shrink-0" />
                 <span className="font-semibold">{application.contact_phone}</span>
               </a>
 
@@ -330,7 +331,7 @@ export const SponsorApplicationDetailPage: React.FC = () => {
                 href={`mailto:${application.contact_email}?subject=Sponsorship%20Inquiry%20-%20${encodeURIComponent(application.event_title)}`}
                 className="flex items-center gap-2.5 text-gray-900 hover:text-[#63474D] transition-colors"
               >
-                <img src="/mail-icon.jpg" alt="Email" className="w-4 h-4 object-contain shrink-0" />
+                <img src="/mail-icon.webp" alt="Email" className="w-4 h-4 object-contain shrink-0" />
                 <span className="font-semibold truncate">{application.contact_email}</span>
               </a>
 

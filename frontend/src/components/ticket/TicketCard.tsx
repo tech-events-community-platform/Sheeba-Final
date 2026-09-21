@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import type { Ticket } from '../../types/ticket';
 import { Badge } from '../ui/Badge';
 import { Download, ShieldCheck } from 'lucide-react';
+import { printTicketPass } from '../../utils/printTicket';
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -10,16 +11,27 @@ interface TicketCardProps {
 }
 
 export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) => {
+  const handlePrint = () => {
+    if (onDownload) {
+      onDownload();
+      return;
+    }
+    printTicketPass(`ticket-card-${ticket.id}`);
+  };
+
   return (
-    <div className="max-w-md mx-auto">
+    <div className="max-w-md mx-auto w-full">
       {/* Container Ticket Card */}
-      <div className="bg-white rounded-3xl shadow-md border border-[#E8DDD7] overflow-hidden relative">
+      <div
+        id={`ticket-card-${ticket.id}`}
+        className="bg-white rounded-3xl shadow-md border border-[#E8DDD7] overflow-hidden relative"
+      >
         {/* Top Header Brand */}
         <div className="bg-[#63474D] text-white p-6 text-center relative overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2.5">
               <img
-                src="/logo.jpg"
+                src="/logo.webp"
                 alt="Sheeba Logo"
                 className="h-9 sm:h-10 w-auto object-contain shrink-0 drop-shadow-xs"
               />
@@ -58,14 +70,14 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
 
           <div className="space-y-2 pt-2 border-t border-[#E8DDD7] text-xs text-[#2D1F23]">
             <div className="flex items-start gap-2.5">
-              <img src="/calendar.png" alt="Calendar" className="w-4 h-4 object-contain mt-0.5 shrink-0" />
+              <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain mt-0.5 shrink-0" />
               <div>
                 <p className="font-semibold text-[#2D1F23]">{ticket.eventDate}</p>
                 <p className="text-[#756366]">{ticket.eventTime}</p>
               </div>
             </div>
             <div className="flex items-start gap-2.5 pt-1">
-              <img src="/location.png" alt="Location" className="w-4 h-4 object-contain mt-0.5 flex-shrink-0" />
+              <img src="/location.webp" alt="Location" className="w-4 h-4 object-contain mt-0.5 flex-shrink-0" />
               <div>
                 <p className="font-semibold text-[#2D1F23]">{ticket.eventLocation}</p>
               </div>
@@ -96,7 +108,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
             </div>
 
             <div className="flex items-center justify-center gap-1.5 text-xs text-[#2A7B5F] font-semibold bg-[#2A7B5F]/10 py-2 px-4 rounded-xl border border-[#2A7B5F]/20">
-              <img src="/tick.png" alt="Valid" className="w-4 h-4 object-contain shrink-0" />
+              <img src="/tick.webp" alt="Valid" className="w-4 h-4 object-contain shrink-0" />
               <span>Evaluated live server-side at door entrance.</span>
             </div>
 
@@ -107,14 +119,14 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
         </div>
 
         {/* Card Footer actions */}
-        <div className="bg-[#FAF7F5] px-6 py-4 border-t border-[#E8DDD7] flex items-center justify-between text-xs text-[#756366]">
+        <div className="bg-[#FAF7F5] px-6 py-4 border-t border-[#E8DDD7] flex items-center justify-between text-xs text-[#756366] no-print">
           <span className="flex items-center gap-1 text-[11px]">
             <ShieldCheck className="w-3.5 h-3.5 text-[#63474D]" />
             Dynamic Signed Token Pass
           </span>
           <button
-            onClick={onDownload}
-            className="flex items-center gap-1 text-[#63474D] hover:underline font-semibold"
+            onClick={handlePrint}
+            className="flex items-center gap-1 text-[#63474D] hover:underline font-semibold cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             Print / Save Pass

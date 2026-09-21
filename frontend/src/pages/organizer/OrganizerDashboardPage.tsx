@@ -140,7 +140,7 @@ export const OrganizerDashboardPage: React.FC = () => {
           ) : sortedEvents.length === 0 ? (
             <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] text-center space-y-4 shadow-xs">
               <div className="w-14 h-14 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center mx-auto">
-                <img src="/calendar.png" alt="Calendar" className="w-7 h-7 object-contain" />
+                <img src="/calendar.webp" alt="Calendar" className="w-7 h-7 object-contain" />
               </div>
               <div className="space-y-1">
                 <h3 className="font-serif font-bold text-lg text-[#2D1F23]">No Events Created Yet</h3>
@@ -193,7 +193,7 @@ export const OrganizerDashboardPage: React.FC = () => {
                           >
                             {copiedId === evt.shareLinkToken ? (
                               <>
-                                <img src="/tick.png" alt="Copied" className="w-3.5 h-3.5 object-contain shrink-0" />
+                                <img src="/tick.webp" alt="Copied" className="w-3.5 h-3.5 object-contain shrink-0" />
                                 <span className="text-[11px] text-[#2A7B5F]">copied!</span>
                               </>
                             ) : (
@@ -234,7 +234,7 @@ export const OrganizerDashboardPage: React.FC = () => {
                       {/* Date, hour (time), and place (location) */}
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-[#756366] font-normal pt-1 border-t border-gray-100">
                         <span className="flex items-center gap-1">
-                          <img src="/calendar.png" alt="Calendar" className="w-3 h-3 object-contain shrink-0" />
+                          <img src="/calendar.webp" alt="Calendar" className="w-3 h-3 object-contain shrink-0" />
                           {evt.date}
                         </span>
                         <span className="flex items-center gap-1">
@@ -242,7 +242,7 @@ export const OrganizerDashboardPage: React.FC = () => {
                           {evt.time || `${evt.startTime} - ${evt.endTime}`}
                         </span>
                         <span className="flex items-center gap-1 truncate">
-                          <img src="/location.png" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
+                          <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
                           {evt.location}
                         </span>
                       </div>

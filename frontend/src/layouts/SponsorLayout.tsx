@@ -78,7 +78,7 @@ export const SponsorLayout: React.FC = () => {
       <div className="md:hidden bg-[#2D1F23] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-40 border-b border-white/10 shadow-sm">
         <div className="flex items-center gap-2.5">
           <img
-            src="/logo.jpg"
+            src="/logo.webp"
             alt="Sheeba Logo"
             className="h-8 w-auto object-contain shrink-0"
           />
@@ -121,10 +121,10 @@ export const SponsorLayout: React.FC = () => {
         })}
       </div>
 
-      {/* Sidebar (Desktop + Mobile Drawer) with custom sponsor-sidebar.jpg background */}
+      {/* Sidebar (Desktop + Mobile Drawer) with custom sponsor-sidebar.webp background */}
       <aside
         style={{
-          backgroundImage: "url('/sponsor-sidebar.jpg')",
+          backgroundImage: "url('/sponsor-sidebar.webp')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
@@ -144,7 +144,7 @@ export const SponsorLayout: React.FC = () => {
             <div className="p-4 border-b border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <img
-                  src="/logo.jpg"
+                  src="/logo.webp"
                   alt="Sheeba Logo"
                   className="h-9 w-auto object-contain shrink-0 drop-shadow-xs"
                 />
@@ -167,7 +167,7 @@ export const SponsorLayout: React.FC = () => {
           ) : (
             <div className="py-3.5 border-b border-white/10 flex flex-col items-center gap-2">
               <img
-                src="/logo.jpg"
+                src="/logo.webp"
                 alt="Sheeba Logo"
                 className="h-8 w-auto object-contain shrink-0 drop-shadow-xs"
               />

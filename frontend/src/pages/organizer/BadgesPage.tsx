@@ -227,7 +227,7 @@ export const BadgesPage: React.FC = () => {
       {successToast && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-2xs animate-fade-in">
           <div className="flex items-center gap-2">
-            <img src="/tick.png" alt="Success" className="w-4 h-4 object-contain shrink-0" />
+            <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0" />
             <span>{successToast}</span>
           </div>
           <button type="button" onClick={() => setSuccessToast(null)} className="p-1">
@@ -245,11 +245,11 @@ export const BadgesPage: React.FC = () => {
             </h2>
             <div className="flex flex-wrap items-center gap-4 text-xs text-[#E8DDD7]">
               <span className="flex items-center gap-1">
-                <img src="/calendar.png" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
+                <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
                 {currentEvent.date}
               </span>
               <span className="flex items-center gap-1">
-                <img src="/location.png" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
+                <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
                 {currentEvent.location}
               </span>
             </div>
@@ -368,7 +368,7 @@ export const BadgesPage: React.FC = () => {
                         <div className="flex flex-wrap gap-1.5">
                           {/* Attended Floor Badge */}
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            <img src="/tick.png" alt="Attended" className="w-3 h-3 object-contain" />
+                            <img src="/tick.webp" alt="Attended" className="w-3 h-3 object-contain" />
                             Attended
                           </span>
 
@@ -441,19 +441,19 @@ export const BadgesPage: React.FC = () => {
                   {
                     code: 'winner' as BadgeCode,
                     label: 'Winner',
-                    image: '/badges/hackathon-winner-badge.jpg',
+                    image: '/badges/hackathon-winner-badge.webp',
                     description: 'Awarded for podium placement and competitive track achievements.',
                   },
                   {
                     code: 'participant' as BadgeCode,
                     label: 'Participant',
-                    image: '/badges/participant-badge.jpg',
+                    image: '/badges/participant-badge.webp',
                     description: 'Awarded for active project submission and verified participation.',
                   },
                   {
                     code: 'speaker' as BadgeCode,
                     label: 'Speaker',
-                    image: '/badges/speaker-badge.jpg',
+                    image: '/badges/speaker-badge.webp',
                     description: 'Awarded to keynote speakers, workshop hosts, and mentors.',
                   },
                 ].map((b) => {

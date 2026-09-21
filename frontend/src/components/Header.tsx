@@ -96,22 +96,22 @@ export default function Header() {
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
 
   return (
-    <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isExternalRegistration
-          ? 'bg-white/10 backdrop-blur-md border-b border-white/15'
-          : scrolled
-          ? 'bg-white/15 backdrop-blur-md shadow-xs border-b border-gray-200/40'
-          : 'bg-white/10 backdrop-blur-md border-b border-gray-200/20'
-      }`}
-    >
-      {/* Top Navbar Row */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3">
+    <header className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 pointer-events-none transition-all duration-300">
+      {/* Top Navbar Row: Floating Circular Pill */}
+      <div
+        className={`pointer-events-auto mx-auto max-w-7xl rounded-full transition-all duration-300 px-4 sm:px-7 py-2 sm:py-2.5 ${
+          isExternalRegistration
+            ? 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg shadow-black/5'
+            : scrolled
+            ? 'bg-white/15 backdrop-blur-xl border border-white/25 shadow-lg shadow-black/5'
+            : 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-md shadow-black/5'
+        }`}
+      >
         <div className="flex items-center justify-between gap-4">
           {/* Brand Logo */}
           <Link to="/" className="flex items-center gap-3 group shrink-0">
             <img
-              src="/logo.jpg"
+              src="/logo.webp"
               alt="Sheeba Logo"
               className="h-8 sm:h-10 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
             />
@@ -259,7 +259,7 @@ export default function Header() {
                   Log In
                 </Link>
                 <Link
-                  to={isExternalRegistration ? `/register?redirect=${encodeURIComponent(location.pathname + location.search)}` : "/register"}
+                  to={isExternalRegistration ? `/login?mode=signup&redirect=${encodeURIComponent(location.pathname + location.search)}` : "/login?mode=signup"}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#63474D] text-white text-xs font-bold hover:bg-[#523a3f] shadow-xs hover:shadow-sm transition-all duration-200"
                 >
                   <span>Sign Up</span>
@@ -298,7 +298,7 @@ export default function Header() {
 
       {/* 1-LINE QUICK NAVIGATION SUBNAV (Visible When Logged In, Hidden on External Registration) */}
       {isAuthenticated && user && !isExternalRegistration && (
-        <div className="bg-[#FAF7F5] border-t border-b border-[#E8DDD7]/70 py-1 px-4 sm:px-6 lg:px-8 overflow-x-auto scrollbar-none">
+        <div className="pointer-events-auto mt-2 mx-auto max-w-5xl rounded-full bg-[#FAF7F5]/95 backdrop-blur-md border border-[#E8DDD7] py-1.5 px-4 sm:px-6 shadow-sm overflow-x-auto scrollbar-none">
           <div className="max-w-7xl mx-auto flex items-center justify-start sm:justify-center gap-2 sm:gap-4 whitespace-nowrap min-w-max text-xs">
             {user.role === 'ATTENDEE' && (
               <>
@@ -374,7 +374,7 @@ export default function Header() {
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
                   }`}
                 >
-                  <img src="/calendar.png" alt="Calendar" className="w-3.5 h-3.5 object-contain" />
+                  <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain" />
                   <span>My Events</span>
                 </Link>
 
@@ -462,7 +462,7 @@ export default function Header() {
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
                   }`}
                 >
-                  <img src="/calendar.png" alt="Calendar" className="w-3.5 h-3.5 object-contain" />
+                  <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain" />
                   <span>Events Moderation</span>
                 </Link>
 
@@ -485,7 +485,7 @@ export default function Header() {
 
       {/* Mobile Drawer */}
       {isOpen && (
-        <div className="md:hidden fixed inset-x-0 top-[57px] bg-white/98 backdrop-blur-xl border-b border-gray-200 shadow-xl px-6 py-6 transition-all duration-300 max-h-[85vh] overflow-y-auto">
+        <div className="pointer-events-auto md:hidden mt-2 mx-auto max-w-lg w-full rounded-3xl bg-white/98 backdrop-blur-xl border border-gray-200 shadow-2xl px-6 py-6 transition-all duration-300 max-h-[80vh] overflow-y-auto">
           <div className="flex flex-col gap-4">
             {isAuthenticated && user ? (
               /* Mobile Logged-in User Card */
@@ -541,7 +541,7 @@ export default function Header() {
                         onClick={() => setIsOpen(false)}
                         className="flex items-center gap-2 py-2 px-3 rounded-xl bg-[#FAF7F5] text-xs font-semibold text-[#63474D]"
                       >
-                        <img src="/calendar.png" alt="Calendar" className="w-4 h-4 object-contain" />
+                        <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain" />
                         <span>My Events</span>
                       </Link>
                       <Link
@@ -618,7 +618,7 @@ export default function Header() {
                     Log In
                   </Link>
                   <Link
-                    to={isExternalRegistration ? `/register?redirect=${encodeURIComponent(location.pathname + location.search)}` : "/register"}
+                    to={isExternalRegistration ? `/login?mode=signup&redirect=${encodeURIComponent(location.pathname + location.search)}` : "/login?mode=signup"}
                     onClick={() => setIsOpen(false)}
                     className="flex items-center justify-center gap-1 py-2.5 rounded-xl bg-[#63474D] text-white font-bold text-xs shadow-xs hover:bg-[#523a3f] transition-colors"
                   >

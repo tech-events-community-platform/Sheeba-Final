@@ -70,7 +70,7 @@ export const AdminEventDetailPage: React.FC = () => {
 
       {statusMessage && (
         <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 font-bold flex items-center gap-2 animate-fade-in">
-          <img src="/tick.png" alt="Success" className="w-4 h-4 object-contain shrink-0" />
+          <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0" />
           <span>{statusMessage}</span>
         </div>
       )}
@@ -94,11 +94,11 @@ export const AdminEventDetailPage: React.FC = () => {
             Host: {event.organizerName}
           </span>
           <span className="flex items-center gap-1.5">
-            <img src="/calendar.png" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
+            <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
             {event.date} • {event.time}
           </span>
           <span className="flex items-center gap-1.5">
-            <img src="/location.png" alt="Location" className="w-4 h-4 object-contain shrink-0" />
+            <img src="/location.webp" alt="Location" className="w-4 h-4 object-contain shrink-0" />
             {event.location}
           </span>
         </div>
@@ -108,7 +108,7 @@ export const AdminEventDetailPage: React.FC = () => {
       <div className="bg-white p-5 rounded-2xl border border-[#E8DDD7] shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
         <span className="text-xs text-[#2D1F23] font-bold">Admin State Moderation</span>
         <div className="flex gap-2">
-          <Button onClick={handleApprove} variant="primary" size="sm" icon={<img src="/tick.png" alt="Approve" className="w-4 h-4 object-contain shrink-0" />}>
+          <Button onClick={handleApprove} variant="primary" size="sm" icon={<img src="/tick.webp" alt="Approve" className="w-4 h-4 object-contain shrink-0" />}>
             Set Open / Live
           </Button>
           <Button onClick={handleCancel} variant="danger" size="sm" icon={<XCircle className="w-4 h-4" />}>
