@@ -80,14 +80,22 @@ interface SearchAttendeeItem {
 export function extractTicketTokenOrCode(scannedText: string): string {
   const text = (scannedText || '').trim();
   if (!text) return '';
-  if (text.includes('token=')) {
-    const match = text.match(/token=([^&]+)/);
-    if (match) return decodeURIComponent(match[1]);
-  }
-  if (text.includes('code=')) {
-    const match = text.match(/code=([^&]+)/);
-    if (match) return decodeURIComponent(match[1]);
-  }
+
+  const tokenParamMatch = text.match(/token=([^&\s\n\r]+)/i);
+  if (tokenParamMatch) return decodeURIComponent(tokenParamMatch[1]);
+
+  const tokenLabelMatch = text.match(/Token:\s*([^\s\n\r]+)/i);
+  if (tokenLabelMatch) return tokenLabelMatch[1].trim();
+
+  const codeParamMatch = text.match(/code=([^&\s\n\r]+)/i);
+  if (codeParamMatch) return decodeURIComponent(codeParamMatch[1]);
+
+  const codeLabelMatch = text.match(/(?:Ticket Code|Ticket|Code|Pass Code):\s*([^\s\n\r]+)/i);
+  if (codeLabelMatch) return codeLabelMatch[1].trim();
+
+  const shbMatch = text.match(/SHB-[A-Z0-9]+-[0-9]{4}/i);
+  if (shbMatch) return shbMatch[0].trim();
+
   if (text.startsWith('http://') || text.startsWith('https://')) {
     try {
       const parsedUrl = new URL(text);

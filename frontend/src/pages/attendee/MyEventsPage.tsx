@@ -277,24 +277,37 @@ export const MyEventsPage: React.FC = () => {
                     {/* Main Content: QR Code Left + Details Right */}
                     <div className="p-6 flex flex-col md:flex-row items-center md:items-stretch gap-6">
                       {/* Live Dynamic QR Code Section */}
-                      <div className="flex flex-col items-center justify-center p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] shrink-0 text-center">
+                      <div className="flex flex-col items-center justify-center p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] shrink-0 text-center w-full md:w-auto">
                         <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] shadow-2xs">
                           <QRCodeSVG
-                            value={`${window.location.origin}/verify-ticket?token=${encodeURIComponent(ticket.qrToken || ticket.id)}&code=${encodeURIComponent(ticket.ticketCode || '')}`}
+                            value={[
+                              `SHEEBA VERIFIED PASS`,
+                              `Attendee: ${ticket.attendeeName || 'Attendee'}`,
+                              ticket.attendeeEmail ? `Email: ${ticket.attendeeEmail}` : '',
+                              `Event: ${ticket.eventTitle || 'Tech Event'}`,
+                              `Code: ${ticket.ticketCode || ticket.id}`,
+                              `Status: ${ticket.status || 'Valid'}`,
+                              `Verify: ${window.location.origin}/verify-ticket?token=${encodeURIComponent(ticket.qrToken || ticket.id)}&code=${encodeURIComponent(ticket.ticketCode || '')}`,
+                            ].filter(Boolean).join('\n')}
                             size={160}
                             bgColor="#ffffff"
                             fgColor="#2D1F23"
-                            level="H"
+                            level="M"
                             includeMargin={false}
                           />
                         </div>
-                        <p className="mt-2 text-[11px] font-mono font-bold text-[#63474D]">
-                          {ticket.ticketCode || 'SHB-PASS'}
-                        </p>
-                        <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-[#2A7B5F]" />
-                          <span>Scan for Entrance & Verification</span>
-                        </span>
+                        <div className="mt-2.5 text-center w-full max-w-[180px]">
+                          <p className="text-xs font-bold text-[#2D1F23] truncate">
+                            {ticket.attendeeName}
+                          </p>
+                          <p className="text-[11px] font-mono font-bold text-[#63474D]">
+                            {ticket.ticketCode || 'SHB-PASS'}
+                          </p>
+                          <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center justify-center gap-1">
+                            <Sparkles className="w-3 h-3 text-[#2A7B5F]" />
+                            <span>Scan to Verify Attendee</span>
+                          </span>
+                        </div>
                       </div>
 
                       {/* Event & Pass Details */}

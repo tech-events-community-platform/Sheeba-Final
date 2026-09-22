@@ -445,7 +445,25 @@ export class EventService {
       const ticketId = (await client.query('SELECT gen_random_uuid() AS id')).rows[0].id;
       const expiresAt = computeEventDayExpiration(eventDate);
       const qrToken = generateTicketToken(ticketId, event.id, eventDate);
-      const qrDataUrl = await generateQrDataUrl(qrToken);
+
+      const userRes = await client.query('SELECT full_name, email FROM users WHERE id = $1', [userId]);
+      const attendeeUser = userRes.rows[0] || {};
+      const attendeeName = attendeeUser.full_name || 'Attendee';
+      const attendeeEmail = attendeeUser.email || '';
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const verifyUrl = `${frontendUrl}/verify-ticket?token=${encodeURIComponent(qrToken)}&code=${encodeURIComponent(ticketCode)}`;
+      const qrPayload = [
+        `SHEEBA VERIFIED PASS`,
+        `Attendee: ${attendeeName}`,
+        attendeeEmail ? `Email: ${attendeeEmail}` : '',
+        `Event: ${event.title}`,
+        `Code: ${ticketCode}`,
+        `Status: Valid`,
+        `Verify: ${verifyUrl}`,
+      ].filter(Boolean).join('\n');
+
+      const qrDataUrl = await generateQrDataUrl(qrPayload);
 
       const ticketRes = await client.query(
         `INSERT INTO tickets (
@@ -478,8 +496,6 @@ export class EventService {
       CacheService.del(`report:${event.id}`);
 
       const rawTicket = ticketRes.rows[0];
-      const userRes = await query('SELECT full_name, email FROM users WHERE id = $1', [userId]);
-      const attendeeUser = userRes.rows[0] || {};
 
       const formattedTicket = {
         id: rawTicket.ticket_code || rawTicket.id,

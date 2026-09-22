@@ -87,8 +87,6 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
 
         if (fetched && user) {
           try {
-            const ticket = await api.registration.getTicketByEvent(fetched.id, user.id);
-            if (ticket) {
             const userTicket = await api.registration.getTicketByEvent(fetched.id, user.id);
             if (userTicket) {
               setIsAlreadyRegistered(true);
@@ -345,8 +343,6 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex justify-center gap-3 pt-4">
-            <Link to={`/app/ticket/${event.id}`}>
           {/* Direct Scannable Ticket QR Pass */}
           {ticket && (
             <div className="pt-4 max-w-sm mx-auto text-left animate-fade-in">
@@ -360,7 +356,6 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
           <div className="flex flex-wrap justify-center gap-3 pt-4">
             <Link to="/app/events">
               <Button variant="primary" size="sm">
-                View Entry Pass
                 View in My Events
               </Button>
             </Link>

@@ -5,6 +5,38 @@ import { BadgeService } from './badge.service';
 import { EventService } from './event.service';
 import { CacheService } from './cache.service';
 
+function extractCleanTokenOrCode(input: string): string {
+  const raw = (input || '').trim();
+  if (!raw) return '';
+
+  const tokenParamMatch = raw.match(/token=([^&\s\n\r]+)/i);
+  if (tokenParamMatch) return decodeURIComponent(tokenParamMatch[1]);
+
+  const tokenLabelMatch = raw.match(/Token:\s*([^\s\n\r]+)/i);
+  if (tokenLabelMatch) return tokenLabelMatch[1].trim();
+
+  const codeParamMatch = raw.match(/code=([^&\s\n\r]+)/i);
+  if (codeParamMatch) return decodeURIComponent(codeParamMatch[1]);
+
+  const codeLabelMatch = raw.match(/(?:Ticket Code|Ticket|Code|Pass Code):\s*([^\s\n\r]+)/i);
+  if (codeLabelMatch) return codeLabelMatch[1].trim();
+
+  const shbMatch = raw.match(/SHB-[A-Z0-9]+-[0-9]{4}/i);
+  if (shbMatch) return shbMatch[0].trim();
+
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    try {
+      const parsedUrl = new URL(raw);
+      const token = parsedUrl.searchParams.get('token');
+      const code = parsedUrl.searchParams.get('code');
+      if (token) return token;
+      if (code) return code;
+    } catch {}
+  }
+
+  return raw;
+}
+
 export class CheckinService {
   static async lookupAttendee(eventIdOrToken: string, queryText: string, organizerId?: string, userRole?: string) {
     const event = await EventService.getEventById(eventIdOrToken);
@@ -176,23 +208,7 @@ export class CheckinService {
     userRole?: UserRole;
   }) {
     const { tokenOrCode, userId, userRole } = params;
-    let cleanInput = (tokenOrCode || '').trim();
-
-    if (cleanInput.includes('token=')) {
-      const match = cleanInput.match(/token=([^&]+)/);
-      if (match) cleanInput = decodeURIComponent(match[1]);
-    } else if (cleanInput.includes('code=')) {
-      const match = cleanInput.match(/code=([^&]+)/);
-      if (match) cleanInput = decodeURIComponent(match[1]);
-    } else if (cleanInput.startsWith('http://') || cleanInput.startsWith('https://')) {
-      try {
-        const parsedUrl = new URL(cleanInput);
-        const token = parsedUrl.searchParams.get('token');
-        const code = parsedUrl.searchParams.get('code');
-        if (token) cleanInput = token;
-        else if (code) cleanInput = code;
-      } catch {}
-    }
+    const cleanInput = extractCleanTokenOrCode(tokenOrCode);
 
     if (!cleanInput) {
       const err: any = new Error('No ticket token or code provided.');
@@ -362,22 +378,7 @@ export class CheckinService {
       throw err;
     }
 
-    let cleanInput = (tokenOrCode || '').trim();
-    if (cleanInput.includes('token=')) {
-      const match = cleanInput.match(/token=([^&]+)/);
-      if (match) cleanInput = decodeURIComponent(match[1]);
-    } else if (cleanInput.includes('code=')) {
-      const match = cleanInput.match(/code=([^&]+)/);
-      if (match) cleanInput = decodeURIComponent(match[1]);
-    } else if (cleanInput.startsWith('http://') || cleanInput.startsWith('https://')) {
-      try {
-        const parsedUrl = new URL(cleanInput);
-        const token = parsedUrl.searchParams.get('token');
-        const code = parsedUrl.searchParams.get('code');
-        if (token) cleanInput = token;
-        else if (code) cleanInput = code;
-      } catch {}
-    }
+    const cleanInput = extractCleanTokenOrCode(tokenOrCode);
 
     if (!cleanInput) {
       const err: any = new Error('Please scan a QR code or enter a ticket token / code.');

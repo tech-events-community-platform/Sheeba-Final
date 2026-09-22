@@ -23,6 +23,16 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
     ? `${window.location.origin}/verify-ticket?token=${encodeURIComponent(ticket.qrToken || ticket.id)}&code=${encodeURIComponent(ticket.ticketCode || '')}`
     : `/verify-ticket?token=${encodeURIComponent(ticket.qrToken || ticket.id)}`;
 
+  const qrPayload = [
+    `SHEEBA VERIFIED PASS`,
+    `Attendee: ${ticket.attendeeName || 'Attendee'}`,
+    ticket.attendeeEmail ? `Email: ${ticket.attendeeEmail}` : '',
+    `Event: ${ticket.eventTitle || 'Tech Event'}`,
+    `Code: ${ticket.ticketCode || ticket.id}`,
+    `Status: ${ticket.status || 'Valid'}`,
+    `Verify: ${verificationUrl}`,
+  ].filter(Boolean).join('\n');
+
   return (
     <div className="max-w-md mx-auto w-full">
       {/* Container Ticket Card */}
@@ -92,17 +102,40 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
 
           {/* Dynamic Signed QR Code Section */}
           <div className="text-center space-y-3 pt-2">
-            <div className="bg-[#FAF7F5] p-5 rounded-2xl border-2 border-[#D6A184]/50 inline-block shadow-inner">
-              <QRCodeSVG
-                value={verificationUrl}
-                size={180}
-                bgColor="#FAF7F5"
-                fgColor="#63474D"
-                level="H"
-                includeMargin={false}
-              />
-              <div className="mt-2 text-[11px] font-mono font-bold text-[#63474D]">
-                {ticket.ticketCode || 'SHB-PASS'}
+            <div className="bg-[#FAF7F5] p-5 rounded-2xl border-2 border-[#D6A184]/50 inline-block shadow-inner w-full max-w-[280px]">
+              <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] inline-block shadow-xs">
+                <QRCodeSVG
+                  value={qrPayload}
+                  size={190}
+                  bgColor="#ffffff"
+                  fgColor="#63474D"
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
+
+              {/* Attendee Details Beneath QR Code */}
+              <div className="mt-3 pt-3 border-t border-[#E8DDD7] text-left space-y-1.5 bg-white p-3 rounded-xl border border-[#E8DDD7]/70">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#756366] block">Attendee Name</span>
+                  <span className="font-bold text-xs text-[#2D1F23] block">{ticket.attendeeName || 'Registered Attendee'}</span>
+                </div>
+                {ticket.attendeeEmail && (
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#756366] block">Email</span>
+                    <span className="text-[#63474D] font-medium text-xs block truncate">{ticket.attendeeEmail}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between pt-1 border-t border-[#FAF7F5]">
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-[#756366] block">Pass Code</span>
+                    <span className="font-mono font-bold text-[#63474D] text-xs">{ticket.ticketCode || 'SHB-PASS'}</span>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    Verified Pass
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -112,7 +145,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
             </div>
 
             <p className="text-[11px] text-[#756366]">
-              Scan to view attendee information and verify attendance.
+              Displays attendee info and validates entry credentials.
             </p>
           </div>
         </div>
