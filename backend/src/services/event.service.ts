@@ -258,6 +258,7 @@ export class EventService {
       'status',
       'is_paid',
       'ticket_price',
+      'event_date',
       'start_time',
       'end_time',
       'time_str',
@@ -266,7 +267,14 @@ export class EventService {
       'custom_questions',
     ];
 
-    for (const [key, value] of Object.entries(data)) {
+    const inputData = { ...data };
+    if ((inputData.startTime || inputData.endTime) && !inputData.time && !inputData.time_str) {
+      const sTime = inputData.startTime || (existing.rows[0] as any).start_time || '09:00 AM';
+      const eTime = inputData.endTime || (existing.rows[0] as any).end_time || '05:00 PM';
+      (inputData as any).time_str = `${sTime} - ${eTime} EAT`;
+    }
+
+    for (const [key, value] of Object.entries(inputData)) {
       const dbKey =
         key === 'type'
           ? 'event_type'
@@ -274,6 +282,16 @@ export class EventService {
           ? 'ticket_price'
           : key === 'isPaid'
           ? 'is_paid'
+          : key === 'date'
+          ? 'event_date'
+          : key === 'startTime'
+          ? 'start_time'
+          : key === 'endTime'
+          ? 'end_time'
+          : key === 'time'
+          ? 'time_str'
+          : key === 'venueName'
+          ? 'venue_name'
           : key === 'posterImageUrl'
           ? 'poster_image_url'
           : key === 'bannerUrl'
@@ -288,6 +306,8 @@ export class EventService {
             ? typeof value === 'string'
               ? value
               : JSON.stringify(value || [])
+            : dbKey === 'event_date'
+            ? new Date(value as string)
             : value
         );
       }

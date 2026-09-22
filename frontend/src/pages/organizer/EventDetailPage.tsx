@@ -19,8 +19,10 @@ import {
   AlertCircle,
   X,
   HelpCircle,
+  Edit,
 } from 'lucide-react';
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
+import { EditEventModal } from '../../components/organizer/EditEventModal';
 
 export const EventDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,8 +42,9 @@ export const EventDetailPage: React.FC = () => {
   const [awardSuccessMsg, setAwardSuccessMsg] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Edit Questions Modal State
+  // Edit Questions & Edit Event Modals State
   const [isEditQuestionsOpen, setIsEditQuestionsOpen] = useState(false);
+  const [isEditEventOpen, setIsEditEventOpen] = useState(false);
 
   // Manual Add Attendee Modal State
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
@@ -193,10 +196,10 @@ export const EventDetailPage: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setIsEditQuestionsOpen(true)}
-            icon={<HelpCircle className="w-4 h-4 text-[#63474D]" />}
+            onClick={() => setIsEditEventOpen(true)}
+            icon={<Edit className="w-4 h-4 text-[#63474D]" />}
           >
-            Edit Form Questions ({event.customQuestions?.length || 0})
+            Edit Form
           </Button>
           <Link to={`/organizer/check-in/${event.id}`}>
             <Button variant="accent" size="sm" icon={<QrCode className="w-4 h-4" />}>
@@ -359,7 +362,7 @@ export const EventDetailPage: React.FC = () => {
             icon={<HelpCircle className="w-3.5 h-3.5 text-[#63474D]" />}
             className="self-start sm:self-auto cursor-pointer"
           >
-            Manage / Edit Questions
+            Edit Question
           </Button>
         </div>
       </div>
@@ -827,6 +830,16 @@ export const EventDetailPage: React.FC = () => {
           if (event) {
             setEvent({ ...event, customQuestions: updatedQuestions });
           }
+        }}
+      />
+
+      {/* Edit Form (Event Details & Poster) Modal */}
+      <EditEventModal
+        event={event}
+        isOpen={isEditEventOpen}
+        onClose={() => setIsEditEventOpen(false)}
+        onEventUpdated={(updatedEvent) => {
+          setEvent(updatedEvent);
         }}
       />
     </div>

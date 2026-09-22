@@ -13,8 +13,10 @@ import {
   Copy,
   ShieldCheck,
   HelpCircle,
+  Edit,
 } from 'lucide-react';
 import { EditEventQuestionsModal } from './EditEventQuestionsModal';
+import { EditEventModal } from './EditEventModal';
 
 interface EventDetailModalProps {
   event: Event | null;
@@ -33,6 +35,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isEditQuestionsOpen, setIsEditQuestionsOpen] = useState(false);
+  const [isEditEventOpen, setIsEditEventOpen] = useState(false);
   const [currentEvent, setCurrentEvent] = useState<Event | null>(event);
 
   React.useEffect(() => {
@@ -200,14 +203,22 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         </div>
 
         {/* Actions Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => setIsEditEventOpen(true)}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-white border border-gray-200 hover:border-[#63474D] text-[#63474D] text-xs font-semibold transition-colors shadow-2xs text-center cursor-pointer"
+          >
+            <Edit className="w-3.5 h-3.5" />
+            <span>Edit Form</span>
+          </button>
           <button
             type="button"
             onClick={() => setIsEditQuestionsOpen(true)}
             className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-white border border-gray-200 hover:border-[#63474D] text-[#63474D] text-xs font-semibold transition-colors shadow-2xs text-center cursor-pointer"
           >
             <HelpCircle className="w-3.5 h-3.5" />
-            <span>Edit Questions</span>
+            <span>Edit Question</span>
           </button>
           <Link
             to={`/organizer/events/${currentEvent.id}/scanner`}
@@ -264,6 +275,19 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
             if (onEventUpdated) {
               onEventUpdated(updated);
             }
+          }
+        }}
+      />
+
+      {/* Edit Form (Event Details & Poster) Modal */}
+      <EditEventModal
+        event={currentEvent}
+        isOpen={isEditEventOpen}
+        onClose={() => setIsEditEventOpen(false)}
+        onEventUpdated={(updated) => {
+          setCurrentEvent(updated);
+          if (onEventUpdated) {
+            onEventUpdated(updated);
           }
         }}
       />
