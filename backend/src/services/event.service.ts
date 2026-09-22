@@ -229,9 +229,9 @@ export class EventService {
     eventId: string,
     userId: string,
     userRole: UserRole,
-    data: Partial<IEvent>
+    data: any
   ): Promise<any> {
-    const existing = await query('SELECT organizer_id FROM events WHERE id = $1', [eventId]);
+    const existing = await query('SELECT organizer_id, start_time, end_time FROM events WHERE id = $1', [eventId]);
     if (!existing.rowCount || existing.rowCount === 0) {
       const err: any = new Error('Event not found.');
       err.statusCode = 404;
@@ -267,11 +267,11 @@ export class EventService {
       'custom_questions',
     ];
 
-    const inputData = { ...data };
+    const inputData: any = { ...data };
     if ((inputData.startTime || inputData.endTime) && !inputData.time && !inputData.time_str) {
       const sTime = inputData.startTime || (existing.rows[0] as any).start_time || '09:00 AM';
       const eTime = inputData.endTime || (existing.rows[0] as any).end_time || '05:00 PM';
-      (inputData as any).time_str = `${sTime} - ${eTime} EAT`;
+      inputData.time_str = `${sTime} - ${eTime} EAT`;
     }
 
     for (const [key, value] of Object.entries(inputData)) {
