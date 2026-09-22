@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import type { Event } from '../../types/event';
@@ -17,6 +17,8 @@ import {
   TrendingUp,
   Quote,
   Compass,
+  PlusCircle,
+  AlertCircle,
 } from 'lucide-react';
 
 const DEMO_EVENT: Event = {
@@ -201,47 +203,37 @@ export const ReportPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [events, setEvents] = useState<Event[]>([DEMO_EVENT]);
-  const [selectedEventId, setSelectedEventId] = useState<string>(id || DEMO_EVENT.id);
-  const [report, setReport] = useState<SponsorReportData>(INITIAL_DEMO_REPORT);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>(id || '');
+  const [report, setReport] = useState<SponsorReportData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [reportLoading, setReportLoading] = useState<boolean>(false);
   const [activeSection, setActiveSection] = useState<string>('executive-summary');
 
   const reportContainerRef = useRef<HTMLDivElement>(null);
 
-  // Sync selectedEventId if route param id changes
-  useEffect(() => {
-    if (id && id !== selectedEventId) {
-      setSelectedEventId(id);
-    }
-  }, [id]);
-
-  // 1. Fetch events list
+  // 1. Fetch events list strictly for the current organizer
   useEffect(() => {
     const fetchEvents = async () => {
+      setLoading(true);
       try {
-        // Fetch all platform events
-        const allEvents = await api.events.getAll();
+        const isAdmin = user?.role === 'ADMIN';
+        // When not admin, query events scoped strictly to this organizer
+        const fetchedEvents = await api.events.getAll(isAdmin ? undefined : user?.id);
 
-        // Check if current user has events of their own
+        // Security check: only events hosted by this organizer (unless admin)
         const userEvents = user?.id
-          ? allEvents.filter((e) => e.organizerId === user.id)
+          ? fetchedEvents.filter((e) => e.organizerId === user.id)
           : [];
 
-        // Prioritize user's own events; if they have none yet, show all community events so they can evaluate reports
-        let availableEvents = userEvents.length > 0 ? userEvents : allEvents;
+        const availableEvents = isAdmin ? fetchedEvents : userEvents;
 
-        // If route specifies an event id, ensure it is available in the selection list
-        if (id && !availableEvents.some((e) => e.id === id)) {
-          const matchedEvent = allEvents.find((e) => e.id === id);
-          if (matchedEvent) {
-            availableEvents = [matchedEvent, ...availableEvents];
-          }
-        }
-
-        // If no events exist in database or storage at all, include the flagship demo event
+        // If the organizer has not hosted any events, show empty state immediately
         if (availableEvents.length === 0) {
-          availableEvents = [DEMO_EVENT];
+          setEvents([]);
+          setSelectedEventId('');
+          setReport(null);
+          return;
         }
 
         const sorted = [...availableEvents].sort((a, b) => {
@@ -259,46 +251,84 @@ export const ReportPage: React.FC = () => {
 
         setEvents(sorted);
 
-        // Auto-select event: route id if valid, or keep currently selected if valid, or first event in sorted list
+        // Auto-select event: route id if it belongs to this organizer, or keep selected if valid, or first event
+        let nextSelectedId = '';
         if (id && sorted.some((e) => e.id === id)) {
-          setSelectedEventId(id);
-        } else if (!id && sorted.length > 0 && !sorted.some((e) => e.id === selectedEventId)) {
-          setSelectedEventId(sorted[0].id);
+          nextSelectedId = id;
+        } else if (selectedEventId && sorted.some((e) => e.id === selectedEventId)) {
+          nextSelectedId = selectedEventId;
+        } else {
+          nextSelectedId = sorted[0].id;
+        }
+
+        setSelectedEventId(nextSelectedId);
+
+        // If url id is invalid or belongs to another organizer, update the URL
+        if (id && id !== nextSelectedId) {
+          navigate(nextSelectedId ? `/organizer/reports/${nextSelectedId}` : '/organizer/reports', { replace: true });
         }
       } catch (err) {
-        console.error('Failed to load events:', err);
-        setEvents([DEMO_EVENT]);
-        setSelectedEventId(DEMO_EVENT.id);
+        console.error('Failed to load events for reports:', err);
+        setEvents([]);
+        setSelectedEventId('');
+        setReport(null);
       } finally {
         setLoading(false);
       }
     };
     fetchEvents();
-  }, [id, user?.id, user?.role]);
+  }, [id, user?.id, user?.role, navigate]);
+
+  // Sync selectedEventId if route param id changes, ensuring it is permitted
+  useEffect(() => {
+    if (id && id !== selectedEventId) {
+      if (events.length > 0) {
+        if (events.some((e) => e.id === id) || user?.role === 'ADMIN') {
+          setSelectedEventId(id);
+        }
+      }
+    }
+  }, [id, events, user?.role, selectedEventId]);
 
   // 2. Fetch report data
   useEffect(() => {
     const fetchReport = async () => {
-      if (!selectedEventId) return;
-      setLoading(true);
+      if (!selectedEventId) {
+        setReport(null);
+        setReportLoading(false);
+        return;
+      }
+
+      // Security check: event must be in allowed events list
+      if (events.length > 0 && !events.some((e) => e.id === selectedEventId) && user?.role !== 'ADMIN') {
+        setReport(null);
+        setReportLoading(false);
+        return;
+      }
+
+      setReportLoading(true);
       try {
         const data = await api.reports.getEventReport(selectedEventId);
         if (data && data.eventTitle) {
           setReport(data);
         } else {
-          const fallback = await api.reports.getSponsorReport(selectedEventId);
-          setReport(fallback);
+          setReport(null);
         }
       } catch (err) {
-        console.warn('Backend report fetch error, using synthesized event dossier:', err);
-        const fallback = await api.reports.getSponsorReport(selectedEventId);
-        setReport(fallback);
+        console.warn('Backend report fetch error:', err);
+        setReport(null);
       } finally {
-        setLoading(false);
+        setReportLoading(false);
       }
     };
-    fetchReport();
-  }, [selectedEventId]);
+
+    if (events.length > 0 && selectedEventId) {
+      fetchReport();
+    } else if (!loading && events.length === 0) {
+      setReport(null);
+      setReportLoading(false);
+    }
+  }, [selectedEventId, events, loading, user?.role]);
 
   const handleSelectEvent = (eventId: string) => {
     setSelectedEventId(eventId);
@@ -340,9 +370,9 @@ export const ReportPage: React.FC = () => {
           </h1>
         </div>
 
-        {/* Event Selector & Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3">
-          {events.length > 0 && (
+        {/* Event Selector & Action Buttons (Only visible if organizer has events) */}
+        {!loading && events.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-64">
               <select
                 value={selectedEventId}
@@ -356,68 +386,121 @@ export const ReportPage: React.FC = () => {
                 ))}
               </select>
             </div>
-          )}
 
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleExportCSV}
-              variant="outline"
-              size="sm"
-              icon={<FileSpreadsheet className="w-4 h-4 text-[#2A7B5F]" />}
-            >
-              Export CSV
-            </Button>
-            <Button
-              onClick={handlePrintPDF}
-              variant="accent"
-              size="sm"
-              icon={<Printer className="w-4 h-4" />}
-            >
-              Print / Save PDF
-            </Button>
+            {report && (
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleExportCSV}
+                  variant="outline"
+                  size="sm"
+                  icon={<FileSpreadsheet className="w-4 h-4 text-[#2A7B5F]" />}
+                >
+                  Export CSV
+                </Button>
+                <Button
+                  onClick={handlePrintPDF}
+                  variant="accent"
+                  size="sm"
+                  icon={<Printer className="w-4 h-4" />}
+                >
+                  Print / Save PDF
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="space-y-6 pt-4">
+          <div className="h-1 w-full bg-[#63474D]/20 overflow-hidden rounded-full print:hidden">
+            <div className="h-full bg-[#63474D] animate-pulse w-1/2 rounded-full" />
+          </div>
+          <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] shadow-xs space-y-4 animate-pulse">
+            <div className="h-6 w-48 bg-gray-200 rounded-lg"></div>
+            <div className="h-4 w-96 bg-gray-100 rounded-lg"></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6">
+              <div className="h-28 bg-gray-100 rounded-2xl"></div>
+              <div className="h-28 bg-gray-100 rounded-2xl"></div>
+              <div className="h-28 bg-gray-100 rounded-2xl"></div>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Screen Section Quick Navigation Bar (Sticky, Hidden when printing) */}
-      <div className="sticky top-2 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-1.5 overflow-x-auto print:hidden">
-        <span className="text-[11px] font-bold text-gray-500 uppercase px-2 shrink-0">Sections:</span>
-        {[
-          { id: 'sec-exec-summary', label: '1. Executive Summary' },
-          { id: 'sec-about-event', label: '2. About Event' },
-          { id: 'sec-delivery', label: '3. Delivery' },
-          { id: 'sec-audience', label: '4. Audience' },
-          { id: 'sec-orgs', label: '5. Organizations' },
-          { id: 'sec-interests', label: '6. Interests' },
-          { id: 'sec-motivations', label: '7. Motivations' },
-          { id: 'sec-engagement', label: '8. Engagement' },
-          { id: 'sec-voice', label: '9. Attendee Voice' },
-          { id: 'sec-ai-analysis', label: '10. AI Analysis' },
-          { id: 'sec-findings', label: '11. Key Findings' },
-          { id: 'sec-recommendations', label: '12. Recommendations' },
-          { id: 'sec-partner-impact', label: '13. Partner Impact' },
-          { id: 'sec-conclusion', label: '14. Conclusion' },
-          { id: 'sec-ledger', label: '15. Verified Ledger' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => scrollToSection(tab.id)}
-            className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-              activeSection === tab.id
-                ? 'bg-[#63474D] text-white shadow-xs'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {loading && (
-        <div className="h-1 w-full bg-[#63474D]/20 overflow-hidden rounded-full print:hidden">
-          <div className="h-full bg-[#63474D] animate-pulse w-1/2 rounded-full" />
+      ) : events.length === 0 ? (
+        /* Empty State: Organizer hasn't hosted any events */
+        <div className="bg-white rounded-3xl p-12 border border-[#E8DDD7] text-center space-y-5 shadow-xs max-w-xl mx-auto my-12">
+          <div className="w-16 h-16 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center mx-auto">
+            <BarChart3 className="w-8 h-8 text-[#63474D]" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="font-serif font-bold text-xl text-[#2D1F23]">No Event Reports Available</h2>
+            <p className="text-sm text-[#756366] max-w-md mx-auto leading-relaxed">
+              Reports and institutional sponsor analytics are generated exclusively for events you organize and host. Once you publish an event and check in attendees, your verified impact dossier will appear here.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Link to="/organizer/events/create">
+              <Button variant="primary" icon={<PlusCircle className="w-4 h-4" />}>
+                Create Your First Event
+              </Button>
+            </Link>
+          </div>
         </div>
-      )}
+      ) : reportLoading ? (
+        <div className="space-y-6 pt-4">
+          <div className="h-1 w-full bg-[#63474D]/20 overflow-hidden rounded-full print:hidden">
+            <div className="h-full bg-[#63474D] animate-pulse w-1/2 rounded-full" />
+          </div>
+          <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] shadow-xs space-y-4 animate-pulse">
+            <div className="h-6 w-48 bg-gray-200 rounded-lg"></div>
+            <div className="h-4 w-96 bg-gray-100 rounded-lg"></div>
+          </div>
+        </div>
+      ) : !report ? (
+        <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] text-center space-y-4 shadow-xs max-w-md mx-auto my-12">
+          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h3 className="font-serif font-bold text-lg text-[#2D1F23]">Report Data Unavailable</h3>
+          <p className="text-xs text-[#756366]">
+            Could not retrieve performance metrics for this event. Ensure the event exists and you have access permissions.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Screen Section Quick Navigation Bar (Sticky, Hidden when printing) */}
+          <div className="sticky top-2 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-1.5 overflow-x-auto print:hidden">
+            <span className="text-[11px] font-bold text-gray-500 uppercase px-2 shrink-0">Sections:</span>
+            {[
+              { id: 'sec-exec-summary', label: '1. Executive Summary' },
+              { id: 'sec-about-event', label: '2. About Event' },
+              { id: 'sec-delivery', label: '3. Delivery' },
+              { id: 'sec-audience', label: '4. Audience' },
+              { id: 'sec-orgs', label: '5. Organizations' },
+              { id: 'sec-interests', label: '6. Interests' },
+              { id: 'sec-motivations', label: '7. Motivations' },
+              { id: 'sec-engagement', label: '8. Engagement' },
+              { id: 'sec-voice', label: '9. Attendee Voice' },
+              { id: 'sec-ai-analysis', label: '10. AI Analysis' },
+              { id: 'sec-findings', label: '11. Key Findings' },
+              { id: 'sec-recommendations', label: '12. Recommendations' },
+              { id: 'sec-partner-impact', label: '13. Partner Impact' },
+              { id: 'sec-conclusion', label: '14. Conclusion' },
+              { id: 'sec-ledger', label: '15. Verified Ledger' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => scrollToSection(tab.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  activeSection === tab.id
+                    ? 'bg-[#63474D] text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
       <div ref={reportContainerRef} className="space-y-12 print:space-y-8 text-[#2D1F23]">
           {/* ========================================================================= */}
@@ -1867,6 +1950,8 @@ export const ReportPage: React.FC = () => {
             </div>
           </section>
         </div>
+        </>
+      )}
     </div>
   );
 };

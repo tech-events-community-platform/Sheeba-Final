@@ -59,6 +59,17 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const effectiveQuestions = React.useMemo(() => {
+    if (!event) return [];
+    if (event.customQuestions && event.customQuestions.length > 0) {
+      return event.customQuestions;
+    }
+    if (event.includeDefaultQuestions === false) {
+      return [];
+    }
+    return [];
+  }, [event]);
+
   useEffect(() => {
     const fetchEventAndStatus = async () => {
       setLoading(true);
@@ -174,36 +185,39 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
       }
     }
 
-    // Validate Sheeba Standard Platform Questions
-    if (!answers.sheba_role || !String(answers.sheba_role).trim()) {
-      setErrorMsg('Please select what best describes you (Standard Question 1: Role).');
-      return;
-    }
-    if (!answers.sheba_interests || !String(answers.sheba_interests).trim()) {
-      setErrorMsg('Please enter your main areas of interest or expertise (Standard Question 2).');
-      return;
-    }
-    if (!answers.sheba_organization || !String(answers.sheba_organization).trim()) {
-      setErrorMsg('Please enter your organization or affiliation (Standard Question 3).');
-      return;
-    }
-    const selectedGoals: string[] = Array.isArray(answers.sheba_goals)
-      ? answers.sheba_goals
-      : typeof answers.sheba_goals === 'string' && answers.sheba_goals
-      ? answers.sheba_goals.split(', ')
-      : [];
-    if (selectedGoals.length === 0) {
-      setErrorMsg('Please select at least one goal you hope to gain from this event (Standard Question 4).');
-      return;
-    }
-
-    // Validate required custom questions
-    for (const q of event.customQuestions || []) {
+    // Validate required questions dynamically from effectiveQuestions
+    for (const q of effectiveQuestions) {
       const qVal = answers[q.id];
-      const isFilled = typeof qVal === 'string' ? qVal.trim().length > 0 : Boolean(qVal);
+      const isFilled =
+        typeof qVal === 'string'
+          ? qVal.trim().length > 0
+          : Array.isArray(qVal)
+          ? qVal.length > 0
+          : Boolean(qVal);
       if (q.isRequired && !isFilled) {
         setErrorMsg(`Please answer required question: "${q.questionText}"`);
         return;
+      }
+    }
+
+    // Populate backward-compatible keys for analytics/reports if matching questions exist
+    for (const q of effectiveQuestions) {
+      const val = answers[q.id];
+      if (val) {
+        const text = q.questionText.toLowerCase();
+        if (text.includes('best describes you') || text.includes('role')) {
+          answers.sheba_role = val;
+        } else if (text.includes('interest') || text.includes('expertise')) {
+          answers.sheba_interests = val;
+        } else if (
+          text.includes('organization') ||
+          text.includes('institution') ||
+          text.includes('affiliated')
+        ) {
+          answers.sheba_organization = val;
+        } else if (text.includes('hoping to gain') || text.includes('goals')) {
+          answers.sheba_goals = val;
+        }
       }
     }
 
@@ -504,239 +518,160 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
           )}
         </div>
 
-        {/* Sheeba Standard Impact & Demographics Questions */}
-        <div className="space-y-6 pt-2 pb-6 border-b border-gray-300">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#63474D]/10 text-[#63474D]">
-                Platform Standard
-              </span>
-              <span className="text-[11px] text-gray-500 font-medium">
-                Mandatory for impact analysis & verifiable credentials
-              </span>
-            </div>
-            <h2 className="font-serif font-bold text-lg text-black">
-              Attendee Profile & Goals
-            </h2>
-            <p className="text-xs text-gray-600 mt-0.5">
-              These standardized questions help event organizers and partners assess attendance impact, tailor sessions, and compile verified reports.
-            </p>
-          </div>
-
-          <div className="space-y-5">
-            {/* Question 1: Role */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-black">
-                1. What best describes you? <span className="text-red-600">*</span>
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                {SHEEBA_ROLES.map((role) => {
-                  const isSelected = answers.sheba_role === role;
-                  return (
-                    <label
-                      key={role}
-                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                        isSelected
-                          ? 'border-[#63474D] bg-[#63474D]/5 shadow-xs'
-                          : 'border-gray-200 bg-white/60 hover:bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="sheba_role"
-                        value={role}
-                        checked={isSelected}
-                        onChange={() => handleAnswerChange('sheba_role', role)}
-                        className="w-4 h-4 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
-                      />
-                      <span className="text-xs font-medium text-black">{role}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Question 2: Interests */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-semibold text-black">
-                  2. What are your main areas of interest or expertise? <span className="text-red-600">*</span>
-                </label>
-                <span className="text-[10px] text-gray-500">e.g., AI, Product Design, FinTech</span>
-              </div>
-              <textarea
-                rows={2}
-                value={answers.sheba_interests || ''}
-                onChange={(e) => handleAnswerChange('sheba_interests', e.target.value)}
-                placeholder="List topics, technologies, or skills you specialize in or want to explore..."
-                className="w-full px-3.5 py-2.5 bg-white/70 border border-gray-300 rounded-xl text-xs text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#63474D] shadow-xs resize-none"
-              />
-            </div>
-
-            {/* Question 3: Organization */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-black">
-                3. What organization, company, or institution are you affiliated with? <span className="text-red-600">*</span>
-              </label>
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={answers.sheba_organization || ''}
-                  onChange={(e) => handleAnswerChange('sheba_organization', e.target.value)}
-                  placeholder="e.g., Addis Ababa University, Gebeya, Commercial Bank of Ethiopia..."
-                  className="w-full px-3.5 py-2.5 bg-white/70 border border-gray-300 rounded-xl text-xs text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#63474D] shadow-xs"
-                />
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-gray-500 mr-1">Quick fill:</span>
-                  {['Independent / Freelancer', 'Student (No affiliation)', 'Seeking Opportunities'].map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => handleAnswerChange('sheba_organization', tag)}
-                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
-                        answers.sheba_organization === tag
-                          ? 'border-[#63474D] bg-[#63474D] text-white font-medium'
-                          : 'border-gray-200 bg-white/60 text-gray-700 hover:border-gray-300 hover:bg-white'
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Question 4: Goals */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-black">
-                4. What are you hoping to gain from this event? <span className="text-red-600">*</span>
-              </label>
-              <p className="text-[11px] text-gray-500">Select all that apply:</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-                {SHEEBA_GOALS.map((goal) => {
-                  const currentGoals: string[] = Array.isArray(answers.sheba_goals)
-                    ? answers.sheba_goals
-                    : typeof answers.sheba_goals === 'string' && answers.sheba_goals
-                    ? answers.sheba_goals.split(', ')
-                    : [];
-                  const isChecked = currentGoals.includes(goal);
-                  return (
-                    <label
-                      key={goal}
-                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                        isChecked
-                          ? 'border-[#63474D] bg-[#63474D]/5 shadow-xs'
-                          : 'border-gray-200 bg-white/60 hover:bg-white hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        value={goal}
-                        checked={isChecked}
-                        onChange={() => handleToggleGoal(goal)}
-                        className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D] cursor-pointer"
-                      />
-                      <span className="text-xs font-medium text-black">{goal}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Organizer Questions Section (Google Form Formality, Text Black, Unboxed) */}
-        {event.customQuestions && event.customQuestions.length > 0 ? (
-          <div className="space-y-6">
+        {/* Dynamic Registration Questions Section */}
+        {effectiveQuestions.length > 0 ? (
+          <div className="space-y-6 pt-2 pb-6 border-b border-gray-300">
             <div>
               <h2 className="font-serif font-bold text-lg text-black">
                 Registration Questions
               </h2>
               <p className="text-xs text-gray-600 mt-0.5">
-                Please complete the questions required by the event organizer.
+                Please complete the questions required for this event registration.
               </p>
             </div>
 
             <div className="space-y-5">
-              {event.customQuestions.map((q, index) => {
+              {effectiveQuestions.map((q, index) => {
                 const qType = q.type || 'text';
+                const isAffiliationQ =
+                  q.questionText.toLowerCase().includes('organization') ||
+                  q.questionText.toLowerCase().includes('institution') ||
+                  q.questionText.toLowerCase().includes('affiliated');
+                const isInterestsQ =
+                  q.questionText.toLowerCase().includes('interest') ||
+                  q.questionText.toLowerCase().includes('expertise');
+
                 return (
                   <div key={q.id} className="space-y-2">
-                    <label className="block text-sm font-semibold text-black">
-                      {index + 1}. {q.questionText} {q.isRequired && <span className="text-red-600">*</span>}
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-black">
+                        {index + 1}. {q.questionText}{' '}
+                        {q.isRequired && <span className="text-red-600">*</span>}
+                      </label>
+                      {isInterestsQ && (
+                        <span className="text-[10px] text-gray-500">
+                          e.g., AI, Product Design, FinTech
+                        </span>
+                      )}
+                    </div>
 
                     {qType === 'choice' && q.options && q.options.length > 0 ? (
-                      <div className="space-y-2 pt-1 pl-1">
-                        {q.options.map((opt, i) => (
-                          <label
-                            key={i}
-                            className="flex items-center gap-3 text-sm text-black hover:text-gray-700 cursor-pointer"
-                          >
-                            <input
-                              type="radio"
-                              name={`question_${q.id}`}
-                              value={opt}
-                              checked={answers[q.id] === opt}
-                              onChange={() => handleAnswerChange(q.id, opt)}
-                              className="w-4 h-4 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
-                            />
-                            <span>{opt}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : qType === 'multi_choice' && q.options && q.options.length > 0 ? (
-                      <div className="space-y-2 pt-1 pl-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                         {q.options.map((opt, i) => {
-                          const currentSelections: string[] = answers[q.id]
-                            ? answers[q.id].split(', ').filter(Boolean)
-                            : [];
-                          const isChecked = currentSelections.includes(opt);
+                          const isSelected = answers[q.id] === opt;
                           return (
                             <label
                               key={i}
-                              className="flex items-center gap-3 text-sm text-black hover:text-gray-700 cursor-pointer"
+                              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'border-[#63474D] bg-[#63474D]/5 shadow-xs'
+                                  : 'border-gray-200 bg-white/60 hover:bg-white hover:border-gray-300'
+                              }`}
                             >
                               <input
-                                type="checkbox"
+                                type="radio"
+                                name={`question_${q.id}`}
                                 value={opt}
-                                checked={isChecked}
-                                onChange={(e) => {
-                                  let updated: string[];
-                                  if (e.target.checked) {
-                                    updated = [...currentSelections, opt];
-                                  } else {
-                                    updated = currentSelections.filter((x) => x !== opt);
-                                  }
-                                  handleAnswerChange(q.id, updated.join(', '));
-                                }}
-                                className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                                checked={isSelected}
+                                onChange={() => handleAnswerChange(q.id, opt)}
+                                className="w-4 h-4 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
                               />
-                              <span>{opt}</span>
+                              <span className="text-xs font-medium text-black">{opt}</span>
                             </label>
                           );
                         })}
                       </div>
-                    ) : (
-                      <input
-                        type="text"
-                        required={q.isRequired}
+                    ) : qType === 'multi_choice' && q.options && q.options.length > 0 ? (
+                      <div className="space-y-1">
+                        <p className="text-[11px] text-gray-500">Select all that apply:</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                          {q.options.map((opt, i) => {
+                            const currentVal = answers[q.id] || '';
+                            const currentList = Array.isArray(currentVal)
+                              ? currentVal
+                              : currentVal.split(', ').filter(Boolean);
+                            const isChecked = currentList.includes(opt);
+                            return (
+                              <label
+                                key={i}
+                                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                                  isChecked
+                                    ? 'border-[#63474D] bg-[#63474D]/5 shadow-xs'
+                                    : 'border-gray-200 bg-white/60 hover:bg-white hover:border-gray-300'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  value={opt}
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    let updated: string[];
+                                    if (e.target.checked) {
+                                      updated = [...currentList, opt];
+                                    } else {
+                                      updated = currentList.filter((x: string) => x !== opt);
+                                    }
+                                    handleAnswerChange(q.id, updated.join(', '));
+                                  }}
+                                  className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                                />
+                                <span className="text-xs font-medium text-black">{opt}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : isInterestsQ ? (
+                      <textarea
+                        rows={2}
                         value={answers[q.id] || ''}
                         onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                        placeholder="Your answer"
-                        className="w-full px-4 py-2.5 bg-white/70 border border-gray-300 rounded-xl text-xs text-black focus:outline-none focus:ring-2 focus:ring-[#63474D] shadow-xs"
+                        placeholder="List topics, technologies, or skills you specialize in or want to explore..."
+                        className="w-full px-3.5 py-2.5 bg-white/70 border border-gray-300 rounded-xl text-xs text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#63474D] shadow-xs resize-none"
                       />
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          required={q.isRequired}
+                          value={answers[q.id] || ''}
+                          onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                          placeholder={
+                            isAffiliationQ
+                              ? 'e.g., Addis Ababa University, Gebeya, Commercial Bank of Ethiopia...'
+                              : 'Your answer'
+                          }
+                          className="w-full px-3.5 py-2.5 bg-white/70 border border-gray-300 rounded-xl text-xs text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#63474D] shadow-xs"
+                        />
+                        {isAffiliationQ && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] text-gray-500 mr-1">Quick fill:</span>
+                            {['Independent / Freelancer', 'Student (No affiliation)', 'Seeking Opportunities'].map(
+                              (tag) => (
+                                <button
+                                  key={tag}
+                                  type="button"
+                                  onClick={() => handleAnswerChange(q.id, tag)}
+                                  className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
+                                    answers[q.id] === tag
+                                      ? 'border-[#63474D] bg-[#63474D] text-white font-medium'
+                                      : 'border-gray-200 bg-white/60 text-gray-700 hover:border-gray-300 hover:bg-white'
+                                  }`}
+                                >
+                                  {tag}
+                                </button>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
               })}
             </div>
           </div>
-        ) : (
-          <div className="text-xs text-gray-700 py-1">
-            No additional registration questions are required for this event.
-          </div>
-        )}
+        ) : null}
 
         {/* Payment Section (ONLY displayed if the event is NOT free) */}
         {event.isPaid && (event.ticketPrice || 0) > 0 && (

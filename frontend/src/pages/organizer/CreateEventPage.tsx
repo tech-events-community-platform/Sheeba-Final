@@ -12,6 +12,7 @@ import {
   CreditCard,
   X,
 } from 'lucide-react';
+import { getOrganizerDefaultQuestions } from '../../utils/defaultQuestions';
 
 interface QuestionDraft {
   id: string;
@@ -38,15 +39,45 @@ export const CreateEventPage: React.FC = () => {
     posterImageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
   });
 
-  const [questions, setQuestions] = useState<QuestionDraft[]>([
-    {
-      id: 'q_init_1',
-      questionText: 'What is your background or experience level with this topic?',
-      type: 'choice',
-      options: ['Beginner', 'Intermediate', 'Advanced'],
-      isRequired: true,
-    },
-  ]);
+  const [includeDefaultQuestions, setIncludeDefaultQuestions] = useState<boolean>(true);
+
+  const [questions, setQuestions] = useState<QuestionDraft[]>(() => {
+    const defaultQuestions = getOrganizerDefaultQuestions(user?.id);
+    return defaultQuestions.map((q) => ({
+      id: q.id,
+      questionText: q.questionText,
+      type: q.type,
+      options: [...q.options],
+      isRequired: q.isRequired,
+    }));
+  });
+
+  const handleToggleDefaultQuestions = () => {
+    if (includeDefaultQuestions) {
+      setIncludeDefaultQuestions(false);
+      setQuestions([
+        {
+          id: `q_custom_${Date.now()}`,
+          questionText: '',
+          type: 'text',
+          options: ['Option 1', 'Option 2'],
+          isRequired: false,
+        },
+      ]);
+    } else {
+      setIncludeDefaultQuestions(true);
+      const defaultQuestions = getOrganizerDefaultQuestions(user?.id);
+      setQuestions(
+        defaultQuestions.map((q) => ({
+          id: `q_def_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          questionText: q.questionText,
+          type: q.type,
+          options: [...q.options],
+          isRequired: q.isRequired,
+        }))
+      );
+    }
+  };
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -183,9 +214,9 @@ export const CreateEventPage: React.FC = () => {
         currency: 'ETB',
         organizerId: user?.id || 'demo-organizer-001',
         organizerName: user?.organization || user?.name || 'GDG Addis',
-        customQuestions: formattedQuestions,
         bannerUrl: formData.posterImageUrl,
-        posterImageUrl: formData.posterImageUrl,
+        customQuestions: formattedQuestions,
+        includeDefaultQuestions,
       });
 
       setCreatedEvent(newEvent);
@@ -434,29 +465,64 @@ export const CreateEventPage: React.FC = () => {
 
           {/* 3. Registration Questions (Unboxed, free spacing, customizable answer choices) */}
           <div className="space-y-4 pt-6 border-t border-gray-100">
-            <div>
-              <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
-                <HelpCircle className="w-4 h-4 text-[#63474D]" />
-                Registration Questions
-              </h2>
-              <p className="text-xs text-[#756366] mt-0.5">
-                Customize the questions and answer types (text, choice options, multi-tick) for attendees.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-[#63474D]" />
+                  Registration Questions
+                </h2>
+                <p className="text-xs text-[#756366] mt-0.5">
+                  Customize the questions and answer types (text, choice options, multi-tick) for attendees.
+                </p>
+              </div>
+
+              {/* Small Toggle for Default Organization Questions */}
+              <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center bg-[#FAF7F5] border border-[#E8DDD7] px-3 py-1.5 rounded-2xl">
+                <span className="text-xs font-semibold text-[#2D1F23]">
+                  {includeDefaultQuestions ? 'Default questions on' : 'Default questions off'}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={includeDefaultQuestions}
+                  onClick={handleToggleDefaultQuestions}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    includeDefaultQuestions ? 'bg-[#63474D]' : 'bg-gray-300'
+                  }`}
+                  title={
+                    includeDefaultQuestions
+                      ? '4 default organization questions included'
+                      : 'Default questions excluded (write your own)'
+                  }
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      includeDefaultQuestions ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4">
-              {questions.map((q, idx) => (
-                <div
-                  key={q.id}
-                  className="p-4 sm:p-5 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] space-y-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[#63474D] font-mono">Q{idx + 1}</span>
-                      <span className="text-xs font-semibold text-[#2D1F23]">Question Details</span>
-                    </div>
+              {questions.length === 0 ? (
+                <div className="p-6 bg-[#FAF7F5] border border-dashed border-[#E8DDD7] rounded-2xl text-center space-y-2">
+                  <p className="text-xs text-[#756366]">
+                    No questions added for this event. Click below to add custom questions.
+                  </p>
+                </div>
+              ) : (
+                questions.map((q, idx) => (
+                  <div
+                    key={q.id}
+                    className="p-4 sm:p-5 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-[#63474D] font-mono">Q{idx + 1}</span>
+                        <span className="text-xs font-semibold text-[#2D1F23]">Question Details</span>
+                      </div>
 
-                    {questions.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveQuestion(q.id)}
@@ -465,8 +531,7 @@ export const CreateEventPage: React.FC = () => {
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    )}
-                  </div>
+                    </div>
 
                   <div className="space-y-2">
                     <input
@@ -545,9 +610,10 @@ export const CreateEventPage: React.FC = () => {
                         </button>
                       </div>
                     )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
 
               {/* Big, prominent Add Question button placed below all questions */}
               <button

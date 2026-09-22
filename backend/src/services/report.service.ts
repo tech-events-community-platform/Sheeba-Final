@@ -12,12 +12,11 @@ export class ReportService {
       throw err;
     }
 
-    // Security check: Only the event organizer or an admin can access reports (in dev mode, organizers can preview all reports)
+    // Security check: Only the event organizer or an admin can access reports
     const isOwner = event.organizerId === userId;
     const isAdmin = userRole?.toLowerCase() === 'admin';
-    const isDevOrganizer = process.env.NODE_ENV === 'development' && (userRole?.toLowerCase() === 'organizer' || !userRole);
 
-    if (userId && !isOwner && !isAdmin && !isDevOrganizer) {
+    if (!isOwner && !isAdmin) {
       const err: any = new Error('Forbidden. You are not authorized to view reports for this event.');
       err.statusCode = 403;
       throw err;
