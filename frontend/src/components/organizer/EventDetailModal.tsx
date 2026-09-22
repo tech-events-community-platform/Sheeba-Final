@@ -12,25 +12,40 @@ import {
   ExternalLink,
   Copy,
   ShieldCheck,
+  HelpCircle,
 } from 'lucide-react';
+import { EditEventQuestionsModal } from './EditEventQuestionsModal';
 
 interface EventDetailModalProps {
   event: Event | null;
   isOpen: boolean;
   onClose: () => void;
   onDeleteClick?: (event: Event) => void;
+  onEventUpdated?: (updatedEvent: Event) => void;
 }
 
-export const EventDetailModal: React.FC<EventDetailModalProps> = ({ event, isOpen, onClose, onDeleteClick }) => {
+export const EventDetailModal: React.FC<EventDetailModalProps> = ({
+  event,
+  isOpen,
+  onClose,
+  onDeleteClick,
+  onEventUpdated,
+}) => {
   const [copied, setCopied] = useState(false);
+  const [isEditQuestionsOpen, setIsEditQuestionsOpen] = useState(false);
+  const [currentEvent, setCurrentEvent] = useState<Event | null>(event);
 
-  if (!isOpen || !event) return null;
+  React.useEffect(() => {
+    setCurrentEvent(event);
+  }, [event]);
 
-  const publicUrl = `${window.location.origin}/e/${event.shareLinkToken}`;
-  const fillRate = event.capacity > 0 ? Math.round((event.registeredCount / event.capacity) * 100) : 100;
-  const turnoutRate = event.registeredCount > 0 ? Math.round((event.checkedInCount / event.registeredCount) * 100) : 0;
-  const grossRevenue = event.isPaid ? event.registeredCount * event.ticketPrice : 0;
-  const remainingSpots = Math.max(0, event.capacity - event.registeredCount);
+  if (!isOpen || !event || !currentEvent) return null;
+
+  const publicUrl = `${window.location.origin}/e/${currentEvent.shareLinkToken}`;
+  const fillRate = currentEvent.capacity > 0 ? Math.round((currentEvent.registeredCount / currentEvent.capacity) * 100) : 100;
+  const turnoutRate = currentEvent.registeredCount > 0 ? Math.round((currentEvent.checkedInCount / currentEvent.registeredCount) * 100) : 0;
+  const grossRevenue = currentEvent.isPaid ? currentEvent.registeredCount * currentEvent.ticketPrice : 0;
+  const remainingSpots = Math.max(0, currentEvent.capacity - currentEvent.registeredCount);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(publicUrl);
@@ -185,30 +200,38 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ event, isOpe
         </div>
 
         {/* Actions Grid */}
-        <div className="grid grid-cols-3 gap-2.5 pt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => setIsEditQuestionsOpen(true)}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-white border border-gray-200 hover:border-[#63474D] text-[#63474D] text-xs font-semibold transition-colors shadow-2xs text-center cursor-pointer"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>Edit Questions</span>
+          </button>
           <Link
-            to={`/organizer/events/${event.id}/scanner`}
+            to={`/organizer/events/${currentEvent.id}/scanner`}
             onClick={onClose}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-white border border-gray-200 hover:border-[#C84B18] text-[#C84B18] text-xs font-semibold transition-colors shadow-2xs text-center"
+            className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-white border border-gray-200 hover:border-[#C84B18] text-[#C84B18] text-xs font-semibold transition-colors shadow-2xs text-center"
           >
             <QrCode className="w-3.5 h-3.5" />
-            <span>Check-in Console</span>
+            <span>Check-in</span>
           </Link>
           <Link
-            to={`/organizer/events/${event.id}/attendees`}
+            to={`/organizer/events/${currentEvent.id}/attendees`}
             onClick={onClose}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-white border border-gray-200 hover:border-[#C84B18] text-[#C84B18] text-xs font-semibold transition-colors shadow-2xs text-center"
+            className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-white border border-gray-200 hover:border-[#C84B18] text-[#C84B18] text-xs font-semibold transition-colors shadow-2xs text-center"
           >
             <Award className="w-3.5 h-3.5" />
-            <span>Manage Badges</span>
+            <span>Badges</span>
           </Link>
           <Link
-            to={`/organizer/reports/${event.id}`}
+            to={`/organizer/reports/${currentEvent.id}`}
             onClick={onClose}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-white border border-gray-200 hover:border-[#C84B18] text-[#C84B18] text-xs font-semibold transition-colors shadow-2xs text-center"
+            className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-white border border-gray-200 hover:border-[#C84B18] text-[#C84B18] text-xs font-semibold transition-colors shadow-2xs text-center"
           >
             <BarChart3 className="w-3.5 h-3.5" />
-            <span>Event Report</span>
+            <span>Report</span>
           </Link>
         </div>
 
@@ -219,7 +242,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ event, isOpe
               type="button"
               onClick={() => {
                 onClose();
-                onDeleteClick(event);
+                onDeleteClick(currentEvent);
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
             >
@@ -228,6 +251,22 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ event, isOpe
           </div>
         )}
       </div>
+
+      {/* Edit Registration Questions Modal */}
+      <EditEventQuestionsModal
+        event={currentEvent}
+        isOpen={isEditQuestionsOpen}
+        onClose={() => setIsEditQuestionsOpen(false)}
+        onQuestionsUpdated={(updatedQuestions) => {
+          if (currentEvent) {
+            const updated = { ...currentEvent, customQuestions: updatedQuestions };
+            setCurrentEvent(updated);
+            if (onEventUpdated) {
+              onEventUpdated(updated);
+            }
+          }
+        }}
+      />
     </div>
   );
 };

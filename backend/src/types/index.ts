@@ -51,7 +51,7 @@ export interface IUser {
 
 export type IUserSafe = Omit<IUser, 'password_hash'>;
 
-export type EventType = 'hackathon' | 'workshop' | 'meetup';
+export type EventType = 'hackathon' | 'workshop' | 'meetup' | 'summit' | string;
 export type EventStatus = 'open' | 'closed' | 'completed' | 'canceled' | 'postponed' | 'draft' | 'published';
 
 export interface RegistrationQuestion {

@@ -1,6 +1,6 @@
 import type { OrganizerSocials } from './user';
 
-export type EventType = 'hackathon' | 'workshop' | 'meetup' | 'other';
+export type EventType = 'hackathon' | 'workshop' | 'meetup' | 'summit' | 'other' | string;
 
 export type EventStatus = 'open' | 'closed' | 'canceled' | 'postponed' | 'completed';
 
@@ -20,6 +20,7 @@ export interface Event {
   id: string;
   organizerId: string;
   organizerName: string;
+  organizationName?: string;
   organizerAvatar?: string;
   organizerSocials?: OrganizerSocials;
   title: string;

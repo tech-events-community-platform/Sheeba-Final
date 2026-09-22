@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -11,8 +11,15 @@ import {
   HelpCircle,
   CreditCard,
   X,
+  UploadCloud,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { getOrganizerDefaultQuestions } from '../../utils/defaultQuestions';
+import {
+  getCloudinaryConfig,
+  saveCloudinaryConfig,
+  uploadToCloudinary,
+} from '../../utils/cloudinary';
 
 interface QuestionDraft {
   id: string;
@@ -38,6 +45,87 @@ export const CreateEventPage: React.FC = () => {
     description: '',
     posterImageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
   });
+
+  const [selectedTypeOption, setSelectedTypeOption] = useState<string>('meetup');
+  const [customTypeInput, setCustomTypeInput] = useState<string>('');
+
+  const [bannerSource, setBannerSource] = useState<'upload' | 'url'>('upload');
+  const [isUploadingBanner, setIsUploadingBanner] = useState<boolean>(false);
+  const [bannerUploadError, setBannerUploadError] = useState<string | null>(null);
+  const [showCloudinaryConfigModal, setShowCloudinaryConfigModal] = useState<boolean>(false);
+  const [tempCloudName, setTempCloudName] = useState<string>(() => getCloudinaryConfig().cloudName);
+  const [tempUploadPreset, setTempUploadPreset] = useState<string>(() => getCloudinaryConfig().uploadPreset);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTypeChange = (val: string) => {
+    setSelectedTypeOption(val);
+    if (val === 'other') {
+      setFormData((prev) => ({ ...prev, type: (customTypeInput.trim() || 'other') as EventType }));
+    } else {
+      setFormData((prev) => ({ ...prev, type: val as EventType }));
+    }
+    if (errors.customType) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.customType;
+        return next;
+      });
+    }
+  };
+
+  const handleCustomTypeChange = (val: string) => {
+    setCustomTypeInput(val);
+    setFormData((prev) => ({ ...prev, type: (val.trim() || 'other') as EventType }));
+    if (errors.customType) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.customType;
+        return next;
+      });
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const config = getCloudinaryConfig();
+    if (!config.cloudName || !config.uploadPreset) {
+      setShowCloudinaryConfigModal(true);
+      return;
+    }
+
+    setIsUploadingBanner(true);
+    setBannerUploadError(null);
+
+    try {
+      const url = await uploadToCloudinary(file);
+      setFormData((prev) => ({ ...prev, posterImageUrl: url }));
+    } catch (err: any) {
+      if (err.message?.includes('MISSING_CLOUDINARY_CONFIG')) {
+        setShowCloudinaryConfigModal(true);
+      } else {
+        setBannerUploadError(err.message || 'Failed to upload image. Please try again.');
+      }
+    } finally {
+      setIsUploadingBanner(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleSaveCloudinaryConfig = () => {
+    if (!tempCloudName.trim() || !tempUploadPreset.trim()) {
+      alert('Please enter both Cloud Name and Upload Preset');
+      return;
+    }
+    saveCloudinaryConfig(tempCloudName.trim(), tempUploadPreset.trim());
+    setShowCloudinaryConfigModal(false);
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 150);
+  };
 
   const [includeDefaultQuestions, setIncludeDefaultQuestions] = useState<boolean>(true);
 
@@ -167,6 +255,9 @@ export const CreateEventPage: React.FC = () => {
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!formData.title.trim()) errs.title = 'Event title is required';
+    if (selectedTypeOption === 'other' && !customTypeInput.trim()) {
+      errs.customType = 'Please specify what type of event this is';
+    }
     if (!formData.date) errs.date = 'Event date is required';
     if (!formData.location.trim()) errs.location = 'Venue or location is required';
     if (!formData.description.trim()) errs.description = 'Description is required';
@@ -184,6 +275,12 @@ export const CreateEventPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      const finalType = (
+        selectedTypeOption === 'other'
+          ? customTypeInput.trim() || 'other'
+          : selectedTypeOption
+      ) as EventType;
+
       const formattedQuestions: RegistrationQuestion[] = questions
         .filter((q) => q.questionText.trim().length > 0)
         .map((q, idx) => ({
@@ -200,7 +297,7 @@ export const CreateEventPage: React.FC = () => {
 
       const newEvent = await api.events.create({
         title: formData.title,
-        type: formData.type,
+        type: finalType,
         date: formData.date,
         startTime: formData.startTime,
         endTime: formData.endTime,
@@ -317,20 +414,35 @@ export const CreateEventPage: React.FC = () => {
               {errors.title && <p className="text-[11px] text-red-600 mt-1">{errors.title}</p>}
             </div>
 
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-start gap-4">
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1">Event Type *</label>
                 <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as EventType })}
-                  className="w-48 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  value={selectedTypeOption}
+                  onChange={(e) => handleTypeChange(e.target.value)}
+                  className="w-48 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
                 >
                   <option value="meetup">Meetup</option>
                   <option value="workshop">Workshop</option>
                   <option value="hackathon">Hackathon</option>
-                  <option value="other">Other</option>
+                  <option value="summit">Summit</option>
+                  <option value="other">Other (Write your own...)</option>
                 </select>
               </div>
+
+              {selectedTypeOption === 'other' && (
+                <div className="flex-1 min-w-[200px] animate-fade-in">
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1">Specify Event Type *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Conference, Panel, Bootcamp..."
+                    value={customTypeInput}
+                    onChange={(e) => handleCustomTypeChange(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                  {errors.customType && <p className="text-[11px] text-red-600 mt-1">{errors.customType}</p>}
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1">Date *</label>
@@ -367,15 +479,117 @@ export const CreateEventPage: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-[#2D1F23] mb-1">Poster / Banner Image URL</label>
-              <input
-                type="url"
-                placeholder="https://images.unsplash.com/..."
-                value={formData.posterImageUrl}
-                onChange={(e) => setFormData({ ...formData, posterImageUrl: e.target.value })}
-                className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-              />
+            {/* Poster / Banner with Cloudinary PC upload & URL paste */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-[#2D1F23]">Poster / Banner</label>
+                <div className="flex items-center gap-1 bg-[#FAF7F5] p-1 rounded-xl border border-[#E8DDD7]">
+                  <button
+                    type="button"
+                    onClick={() => setBannerSource('upload')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      bannerSource === 'upload'
+                        ? 'bg-[#63474D] text-white shadow-2xs'
+                        : 'text-[#756366] hover:text-[#2D1F23]'
+                    }`}
+                  >
+                    Upload from PC
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBannerSource('url')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      bannerSource === 'url'
+                        ? 'bg-[#63474D] text-white shadow-2xs'
+                        : 'text-[#756366] hover:text-[#2D1F23]'
+                    }`}
+                  >
+                    Paste URL
+                  </button>
+                </div>
+              </div>
+
+              {bannerSource === 'upload' ? (
+                <div className="space-y-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+
+                  <div
+                    onClick={() => !isUploadingBanner && fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
+                      isUploadingBanner
+                        ? 'border-[#AA767C] bg-[#FAF7F5] opacity-75 cursor-wait'
+                        : 'border-[#E8DDD7] bg-[#FAF7F5] hover:border-[#63474D] hover:bg-[#F5ECE8]/50'
+                    }`}
+                  >
+                    {isUploadingBanner ? (
+                      <div className="flex flex-col items-center justify-center space-y-2 py-2">
+                        <div className="w-6 h-6 border-2 border-[#63474D] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs font-bold text-[#63474D]">Uploading to Cloudinary...</span>
+                        <span className="text-[10px] text-[#756366]">Optimizing image and generating secure URL</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center space-y-2 py-1">
+                        <div className="w-10 h-10 rounded-full bg-[#63474D]/10 text-[#63474D] flex items-center justify-center">
+                          <UploadCloud className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-[#63474D] block">
+                            Click to upload poster from your PC
+                          </span>
+                          <span className="text-[10px] text-[#756366] block mt-0.5">
+                            PNG, JPG, or WEBP up to 10MB
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {bannerUploadError && (
+                    <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-center justify-between">
+                      <span>{bannerUploadError}</span>
+                      <button
+                        type="button"
+                        onClick={() => setBannerUploadError(null)}
+                        className="text-red-400 hover:text-red-600 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {formData.posterImageUrl && (
+                    <div className="flex items-center justify-between text-[11px] text-[#756366] px-1">
+                      <span className="truncate max-w-xs">
+                        Current: <strong className="text-[#2D1F23]">{formData.posterImageUrl.substring(0, 45)}...</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-[#63474D] font-bold hover:underline cursor-pointer"
+                      >
+                        Change Image
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <input
+                    type="url"
+                    placeholder="https://images.unsplash.com/... or Cloudinary URL"
+                    value={formData.posterImageUrl}
+                    onChange={(e) => setFormData({ ...formData, posterImageUrl: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                  <p className="text-[10px] text-[#756366]">Paste an image link from Unsplash, Cloudinary, or any CDN.</p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -660,6 +874,79 @@ export const CreateEventPage: React.FC = () => {
           ) : null}
         </div>
       </div>
+
+      {/* Cloudinary Setup Modal (Fallback if environment variables are not yet configured) */}
+      {showCloudinaryConfigModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#E8DDD7] shadow-xl space-y-4 animate-fade-in">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center">
+                  <UploadCloud className="w-4 h-4" />
+                </div>
+                <h3 className="font-serif font-bold text-base text-[#2D1F23]">Connect Cloudinary</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCloudinaryConfigModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#756366] leading-relaxed">
+              To upload banner images directly from your PC, enter your Cloudinary <strong>Cloud Name</strong> and <strong>Unsigned Upload Preset</strong>. (Or switch to "Paste URL" if you prefer using image links).
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">Cloud Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. dxxxxxx"
+                  value={tempCloudName}
+                  onChange={(e) => setTempCloudName(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">Upload Preset (Unsigned) *</label>
+                <input
+                  type="text"
+                  placeholder="e.g. sheeba_event_posters"
+                  value={tempUploadPreset}
+                  onChange={(e) => setTempUploadPreset(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowCloudinaryConfigModal(false);
+                  setBannerSource('url');
+                }}
+              >
+                Use Paste URL
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={handleSaveCloudinaryConfig}
+              >
+                Save & Choose Image
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
