@@ -167,12 +167,12 @@ export const OrganizerDashboardPage: React.FC = () => {
                     onClick={() => navigate(`/organizer/events/${evt.id}`)}
                     className="bg-white rounded-2xl border border-gray-200 shadow-2xs hover:border-[#63474D] hover:shadow-xs transition-all overflow-hidden flex flex-row items-stretch cursor-pointer group h-28 sm:h-28"
                   >
-                    {/* Left Poster Image Container (Fills the entire slot flush with no padding) */}
-                    <div className="w-24 sm:w-32 h-full shrink-0 overflow-hidden bg-gray-100 border-r border-gray-100">
+                    {/* Left Poster Image Container (Flexible container, fully visible image) */}
+                    <div className="w-28 sm:w-36 md:w-44 h-full shrink-0 overflow-hidden bg-[#FAF7F5] border-r border-gray-100 flex items-center justify-center p-2">
                       <img
                         src={posterImage}
                         alt={evt.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 rounded-lg"
                       />
                     </div>
 

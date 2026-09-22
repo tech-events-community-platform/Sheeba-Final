@@ -224,15 +224,17 @@ export const EventDetailPage: React.FC = () => {
       {/* Event Details Section (Unboxed) */}
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row gap-6 items-start">
-          {/* Poster Image */}
+          {/* Poster / Banner Image Container (Wholly visible, no cropping) */}
           {event.posterImageUrl || event.bannerUrl ? (
-            <img
-              src={event.posterImageUrl || event.bannerUrl}
-              alt={event.title}
-              className="w-full md:w-64 h-44 object-cover rounded-2xl shrink-0"
-            />
+            <div className="w-full md:w-72 lg:w-80 h-44 sm:h-48 bg-[#FAF7F5] border border-gray-200/80 rounded-2xl p-2.5 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+              <img
+                src={event.posterImageUrl || event.bannerUrl}
+                alt={event.title}
+                className="w-full h-full object-contain rounded-xl"
+              />
+            </div>
           ) : (
-            <div className="w-full md:w-64 h-44 bg-[#FAF7F5] rounded-2xl flex items-center justify-center text-gray-400 shrink-0">
+            <div className="w-full md:w-72 lg:w-80 h-44 sm:h-48 bg-[#FAF7F5] border border-gray-200/80 rounded-2xl flex items-center justify-center text-gray-400 shrink-0">
               <Image className="w-8 h-8" />
             </div>
           )}

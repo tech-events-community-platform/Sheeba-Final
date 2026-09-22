@@ -862,14 +862,16 @@ export const CreateEventPage: React.FC = () => {
               <span className="text-xs font-bold text-[#756366] uppercase tracking-wider block">
                 Poster Preview
               </span>
-              <img
-                src={formData.posterImageUrl}
-                alt="Poster preview"
-                className="w-full max-w-sm rounded-2xl shadow-md object-cover max-h-[480px]"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
+              <div className="w-full max-w-sm rounded-2xl shadow-md bg-[#FAF7F5] border border-gray-200/80 p-2 flex items-center justify-center overflow-hidden max-h-[480px]">
+                <img
+                  src={formData.posterImageUrl}
+                  alt="Poster preview"
+                  className="w-full h-auto max-h-[460px] object-contain rounded-xl"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              </div>
             </div>
           ) : null}
         </div>
