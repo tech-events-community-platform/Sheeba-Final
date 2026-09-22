@@ -140,6 +140,12 @@ export const VerifyTicketPage: React.FC = () => {
           canCheckIn: false,
         };
       });
+
+      // Navigate to attendee profile
+      const targetAttendeeId = verificationData.attendee.id;
+      setTimeout(() => {
+        navigate(`/profile/${targetAttendeeId}`);
+      }, 900);
     } catch (err: any) {
       playAudioFeedback('error');
       alert(err.data?.message || err.message || 'Failed to mark attendance.');

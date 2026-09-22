@@ -15,6 +15,7 @@ import {
   ExternalLink,
   CheckCircle2,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { printTicketPass } from '../../utils/printTicket';
 
@@ -25,6 +26,7 @@ export const MyEventsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'Upcoming' | 'Tickets'>('Upcoming');
   const [highlightedTicketId, setHighlightedTicketId] = useState<string | null>(null);
+  const [selectedAttendeeTicket, setSelectedAttendeeTicket] = useState<Ticket | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -276,19 +278,15 @@ export const MyEventsPage: React.FC = () => {
 
                     {/* Main Content: QR Code Left + Details Right */}
                     <div className="p-6 flex flex-col md:flex-row items-center md:items-stretch gap-6">
-                      {/* Live Dynamic QR Code Section */}
-                      <div className="flex flex-col items-center justify-center p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] shrink-0 text-center w-full md:w-auto">
-                        <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] shadow-2xs">
+                      {/* Live Dynamic QR Code Section (Clickable to open Attendee Box) */}
+                      <div
+                        onClick={() => setSelectedAttendeeTicket(ticket)}
+                        title="Click QR Code to view Attendee Information Box"
+                        className="flex flex-col items-center justify-center p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] shrink-0 text-center w-full md:w-auto cursor-pointer hover:border-[#63474D] hover:shadow-md transition-all group"
+                      >
+                        <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] shadow-2xs group-hover:scale-105 transition-transform">
                           <QRCodeSVG
-                            value={[
-                              `SHEEBA VERIFIED PASS`,
-                              `Attendee: ${ticket.attendeeName || 'Attendee'}`,
-                              ticket.attendeeEmail ? `Email: ${ticket.attendeeEmail}` : '',
-                              `Event: ${ticket.eventTitle || 'Tech Event'}`,
-                              `Code: ${ticket.ticketCode || ticket.id}`,
-                              `Status: ${ticket.status || 'Valid'}`,
-                              `Verify: ${window.location.origin}/verify-ticket?token=${encodeURIComponent(ticket.qrToken || ticket.id)}&code=${encodeURIComponent(ticket.ticketCode || '')}`,
-                            ].filter(Boolean).join('\n')}
+                            value={ticket.attendeeName || 'Attendee'}
                             size={160}
                             bgColor="#ffffff"
                             fgColor="#2D1F23"
@@ -297,7 +295,11 @@ export const MyEventsPage: React.FC = () => {
                           />
                         </div>
                         <div className="mt-2.5 text-center w-full max-w-[180px]">
-                          <p className="text-xs font-bold text-[#2D1F23] truncate">
+                          <span className="text-[10px] font-bold text-[#63474D] bg-[#63474D]/10 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 group-hover:bg-[#63474D] group-hover:text-white transition-colors">
+                            <Sparkles className="w-3 h-3 text-[#FFA686]" />
+                            Click QR for Info
+                          </span>
+                          <p className="text-xs font-bold text-[#2D1F23] truncate mt-1">
                             {ticket.attendeeName}
                           </p>
                           <p className="text-[11px] font-mono font-bold text-[#63474D]">
@@ -394,6 +396,106 @@ export const MyEventsPage: React.FC = () => {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ATTRACTIVE ATTENDEE INFORMATION MODAL BOX */}
+      {selectedAttendeeTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div
+            className="bg-white rounded-3xl max-w-md w-full border border-[#E8DDD7] shadow-2xl overflow-hidden relative animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-br from-[#63474D] to-[#43272D] text-white p-6 text-center relative overflow-hidden">
+              <button
+                onClick={() => setSelectedAttendeeTicket(null)}
+                className="absolute top-4 right-4 p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <img src="/logo.webp" alt="Sheeba Logo" className="h-7 w-auto object-contain drop-shadow-xs" />
+                <span className="font-serif font-bold text-sm tracking-wider text-white">
+                  SHEEBA<span className="text-[#FFA686]">.</span> ATTENDEE PASS
+                </span>
+              </div>
+
+              <div className="w-20 h-20 rounded-full bg-white/20 border-2 border-white/60 mx-auto flex items-center justify-center font-serif text-3xl font-bold text-white shadow-inner mb-2">
+                {selectedAttendeeTicket.attendeeName ? selectedAttendeeTicket.attendeeName.charAt(0).toUpperCase() : 'A'}
+              </div>
+
+              <h3 className="font-serif text-2xl font-bold text-white leading-tight">
+                {selectedAttendeeTicket.attendeeName}
+              </h3>
+              <p className="text-xs text-[#FFA686] font-medium mt-0.5">
+                {selectedAttendeeTicket.attendeeEmail}
+              </p>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 bg-[#FAF7F5]">
+              <div className="p-4 bg-white rounded-2xl border border-[#E8DDD7] space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-[#E8DDD7]">
+                  <span className="text-[10px] uppercase font-bold text-[#756366]">Pass Code</span>
+                  <span className="font-mono font-bold text-[#63474D] bg-[#FAF7F5] px-2.5 py-0.5 rounded-md border border-[#E8DDD7]">
+                    {selectedAttendeeTicket.ticketCode || selectedAttendeeTicket.id}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[10px] uppercase font-bold text-[#756366]">Status</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    {selectedAttendeeTicket.status}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[10px] uppercase font-bold text-[#756366]">Event</span>
+                  <span className="font-bold text-[#2D1F23] truncate max-w-[210px]">{selectedAttendeeTicket.eventTitle}</span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[10px] uppercase font-bold text-[#756366]">Date & Time</span>
+                  <span className="text-[#2D1F23] font-medium">{selectedAttendeeTicket.eventDate} • {selectedAttendeeTicket.eventTime}</span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[10px] uppercase font-bold text-[#756366]">Location</span>
+                  <span className="text-[#756366] truncate max-w-[210px]">{selectedAttendeeTicket.eventLocation}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 space-y-2.5">
+                <Link
+                  to={`/profile/${selectedAttendeeTicket.attendeeId}`}
+                  className="block w-full"
+                  onClick={() => setSelectedAttendeeTicket(null)}
+                >
+                  <Button
+                    variant="outline"
+                    fullWidth
+                    className="border-[#63474D] text-[#63474D] hover:bg-[#63474D]/10 font-bold py-2.5 text-sm"
+                    icon={<ExternalLink className="w-4 h-4" />}
+                  >
+                    View Attendee Profile
+                  </Button>
+                </Link>
+
+                <Button
+                  variant="outline"
+                  fullWidth
+                  onClick={() => setSelectedAttendeeTicket(null)}
+                  className="border-gray-300 text-gray-700 hover:bg-black/5 text-xs py-2"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

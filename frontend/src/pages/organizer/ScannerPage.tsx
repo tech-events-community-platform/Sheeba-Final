@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Html5Qrcode, type Html5QrcodeCameraScanConfig } from 'html5-qrcode';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -111,6 +111,7 @@ export function extractTicketTokenOrCode(scannedText: string): string {
 export const ScannerPage: React.FC = () => {
   const { id: eventId } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Core event state
   const [event, setEvent] = useState<Event | null>(null);
@@ -389,6 +390,12 @@ export const ScannerPage: React.FC = () => {
           checkedInCount: (event.checkedInCount || 0) + 1,
         });
       }
+
+      // Automatically navigate to attendee's profile
+      const targetAttendeeId = verifiedResult.attendee.id;
+      setTimeout(() => {
+        navigate(`/profile/${targetAttendeeId}`);
+      }, 900);
     } catch (err: any) {
       playAudioFeedback('error');
       const msg = err.data?.message || err.message || 'Failed to complete check-in.';

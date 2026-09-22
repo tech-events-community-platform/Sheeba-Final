@@ -24,6 +24,9 @@ function extractCleanTokenOrCode(input: string): string {
   const shbMatch = raw.match(/SHB-[A-Z0-9]+-[0-9]{4}/i);
   if (shbMatch) return shbMatch[0].trim();
 
+  const attendeeMatch = raw.match(/Attendee:\s*([^\n\r]+)/i);
+  if (attendeeMatch) return attendeeMatch[1].trim();
+
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     try {
       const parsedUrl = new URL(raw);
@@ -260,7 +263,7 @@ export class CheckinService {
          JOIN events e ON t.event_id = e.id
          JOIN users org ON e.organizer_id = org.id
          JOIN registrations r ON t.registration_id = r.id
-         WHERE UPPER(t.ticket_code) = UPPER($1) OR t.qr_token = $1`,
+         WHERE UPPER(t.ticket_code) = UPPER($1) OR t.qr_token = $1 OR UPPER(u.full_name) = UPPER($1) OR u.email ILIKE $1`,
         [cleanInput]
       );
     }
@@ -437,14 +440,14 @@ export class CheckinService {
          FROM tickets t
          JOIN users u ON t.user_id = u.id
          JOIN registrations r ON t.registration_id = r.id
-         WHERE (UPPER(t.ticket_code) = UPPER($1) OR t.qr_token = $1) AND t.event_id = $2`,
+         WHERE (UPPER(t.ticket_code) = UPPER($1) OR t.qr_token = $1 OR UPPER(u.full_name) = UPPER($1) OR u.email ILIKE $1) AND t.event_id = $2`,
         [cleanInput, realEventId]
       );
     }
 
     if (!ticketRes.rowCount || ticketRes.rowCount === 0) {
       const otherEvt = await query(
-        `SELECT e.title FROM tickets t JOIN events e ON t.event_id = e.id WHERE UPPER(t.ticket_code) = UPPER($1) OR t.qr_token = $1`,
+        `SELECT e.title FROM tickets t JOIN events e ON t.event_id = e.id JOIN users u ON t.user_id = u.id WHERE UPPER(t.ticket_code) = UPPER($1) OR t.qr_token = $1 OR UPPER(u.full_name) = UPPER($1) OR u.email ILIKE $1`,
         [cleanInput]
       );
       if (otherEvt.rowCount && otherEvt.rowCount > 0) {
