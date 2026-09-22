@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS events (
     organizer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
-    event_type VARCHAR(50) NOT NULL DEFAULT 'workshop' CHECK (event_type IN ('hackathon', 'workshop', 'meetup')),
+    event_type VARCHAR(50) NOT NULL DEFAULT 'workshop',
     category VARCHAR(100) DEFAULT 'Tech',
     event_date TIMESTAMPTZ NOT NULL,
     end_date TIMESTAMPTZ,
@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS events (
 -- Alter table commands for events
 ALTER TABLE events ADD COLUMN IF NOT EXISTS poster_image_url TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_type VARCHAR(50) NOT NULL DEFAULT 'workshop';
+ALTER TABLE events DROP CONSTRAINT IF EXISTS events_event_type_check;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS start_time VARCHAR(50) DEFAULT '09:00 AM';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS end_time VARCHAR(50) DEFAULT '05:00 PM';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS time_str VARCHAR(100) DEFAULT '09:00 AM - 05:00 PM EAT';

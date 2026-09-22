@@ -28,6 +28,7 @@ export class EventService {
       id: row.id,
       organizerId: row.organizer_id,
       organizerName: row.organizer_organization || row.organization || row.organizer_name || 'Organizer',
+      organizationName: row.organizer_organization || row.organization || '',
       organizerEmail: row.organizer_email || '',
       title: row.title,
       description: row.description,
@@ -179,6 +180,7 @@ export class EventService {
       SELECT 
         e.*,
         u.full_name AS organizer_name,
+        u.organization AS organizer_organization,
         u.email AS organizer_email,
         COUNT(DISTINCT r.id) AS registered_count,
         COUNT(DISTINCT CASE WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) OR t.status = 'CHECKED_IN' THEN r.id END) AS checked_in_count
@@ -201,6 +203,7 @@ export class EventService {
       SELECT 
         e.*,
         u.full_name AS organizer_name,
+        u.organization AS organizer_organization,
         u.email AS organizer_email,
         COUNT(DISTINCT r.id) AS registered_count,
         COUNT(DISTINCT CASE WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) OR t.status = 'CHECKED_IN' THEN r.id END) AS checked_in_count
@@ -245,13 +248,48 @@ export class EventService {
     const values: any[] = [];
     let counter = 1;
 
-    const allowedFields = ['title', 'description', 'event_type', 'location', 'venue_name', 'capacity', 'status', 'is_paid', 'ticket_price', 'start_time', 'end_time', 'time_str', 'banner_url', 'poster_image_url'];
+    const allowedFields = [
+      'title',
+      'description',
+      'event_type',
+      'location',
+      'venue_name',
+      'capacity',
+      'status',
+      'is_paid',
+      'ticket_price',
+      'start_time',
+      'end_time',
+      'time_str',
+      'banner_url',
+      'poster_image_url',
+      'custom_questions',
+    ];
 
     for (const [key, value] of Object.entries(data)) {
-      const dbKey = key === 'type' ? 'event_type' : key === 'ticketPrice' ? 'ticket_price' : key === 'isPaid' ? 'is_paid' : key === 'posterImageUrl' ? 'poster_image_url' : key === 'bannerUrl' ? 'banner_url' : key;
+      const dbKey =
+        key === 'type'
+          ? 'event_type'
+          : key === 'ticketPrice'
+          ? 'ticket_price'
+          : key === 'isPaid'
+          ? 'is_paid'
+          : key === 'posterImageUrl'
+          ? 'poster_image_url'
+          : key === 'bannerUrl'
+          ? 'banner_url'
+          : key === 'customQuestions'
+          ? 'custom_questions'
+          : key;
       if (allowedFields.includes(dbKey)) {
         fields.push(`${dbKey} = $${counter++}`);
-        values.push(value);
+        values.push(
+          dbKey === 'custom_questions'
+            ? typeof value === 'string'
+              ? value
+              : JSON.stringify(value || [])
+            : value
+        );
       }
     }
 

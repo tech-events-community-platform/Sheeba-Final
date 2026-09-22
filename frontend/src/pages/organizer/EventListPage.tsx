@@ -261,6 +261,10 @@ export const EventListPage: React.FC = () => {
         isOpen={!!selectedModalEvent}
         onClose={() => setSelectedModalEvent(null)}
         onDeleteClick={(evt) => handleOpenDeleteModal(evt)}
+        onEventUpdated={(updated) => {
+          setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+          setSelectedModalEvent(updated);
+        }}
       />
 
       {/* Event Delete Confirmation Modal */}

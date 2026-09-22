@@ -15,7 +15,7 @@ export const Footer: React.FC = () => {
           {/* Left: Brand Copyright */}
           <p
             className={`font-semibold tracking-wide text-center sm:text-left ${
-              isExternalRegistration ? 'text-black' : 'text-[#2D1F23]'
+              isExternalRegistration ? 'text-white' : 'text-[#2D1F23]'
             }`}
           >
             © 2026 Sheeba.
@@ -24,7 +24,7 @@ export const Footer: React.FC = () => {
           {/* Middle: Rights & Location */}
           <p
             className={`font-medium tracking-wide text-center ${
-              isExternalRegistration ? 'text-black' : 'text-[#756366]'
+              isExternalRegistration ? 'text-white/80' : 'text-[#756366]'
             }`}
           >
             All rights reserved. Addis Ababa, Ethiopia.
@@ -38,7 +38,7 @@ export const Footer: React.FC = () => {
               rel="noopener noreferrer"
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 isExternalRegistration
-                  ? 'text-black hover:text-black/70 hover:bg-black/10'
+                  ? 'text-white hover:text-white/80 hover:bg-white/10'
                   : 'text-[#2D1F23] hover:text-[#63474D] hover:bg-[#63474D]/10'
               }`}
               title="LinkedIn"
@@ -53,7 +53,7 @@ export const Footer: React.FC = () => {
               rel="noopener noreferrer"
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 isExternalRegistration
-                  ? 'text-black hover:text-black/70 hover:bg-black/10'
+                  ? 'text-white hover:text-white/80 hover:bg-white/10'
                   : 'text-[#2D1F23] hover:text-[#63474D] hover:bg-[#63474D]/10'
               }`}
               title="X (Twitter)"
@@ -68,7 +68,7 @@ export const Footer: React.FC = () => {
               rel="noopener noreferrer"
               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 isExternalRegistration
-                  ? 'text-black hover:text-black/70 hover:bg-black/10'
+                  ? 'text-white hover:text-white/80 hover:bg-white/10'
                   : 'text-[#2D1F23] hover:text-[#63474D] hover:bg-[#63474D]/10'
               }`}
               title="TikTok"

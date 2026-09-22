@@ -81,7 +81,7 @@ export const PublicRegisterPage: React.FC = () => {
 
 
   const getCalendarTile = (dateStr?: string) => {
-    if (!dateStr) return { month: 'EVENT', day: '•', weekday: '', fullDate: '' };
+    if (!dateStr) return { month: 'EVENT', day: '•', weekday: '', fullDate: '', monthYear: '' };
     try {
       const d = new Date(dateStr);
       if (!isNaN(d.getTime())) {
@@ -89,12 +89,13 @@ export const PublicRegisterPage: React.FC = () => {
         const day = d.getDate();
         const weekday = d.toLocaleString('en-US', { weekday: 'long' });
         const fullDate = d.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        return { month, day, weekday, fullDate };
+        const monthYear = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        return { month, day, weekday, fullDate, monthYear };
       }
     } catch {
       // ignore
     }
-    return { month: 'EVENT', day: '•', weekday: '', fullDate: dateStr };
+    return { month: 'EVENT', day: '•', weekday: '', fullDate: dateStr, monthYear: '' };
   };
 
   if (loading) {
@@ -135,21 +136,29 @@ export const PublicRegisterPage: React.FC = () => {
     'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
 
   const cal = getCalendarTile(event.date);
+  const eventMonthYear = cal.monthYear;
+  const displayOrganization =
+    event.organizationName ||
+    (event as any).organizer_organization ||
+    (event as any).organizerOrganization ||
+    (user && (user.role === 'ORGANIZER' || user.id === event.organizerId) && user.organization ? user.organization : '') ||
+    (event.organizerName && event.organizerName !== user?.name ? event.organizerName : '') ||
+    user?.organization ||
+    event.organizerName ||
+    'Organization';
 
-
-
-  // Modern 2-Column Structure
+  // Modern 2-Column Structure aligned to the left beginning of the floating header pill
   return (
-    <div className="w-full py-8 sm:py-10 px-4 sm:px-6 lg:px-12">
-      <div className="max-w-5xl mx-auto">
+    <div className="w-full pt-2 sm:pt-4 pb-12 px-3 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-7">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
 
           {/* LEFT COLUMN: Title, Date/Time, Location, Registration Area, Description */}
           <div className="lg:col-span-7 space-y-6 order-2 lg:order-1">
 
-            {/* Event Category & Price Row (Increased size by a few px for strong visibility) */}
+            {/* Event Category & Price Row (Yellow lines) */}
             <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="primary" className="uppercase font-mono text-sm sm:text-base py-1.5 px-4 rounded-xl shadow-xs font-bold">
+              <Badge variant="primary" className="uppercase font-mono text-xs sm:text-sm py-1.5 px-4 rounded-xl shadow-xs font-bold">
                 {event.type}
               </Badge>
               <span className="text-gray-400 font-bold">•</span>
@@ -158,16 +167,16 @@ export const PublicRegisterPage: React.FC = () => {
               </span>
             </div>
 
-            {/* Event Title */}
+            {/* Event Title (Orange line - wraps down to middle if long) */}
             <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#2D1F23] tracking-tight leading-tight">
               {event.title}
             </h1>
 
-            {/* Date/Time and Location in the same row (Location to the right of date) */}
-            <div className="flex flex-wrap items-center gap-x-8 sm:gap-x-10 gap-y-3 pt-1">
-              {/* Date & Time */}
-              <div className="flex items-center gap-3.5">
-                <div className="flex flex-col items-center justify-center shrink-0 text-center w-10">
+            {/* Date/Time and Location in side-by-side structures (Blue boxes - fully visible with no ellipsis) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-1">
+              {/* Date & Time Structure (Left blue box) */}
+              <div className="flex items-start gap-3.5">
+                <div className="flex flex-col items-center justify-center shrink-0 text-center w-10 pt-0.5">
                   <span className="text-[11px] font-bold text-[#63474D] uppercase leading-tight tracking-wider">
                     {cal.month}
                   </span>
@@ -175,32 +184,38 @@ export const PublicRegisterPage: React.FC = () => {
                     {cal.day}
                   </span>
                 </div>
-                <div className="space-y-0.5">
-                  <p className="text-xs font-bold text-[#2D1F23]">
+                <div className="space-y-1">
+                  <p className="text-xs sm:text-sm font-bold text-[#2D1F23]">
                     {cal.weekday ? `${cal.weekday}, ${cal.fullDate}` : event.date}
                   </p>
-                  <p className="text-xs text-[#756366] flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-[#AA767C]" />
+                  <p className="text-xs text-[#756366] flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#AA767C] shrink-0" />
                     <span>{event.time || `${event.startTime} - ${event.endTime}`}</span>
                   </p>
                 </div>
               </div>
 
-              {/* Location (in the space to the right of date in the same row) */}
-              <div className="flex items-center gap-3">
-                <div className="w-6 flex items-center justify-center shrink-0">
+              {/* Location Structure (Right blue box - no truncation, full text visible) */}
+              <div className="flex items-start gap-3">
+                <div className="w-6 flex items-center justify-center shrink-0 pt-0.5">
                   <img src="/location.webp" alt="Location" className="w-5 h-5 object-contain" />
                 </div>
-                <div className="space-y-0.5">
-                  <p className="text-xs font-bold text-[#2D1F23]">{event.venueName || event.location}</p>
-                  <p className="text-xs text-[#756366] truncate max-w-[240px]">{event.location}</p>
+                <div className="space-y-0.5 min-w-0">
+                  <p className="text-xs sm:text-sm font-bold text-[#2D1F23] break-words">
+                    {event.venueName || event.location}
+                  </p>
+                  {event.venueName && event.location && event.venueName !== event.location && (
+                    <p className="text-xs text-[#756366] break-words leading-relaxed">
+                      {event.location}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* REGISTRATION SECTION (Unboxed, brought up) */}
+            {/* REGISTRATION SECTION (Red line: Registration divider, welcome message, register button) */}
             <div className="space-y-4 pt-1">
-              <div className="flex items-center justify-between pb-2 border-b border-[#E8DDD7]/60">
+              <div className="flex items-center justify-between pb-2 border-b border-[#E8DDD7]/70">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#756366]">
                   Registration
                 </span>
@@ -213,7 +228,7 @@ export const PublicRegisterPage: React.FC = () => {
 
               {/* Already Registered State */}
               {isAlreadyRegistered ? (
-                <div className="space-y-3 pt-2 text-left">
+                <div className="space-y-3 pt-1 text-left">
                   <div className="flex items-center justify-start gap-2 text-xs font-semibold text-emerald-800">
                     <img src="/tick.webp" alt="Done" className="w-5 h-5 object-contain shrink-0" />
                     <span>You are registered for this event!</span>
@@ -232,7 +247,7 @@ export const PublicRegisterPage: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                /* Welcome message (No red line) & Left-aligned Register Button */
+                /* Welcome message & Left-aligned Register Button */
                 <div className="space-y-3 pt-1">
                   {isAuthenticated && user ? (
                     <div className="space-y-1 text-left">
@@ -256,7 +271,7 @@ export const PublicRegisterPage: React.FC = () => {
                       Registration is full
                     </div>
                   ) : (
-                    <div className="flex justify-start pt-2">
+                    <div className="flex justify-start pt-1">
                       <Button
                         variant="primary"
                         size="sm"
@@ -274,9 +289,9 @@ export const PublicRegisterPage: React.FC = () => {
               )}
             </div>
 
-            {/* About Event Description (80% see-through glassmorphic card with colored title row & black paragraph text) */}
+            {/* About Event Description (aligned to the left edge, taking space horizontally to the right) */}
             <div className="pt-2">
-              <div className="rounded-2xl overflow-hidden border border-white/25 shadow-sm">
+              <div className="rounded-2xl overflow-hidden border border-white/25 shadow-sm max-w-3xl">
                 {/* Colored row for 'About event' title */}
                 <div className="bg-[#63474D] px-6 py-3.5 rounded-t-2xl">
                   <h2 className="font-serif font-bold text-base sm:text-lg text-white">About Event</h2>
@@ -291,28 +306,31 @@ export const PublicRegisterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Poster Image on the Right + Unboxed Presented By with Socials */}
-          <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-4 order-1 lg:order-2">
-            <div className="rounded-3xl overflow-hidden shadow-lg border border-[#E8DDD7] bg-white aspect-[4/5] sm:aspect-square lg:aspect-[4/5] relative">
+          {/* RIGHT COLUMN: Poster Image on Right (Positioned at red box level) + Presented By + Sticky Scrolling */}
+          <div className="lg:col-span-5 space-y-4 order-1 lg:order-2 lg:pt-11 lg:sticky lg:top-24 self-start">
+            {/* Poster Image Container: positioned in red box, hugging image naturally */}
+            <div className="rounded-2xl overflow-hidden shadow-2xl bg-black/20 backdrop-blur-md border border-white/20 p-2 flex items-center justify-center">
               <img
                 src={posterImage}
                 alt={event.title}
-                className="w-full h-full object-cover"
+                className="w-full h-auto max-h-[380px] sm:max-h-[420px] object-contain rounded-xl"
               />
             </div>
 
-            {/* Presented By Info & Social Icons (Text completely white) */}
-            <div className="flex items-center justify-between gap-4 pt-1">
-              <div className="flex items-center gap-3 min-w-0">
-                <img
-                  src={event.organizerAvatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80'}
-                  alt={event.organizerName}
-                  className="w-10 h-10 rounded-full object-cover shrink-0 border border-white/40"
-                />
-                <div className="min-w-0">
-                  <span className="text-[11px] uppercase font-bold text-white/90 block">Presented by</span>
-                  <p className="font-bold text-sm text-white truncate">{event.organizerName}</p>
-                </div>
+            {/* Presented By Section: Company/Organization name (not personal name), Month and Year only */}
+            <div className="flex items-center justify-between gap-4 pt-1 px-1">
+              <div className="min-w-0">
+                <span className="text-[10px] sm:text-[11px] uppercase font-bold text-white/80 tracking-wider block">
+                  Presented by
+                </span>
+                <p className="font-bold text-sm sm:text-base text-white truncate">
+                  {displayOrganization}
+                </p>
+                {eventMonthYear && (
+                  <span className="text-[11px] sm:text-xs text-white/70 block mt-0.5 font-medium">
+                    {eventMonthYear}
+                  </span>
+                )}
               </div>
 
               {/* Social icons beside organizer info */}
@@ -382,7 +400,6 @@ export const PublicRegisterPage: React.FC = () => {
               )}
             </div>
           </div>
-
         </div>
       </div>
     </div>

@@ -547,6 +547,22 @@ export const api = {
     },
 
     update: async (id: string, data: Partial<Event>): Promise<Event> => {
+      try {
+        const res = await requestApi(`/events/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        });
+        if (res.data) {
+          const idx = eventsStore.findIndex((e) => e.id === id);
+          if (idx !== -1) {
+            eventsStore[idx] = { ...eventsStore[idx], ...res.data };
+            saveEventsStore();
+          }
+          return res.data;
+        }
+      } catch (e) {
+        console.warn('Backend event update fallback:', e);
+      }
       const idx = eventsStore.findIndex((e) => e.id === id);
       if (idx !== -1) {
         eventsStore[idx] = { ...eventsStore[idx], ...data };

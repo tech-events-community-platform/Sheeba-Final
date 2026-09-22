@@ -18,7 +18,9 @@ import {
   User,
   AlertCircle,
   X,
+  HelpCircle,
 } from 'lucide-react';
+import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 
 export const EventDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +39,9 @@ export const EventDetailPage: React.FC = () => {
   const [isSubmittingAward, setIsSubmittingAward] = useState(false);
   const [awardSuccessMsg, setAwardSuccessMsg] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Edit Questions Modal State
+  const [isEditQuestionsOpen, setIsEditQuestionsOpen] = useState(false);
 
   // Manual Add Attendee Modal State
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
@@ -185,6 +190,14 @@ export const EventDetailPage: React.FC = () => {
         </Link>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsEditQuestionsOpen(true)}
+            icon={<HelpCircle className="w-4 h-4 text-[#63474D]" />}
+          >
+            Edit Form Questions ({event.customQuestions?.length || 0})
+          </Button>
           <Link to={`/organizer/check-in/${event.id}`}>
             <Button variant="accent" size="sm" icon={<QrCode className="w-4 h-4" />}>
               Door Check-in
@@ -321,6 +334,31 @@ export const EventDetailPage: React.FC = () => {
               <ExternalLink className="w-3.5 h-3.5" />
             </Link>
           </div>
+        </div>
+
+        {/* Registration Form Questions Summary & Quick Access */}
+        <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <span className="text-[10px] uppercase font-bold text-[#756366] block">
+              Registration Form Questions
+            </span>
+            <p className="text-xs text-[#2D1F23] font-medium">
+              {event.customQuestions && event.customQuestions.length > 0
+                ? `${event.customQuestions.length} custom question${
+                    event.customQuestions.length === 1 ? '' : 's'
+                  } active on the public registration link`
+                : 'No custom questions set (Attendees only provide basic info)'}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsEditQuestionsOpen(true)}
+            icon={<HelpCircle className="w-3.5 h-3.5 text-[#63474D]" />}
+            className="self-start sm:self-auto cursor-pointer"
+          >
+            Manage / Edit Questions
+          </Button>
         </div>
       </div>
 
@@ -777,6 +815,18 @@ export const EventDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Edit Registration Questions Modal */}
+      <EditEventQuestionsModal
+        event={event}
+        isOpen={isEditQuestionsOpen}
+        onClose={() => setIsEditQuestionsOpen(false)}
+        onQuestionsUpdated={(updatedQuestions) => {
+          if (event) {
+            setEvent({ ...event, customQuestions: updatedQuestions });
+          }
+        }}
+      />
     </div>
   );
 };
