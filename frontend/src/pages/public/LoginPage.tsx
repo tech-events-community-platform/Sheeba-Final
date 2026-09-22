@@ -350,6 +350,7 @@ export const LoginPage: React.FC = () => {
               <input
                 type="email"
                 required
+                autoComplete={authMode === 'signup' ? 'off' : 'email'}
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -379,6 +380,7 @@ export const LoginPage: React.FC = () => {
               <input
                 type="password"
                 required
+                autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

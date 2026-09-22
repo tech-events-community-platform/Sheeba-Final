@@ -4,6 +4,7 @@ export type TicketStatus = 'Valid' | 'Checked in' | 'Used' | 'Expired' | 'Cancel
 
 export interface Ticket {
   id: string; // e.g. "SHB-8921-2026"
+  ticketCode?: string;
   registrationId: string;
   eventId: string;
   eventTitle: string;

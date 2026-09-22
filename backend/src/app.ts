@@ -8,6 +8,9 @@ import { generalLimiter } from './middlewares/rateLimit.middleware';
 
 const app: Application = express();
 
+// Enable HTTP ETag generation for 304 Not Modified caching
+app.set('etag', 'strong');
+
 // Security Headers
 app.use(
   helmet({

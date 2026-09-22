@@ -38,6 +38,8 @@ export interface AttendeeRosterItem {
   attendeeId: string;
   name: string;
   email: string;
+  phone?: string;
+  organization?: string;
   registrationDate: string;
   status: 'Registered' | 'Checked in';
   checkInTime?: string;

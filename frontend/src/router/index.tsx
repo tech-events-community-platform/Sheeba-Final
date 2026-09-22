@@ -17,6 +17,7 @@ import { EventRegistrationCheckoutPage } from '../pages/public/EventRegistration
 import { PublicProfilePage } from '../pages/public/PublicProfilePage';
 import { BadgeDetailPage } from '../pages/public/BadgeDetailPage';
 import { PublicSearchPage } from '../pages/public/PublicSearchPage';
+import { VerifyTicketPage } from '../pages/public/VerifyTicketPage';
 
 // Sponsor Pages & Layout
 import { SponsorLayout } from '../layouts/SponsorLayout';
@@ -74,6 +75,9 @@ export const router = createBrowserRouter([
       { path: 'events/:id/register/form', element: <EventRegistrationCheckoutPage /> },
       { path: 'profile/:id', element: <PublicProfilePage /> },
       { path: 'badge/:id', element: <BadgeDetailPage /> },
+      { path: 'verify-ticket', element: <VerifyTicketPage /> },
+      { path: 'verify/:token', element: <VerifyTicketPage /> },
+      { path: 'tickets/verify/:token', element: <VerifyTicketPage /> },
       { path: 'sponsor/auth', element: <SponsorAuthPage /> },
       { path: 'sponsor/forgot-password', element: <SponsorForgotPasswordPage /> },
     ],

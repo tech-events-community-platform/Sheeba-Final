@@ -280,7 +280,7 @@ export const MyEventsPage: React.FC = () => {
                       <div className="flex flex-col items-center justify-center p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] shrink-0 text-center">
                         <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] shadow-2xs">
                           <QRCodeSVG
-                            value={ticket.qrToken || ticket.id}
+                            value={`${window.location.origin}/verify-ticket?token=${encodeURIComponent(ticket.qrToken || ticket.id)}&code=${encodeURIComponent(ticket.ticketCode || '')}`}
                             size={160}
                             bgColor="#ffffff"
                             fgColor="#2D1F23"
@@ -288,12 +288,12 @@ export const MyEventsPage: React.FC = () => {
                             includeMargin={false}
                           />
                         </div>
-                        <p className="mt-2 text-[10px] font-mono text-[#756366] truncate max-w-[160px]">
-                          {ticket.qrToken ? ticket.qrToken.slice(0, 24) + '...' : ticket.id}
+                        <p className="mt-2 text-[11px] font-mono font-bold text-[#63474D]">
+                          {ticket.ticketCode || 'SHB-PASS'}
                         </p>
                         <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center gap-1">
                           <Sparkles className="w-3 h-3 text-[#2A7B5F]" />
-                          <span>Scan for Entrance</span>
+                          <span>Scan for Entrance & Verification</span>
                         </span>
                       </div>
 

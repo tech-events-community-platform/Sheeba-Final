@@ -76,6 +76,30 @@ interface SearchAttendeeItem {
   answers: Record<string, string>;
 }
 
+// Helper to extract clean token or short code from URLs, queries, or raw strings
+export function extractTicketTokenOrCode(scannedText: string): string {
+  const text = (scannedText || '').trim();
+  if (!text) return '';
+  if (text.includes('token=')) {
+    const match = text.match(/token=([^&]+)/);
+    if (match) return decodeURIComponent(match[1]);
+  }
+  if (text.includes('code=')) {
+    const match = text.match(/code=([^&]+)/);
+    if (match) return decodeURIComponent(match[1]);
+  }
+  if (text.startsWith('http://') || text.startsWith('https://')) {
+    try {
+      const parsedUrl = new URL(text);
+      const token = parsedUrl.searchParams.get('token');
+      const code = parsedUrl.searchParams.get('code');
+      if (token) return token;
+      if (code) return code;
+    } catch {}
+  }
+  return text;
+}
+
 export const ScannerPage: React.FC = () => {
   const { id: eventId } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -195,14 +219,15 @@ export const ScannerPage: React.FC = () => {
 
   // Verify a token or short code
   const handleVerify = useCallback(async (tokenOrCode: string) => {
-    if (!eventId || !tokenOrCode.trim()) return;
+    const cleanTarget = extractTicketTokenOrCode(tokenOrCode);
+    if (!eventId || !cleanTarget) return;
 
     setIsVerifying(true);
     setErrorNotice(null);
     setSuccessNotice(null);
 
     try {
-      const data = await api.checkin.verifyTicket(eventId, tokenOrCode.trim());
+      const data = await api.checkin.verifyTicket(eventId, cleanTarget);
       setVerifiedResult(data);
 
       if (data.canCheckIn) {
@@ -864,6 +889,62 @@ export const ScannerPage: React.FC = () => {
                 <span className="text-xs font-mono bg-black/20 px-2.5 py-1 rounded-lg">
                   {verifiedResult.ticket.ticketCode}
                 </span>
+              </div>
+
+              {/* TOP ACTION & STATUS BAR (Organizer Quick Check-In) */}
+              <div className="px-6 py-3.5 bg-white border-b border-[#E8DDD7] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  {verifiedResult.ticket.status === 'CHECKED_IN' ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-full border border-emerald-300">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      Attended • Verified
+                    </span>
+                  ) : verifiedResult.canCheckIn ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#631A86] bg-[#631A86]/10 px-3 py-1.5 rounded-full border border-[#631A86]/20">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Ready for Organizer Check-In
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-800 bg-red-100 px-3 py-1.5 rounded-full">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Cannot Check In
+                    </span>
+                  )}
+                </div>
+
+                {verifiedResult.canCheckIn && (
+                  <Button
+                    onClick={handleConfirmCheckIn}
+                    disabled={isCheckingIn}
+                    size="md"
+                    className="bg-[#2A7B5F] hover:bg-[#20634c] text-white font-bold px-5 py-2.5 shadow-sm shrink-0 cursor-pointer"
+                  >
+                    {isCheckingIn ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                        Mark as Attended
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {verifiedResult.canUndo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsVoidModalOpen(true)}
+                    disabled={isUndoing}
+                    className="text-amber-800 border-amber-300 hover:bg-amber-100 font-bold"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                    Soft-Void
+                  </Button>
+                )}
               </div>
 
               {/* Attendee Profile Section */}

@@ -1,7 +1,8 @@
-    import { query, getClient } from '../config/db';
+import { query, getClient } from '../config/db';
 import { IEvent, EventType, EventStatus, UserRole, AttendeeRosterItem } from '../types';
 import { generateTicketToken, generateQrDataUrl, generateTicketCode, computeEventDayExpiration } from '../utils/qr.util';
 import { EmailService } from './email.service';
+import { CacheService } from './cache.service';
 
 export class EventService {
   static formatEvent(row: any): any {
@@ -132,12 +133,17 @@ export class EventService {
     const userRes = await query('SELECT full_name, organization, email FROM users WHERE id = $1', [organizerId]);
     const userRow = userRes.rows[0] || {};
 
-    return this.formatEvent({
+    const formatted = this.formatEvent({
       ...insertedEvent,
       organizer_name: userRow.full_name,
       organizer_organization: userRow.organization,
       organizer_email: userRow.email,
     });
+
+    // Invalidate cached event lists
+    CacheService.delPrefix('events:list');
+
+    return formatted;
   }
 
   static async getEvents(filters: {
@@ -146,6 +152,12 @@ export class EventService {
     status?: string;
     organizerId?: string;
   } = {}) {
+    const cacheKey = `events:list:${JSON.stringify(filters || {})}`;
+    const cached = CacheService.get<any[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const { search, type, status, organizerId } = filters;
 
     const conditions: string[] = [];
@@ -195,10 +207,18 @@ export class EventService {
     `;
 
     const result = await query(queryText, values);
-    return result.rows.map(this.formatEvent);
+    const events = result.rows.map(this.formatEvent);
+    CacheService.set(cacheKey, events, 30);
+    return events;
   }
 
   static async getEventById(identifier: string): Promise<any> {
+    const cacheKey = `event:${identifier}`;
+    const cached = CacheService.get<any>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const queryText = `
       SELECT 
         e.*,
@@ -222,7 +242,16 @@ export class EventService {
       return null;
     }
 
-    return this.formatEvent(result.rows[0]);
+    const formatted = this.formatEvent(result.rows[0]);
+    CacheService.set(cacheKey, formatted, 60);
+    if (formatted.id && formatted.id !== identifier) {
+      CacheService.set(`event:${formatted.id}`, formatted, 60);
+    }
+    if (formatted.shareLinkToken && formatted.shareLinkToken !== identifier) {
+      CacheService.set(`event:${formatted.shareLinkToken}`, formatted, 60);
+    }
+
+    return formatted;
   }
 
   static async updateEvent(
@@ -328,6 +357,9 @@ export class EventService {
     `;
 
     await query(queryText, values);
+    CacheService.delPrefix('events:list');
+    CacheService.delPrefix(`event:${eventId}`);
+    CacheService.del(`report:${eventId}`);
     return this.getEventById(eventId);
   }
 
@@ -346,6 +378,9 @@ export class EventService {
     }
 
     await query('DELETE FROM events WHERE id = $1', [eventId]);
+    CacheService.delPrefix('events:list');
+    CacheService.delPrefix(`event:${eventId}`);
+    CacheService.del(`report:${eventId}`);
     return true;
   }
 
@@ -437,6 +472,11 @@ export class EventService {
 
       await client.query('COMMIT');
 
+      // Invalidate event cache, roster cache, reports, and list
+      CacheService.delPrefix('events:list');
+      CacheService.delPrefix(`event:${event.id}`);
+      CacheService.del(`report:${event.id}`);
+
       const rawTicket = ticketRes.rows[0];
       const userRes = await query('SELECT full_name, email FROM users WHERE id = $1', [userId]);
       const attendeeUser = userRes.rows[0] || {};
@@ -502,6 +542,12 @@ export class EventService {
       throw err;
     }
 
+    const cacheKey = `event:${event.id}:roster`;
+    const cached = CacheService.get<AttendeeRosterItem[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const queryText = `
       SELECT 
         r.id AS roster_id,
@@ -509,6 +555,8 @@ export class EventService {
         u.id AS attendee_id,
         u.full_name AS name,
         u.email,
+        u.phone,
+        u.organization,
         r.registered_at,
         r.answers,
         ci.id AS check_in_id,
@@ -530,7 +578,7 @@ export class EventService {
 
     const result = await query(queryText, [event.id]);
 
-    return result.rows.map((row) => {
+    const roster = result.rows.map((row) => {
       const isCheckedIn = Boolean((row.check_in_id && !row.voided_at) || row.ticket_status === 'CHECKED_IN');
       const checkInTimeDate = row.check_in_time;
       return {
@@ -539,8 +587,10 @@ export class EventService {
         attendeeId: row.attendee_id,
         name: row.name,
         email: row.email,
+        phone: row.phone || undefined,
+        organization: row.organization || undefined,
         registrationDate: new Date(row.registered_at).toISOString().split('T')[0],
-        status: isCheckedIn ? 'Checked in' : 'Registered',
+        status: (isCheckedIn ? 'Checked in' : 'Registered') as 'Checked in' | 'Registered',
         checkInTime: checkInTimeDate
           ? new Date(checkInTimeDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' EAT'
           : undefined,
@@ -548,5 +598,8 @@ export class EventService {
         answers: typeof row.answers === 'string' ? JSON.parse(row.answers) : row.answers || {},
       };
     });
+
+    CacheService.set(cacheKey, roster, 20);
+    return roster;
   }
 }

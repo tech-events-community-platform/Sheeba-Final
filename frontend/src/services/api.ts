@@ -42,7 +42,34 @@ export const setAuthToken = (token: string): void => {
 
 export const removeAuthToken = (): void => {
   localStorage.removeItem('sheba_auth_token');
+  clearApiCache();
 };
+
+export interface RequestApiOptions extends RequestInit {
+  skipCache?: boolean;
+  ttlSeconds?: number;
+}
+
+// In-memory client cache and promise deduplication map
+interface ClientCacheEntry {
+  data: any;
+  expiresAt: number;
+}
+
+const clientApiCache = new Map<string, ClientCacheEntry>();
+const inFlightRequests = new Map<string, Promise<any>>();
+
+export function clearApiCache(filter?: string | RegExp): void {
+  if (!filter) {
+    clientApiCache.clear();
+    return;
+  }
+  for (const key of clientApiCache.keys()) {
+    if (typeof filter === 'string' ? key.includes(filter) : filter.test(key)) {
+      clientApiCache.delete(key);
+    }
+  }
+}
 
 // In-memory & local-storage state holders
 const loadInitialEvents = (): Event[] => {
@@ -71,51 +98,138 @@ let ticketsStore: Ticket[] = [];
 let badgeAwardsStore: BadgeAward[] = [];
 let attendeeRosterStore: Record<string, AttendeeRosterItem[]> = {};
 
-export async function requestApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function requestApi<T = any>(endpoint: string, options: RequestApiOptions = {}): Promise<T> {
+  const method = (options.method || 'GET').toUpperCase();
   const token = getAuthToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // For non-GET mutations (POST, PUT, PATCH, DELETE), execute network request and invalidate client cache
+  if (method !== 'GET') {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    } catch (netErr: any) {
+      throw new Error(`Unable to reach Sheeba server at ${API_BASE_URL}. Please check that the backend is running and reachable.`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    let data: any = null;
+
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else if (contentType && contentType.includes('text/csv')) {
+      data = await response.blob();
+    } else {
+      data = await response.text();
+    }
+
+    if (!response.ok) {
+      const errorMsg =
+        (data && typeof data === 'object' && (data.message || data.error)) ||
+        `HTTP ${response.status}: ${response.statusText}`;
+
+      const errorObj: any = new Error(errorMsg);
+      errorObj.status = response.status;
+      errorObj.data = data;
+      errorObj.isPendingApproval = data?.isPendingApproval || response.status === 403;
+      throw errorObj;
+    }
+
+    // Invalidate client-side cache upon successful mutation
+    clearApiCache();
+
+    return data;
   }
 
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
-    });
-  } catch (netErr: any) {
-    throw new Error(`Unable to reach Sheeba server at ${API_BASE_URL}. Please check that the backend is running and reachable.`);
+  // GET Request caching & deduplication
+  const cacheKey = `GET:${endpoint}:${token || 'anon'}`;
+  const shouldSkipCache = options.skipCache || endpoint.includes('refresh=true');
+
+  if (!shouldSkipCache) {
+    const cached = clientApiCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data as T;
+    }
+
+    // Deduplicate in-flight concurrent requests for the exact same resource
+    if (inFlightRequests.has(cacheKey)) {
+      return inFlightRequests.get(cacheKey)!;
+    }
   }
 
-  const contentType = response.headers.get('content-type');
-  let data: any = null;
+  const fetchPromise = (async () => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
 
-  if (contentType && contentType.includes('application/json')) {
-    data = await response.json();
-  } else if (contentType && contentType.includes('text/csv')) {
-    data = await response.blob();
-  } else {
-    data = await response.text();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    } catch (netErr: any) {
+      throw new Error(`Unable to reach Sheeba server at ${API_BASE_URL}. Please check that the backend is running and reachable.`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    let data: any = null;
+
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else if (contentType && contentType.includes('text/csv')) {
+      data = await response.blob();
+    } else {
+      data = await response.text();
+    }
+
+    if (!response.ok) {
+      const errorMsg =
+        (data && typeof data === 'object' && (data.message || data.error)) ||
+        `HTTP ${response.status}: ${response.statusText}`;
+
+      const errorObj: any = new Error(errorMsg);
+      errorObj.status = response.status;
+      errorObj.data = data;
+      errorObj.isPendingApproval = data?.isPendingApproval || response.status === 403;
+      throw errorObj;
+    }
+
+    // Cache valid JSON responses (avoid Blobs or file downloads)
+    if (!shouldSkipCache && !(data instanceof Blob) && !endpoint.includes('/export')) {
+      const ttlMs = (options.ttlSeconds || 20) * 1000;
+      clientApiCache.set(cacheKey, {
+        data,
+        expiresAt: Date.now() + ttlMs,
+      });
+    }
+
+    return data;
+  })().finally(() => {
+    inFlightRequests.delete(cacheKey);
+  });
+
+  if (!shouldSkipCache) {
+    inFlightRequests.set(cacheKey, fetchPromise);
   }
 
-  if (!response.ok) {
-    const errorMsg =
-      (data && typeof data === 'object' && (data.message || data.error)) ||
-      `HTTP ${response.status}: ${response.statusText}`;
-
-    const errorObj: any = new Error(errorMsg);
-    errorObj.status = response.status;
-    errorObj.data = data;
-    errorObj.isPendingApproval = data?.isPendingApproval || response.status === 403;
-    throw errorObj;
-  }
-
-  return data;
+  return fetchPromise;
 }
 
 export const api = {
@@ -793,6 +907,13 @@ export const api = {
       const res = await requestApi('/checkin/verify', {
         method: 'POST',
         body: JSON.stringify({ eventId, tokenOrCode }),
+      });
+      return res.data;
+    },
+
+    getTicketVerification: async (tokenOrCode: string) => {
+      const res = await requestApi(`/checkin/verify-ticket?token=${encodeURIComponent(tokenOrCode)}`, {
+        method: 'GET',
       });
       return res.data;
     },

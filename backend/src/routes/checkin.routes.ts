@@ -1,9 +1,21 @@
 import { Router } from 'express';
 import { CheckinController } from '../controllers/checkin.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, optionalAuthenticate } from '../middlewares/auth.middleware';
 import { authorizeRoles } from '../middlewares/role.middleware';
 
 const router = Router();
+
+// Public / Semi-Public ticket verification (scanned by camera or browser)
+router.get(
+  '/verify-ticket',
+  optionalAuthenticate,
+  CheckinController.getTicketVerification
+);
+router.post(
+  '/verify-ticket',
+  optionalAuthenticate,
+  CheckinController.getTicketVerification
+);
 
 router.post(
   '/verify',

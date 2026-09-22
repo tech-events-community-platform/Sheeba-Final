@@ -19,6 +19,10 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
     printTicketPass(`ticket-card-${ticket.id}`);
   };
 
+  const verificationUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/verify-ticket?token=${encodeURIComponent(ticket.qrToken || ticket.id)}&code=${encodeURIComponent(ticket.ticketCode || '')}`
+    : `/verify-ticket?token=${encodeURIComponent(ticket.qrToken || ticket.id)}`;
+
   return (
     <div className="max-w-md mx-auto w-full">
       {/* Container Ticket Card */}
@@ -43,40 +47,35 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
               {ticket.status}
             </Badge>
           </div>
-
-          <h2 className="font-serif text-xl font-bold text-white mb-1 leading-snug">{ticket.eventTitle}</h2>
-          <p className="text-xs text-[#E8DDD7] font-medium uppercase font-mono">{ticket.eventType} Digital Entrance Pass</p>
+          <h2 className="font-serif text-2xl font-bold mb-1">{ticket.eventTitle}</h2>
+          <p className="text-xs text-[#FFA686] font-medium tracking-wide">
+            VERIFIED ATTENDANCE PASS
+          </p>
         </div>
 
-        {/* Card Body Details */}
-        <div className="p-6 space-y-6">
+        {/* Ticket Details Body */}
+        <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div>
-              <span className="text-[#756366] uppercase tracking-wider text-[10px] font-bold block mb-1">
-                ATTENDEE NAME
-              </span>
-              <p className="font-bold text-[#2D1F23] text-sm">{ticket.attendeeName}</p>
-              <p className="text-[11px] text-[#756366]">{ticket.attendeeEmail}</p>
+              <span className="text-[#756366] block">ATTENDEE</span>
+              <p className="font-bold text-sm text-[#2D1F23] mt-0.5">{ticket.attendeeName}</p>
             </div>
             <div>
-              <span className="text-[#756366] uppercase tracking-wider text-[10px] font-bold block mb-1">
-                PASS NUMBER
-              </span>
-              <p className="font-mono font-bold text-[#2D1F23] text-xs bg-[#FAF7F5] border border-[#E8DDD7] px-2 py-1 rounded-md inline-block">
-                {ticket.id}
-              </p>
+              <span className="text-[#756366] block">TICKET CODE</span>
+              <p className="font-mono font-bold text-sm text-[#2D1F23] mt-0.5">{ticket.ticketCode}</p>
             </div>
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-[#E8DDD7] text-xs text-[#2D1F23]">
-            <div className="flex items-start gap-2.5">
-              <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain mt-0.5 shrink-0" />
+          <div className="space-y-2 pt-2 border-t border-[#E8DDD7] text-xs">
+            <div className="flex items-center gap-2 text-[#756366]">
+              <img src="/calendar.webp" alt="Date" className="w-4 h-4 object-contain flex-shrink-0" />
               <div>
                 <p className="font-semibold text-[#2D1F23]">{ticket.eventDate}</p>
-                <p className="text-[#756366]">{ticket.eventTime}</p>
+                <p className="text-[11px] text-[#756366]">{ticket.eventTime}</p>
               </div>
             </div>
-            <div className="flex items-start gap-2.5 pt-1">
+
+            <div className="flex items-start gap-2 text-[#756366]">
               <img src="/location.webp" alt="Location" className="w-4 h-4 object-contain mt-0.5 flex-shrink-0" />
               <div>
                 <p className="font-semibold text-[#2D1F23]">{ticket.eventLocation}</p>
@@ -95,25 +94,25 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
           <div className="text-center space-y-3 pt-2">
             <div className="bg-[#FAF7F5] p-5 rounded-2xl border-2 border-[#D6A184]/50 inline-block shadow-inner">
               <QRCodeSVG
-                value={ticket.qrToken}
+                value={verificationUrl}
                 size={180}
                 bgColor="#FAF7F5"
                 fgColor="#63474D"
                 level="H"
                 includeMargin={false}
               />
-              <div className="mt-2 text-[10px] font-mono text-[#756366] truncate max-w-[180px]">
-                {ticket.qrToken}
+              <div className="mt-2 text-[11px] font-mono font-bold text-[#63474D]">
+                {ticket.ticketCode || 'SHB-PASS'}
               </div>
             </div>
 
             <div className="flex items-center justify-center gap-1.5 text-xs text-[#2A7B5F] font-semibold bg-[#2A7B5F]/10 py-2 px-4 rounded-xl border border-[#2A7B5F]/20">
               <img src="/tick.webp" alt="Valid" className="w-4 h-4 object-contain shrink-0" />
-              <span>Evaluated live server-side at door entrance.</span>
+              <span>Scan with phone camera or door scanner to verify.</span>
             </div>
 
             <p className="text-[11px] text-[#756366]">
-              Pass remains valid through the day after the event.
+              Scan to view attendee information and verify attendance.
             </p>
           </div>
         </div>

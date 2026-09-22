@@ -4,6 +4,8 @@ import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import type { Event } from '../../types/event';
 import type { User } from '../../types/user';
+import type { Ticket } from '../../types/ticket';
+import { TicketCard } from '../../components/ticket/TicketCard';
 import { Button } from '../../components/ui/Button';
 import {
   ArrowLeft,
@@ -38,6 +40,7 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
   const { user, isAuthenticated, register, switchRole } = useAuth();
 
   const [event, setEvent] = useState<Event | null>(null);
+  const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
@@ -86,8 +89,11 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
           try {
             const ticket = await api.registration.getTicketByEvent(fetched.id, user.id);
             if (ticket) {
+            const userTicket = await api.registration.getTicketByEvent(fetched.id, user.id);
+            if (userTicket) {
               setIsAlreadyRegistered(true);
               setConfirmedEmail(user.email);
+              setTicket(userTicket);
             }
           } catch {
             // Not registered yet
@@ -233,6 +239,7 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
 
       if (res.ticket) {
         setConfirmedEmail(attendeeToRegister.email);
+        setTicket(res.ticket);
         setIsAlreadyRegistered(true);
         setIsConfirmed(true);
       }
@@ -243,6 +250,12 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
         setConfirmedEmail(attendeeToRegister.email);
         setIsAlreadyRegistered(true);
         setIsConfirmed(true);
+        try {
+          const userTicket = await api.registration.getTicketByEvent(event.id, attendeeToRegister.id);
+          if (userTicket) setTicket(userTicket);
+        } catch {
+          // ignore
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -334,8 +347,26 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
 
           <div className="flex justify-center gap-3 pt-4">
             <Link to={`/app/ticket/${event.id}`}>
+          {/* Direct Scannable Ticket QR Pass */}
+          {ticket && (
+            <div className="pt-4 max-w-sm mx-auto text-left animate-fade-in">
+              <div className="text-center pb-2">
+                <span className="text-xs font-bold text-[#63474D] uppercase tracking-wider">Your Digital Entry Pass</span>
+              </div>
+              <TicketCard ticket={ticket} />
+            </div>
+          )}
+
+          <div className="flex flex-wrap justify-center gap-3 pt-4">
+            <Link to="/app/events">
               <Button variant="primary" size="sm">
                 View Entry Pass
+                View in My Events
+              </Button>
+            </Link>
+            <Link to={`/app/ticket/${event.id}`}>
+              <Button variant="outline" size="sm" className="border-gray-400 text-black hover:bg-black/5">
+                Full Ticket Pass
               </Button>
             </Link>
             <Link to={backUrl}>

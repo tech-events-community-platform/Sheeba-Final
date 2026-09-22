@@ -4,6 +4,24 @@ import { sendSuccess } from '../utils/apiResponse';
 import { AuthRequest } from '../types';
 
 export class CheckinController {
+  static async getTicketVerification(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const tokenOrCode = (req.query.token as string) || (req.query.code as string) || (req.body?.tokenOrCode as string) || (req.params?.token as string);
+      const userId = req.user?.userId;
+      const userRole = req.user?.role;
+
+      const result = await CheckinService.getTicketVerification({
+        tokenOrCode,
+        userId,
+        userRole,
+      });
+
+      return sendSuccess(res, result, 'Ticket verification details retrieved.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async verify(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { eventId, tokenOrCode } = req.body;

@@ -3,6 +3,7 @@ import { verifyTicketToken } from '../utils/qr.util';
 import { UserRole } from '../types';
 import { BadgeService } from './badge.service';
 import { EventService } from './event.service';
+import { CacheService } from './cache.service';
 
 export class CheckinService {
   static async lookupAttendee(eventIdOrToken: string, queryText: string, organizerId?: string, userRole?: string) {
@@ -167,6 +168,177 @@ export class CheckinService {
     }));
   }
 
+  // Public / Semi-Public ticket verification endpoint
+  // Surfaces full attendee info, answers, event info, and checks if viewer is organizer
+  static async getTicketVerification(params: {
+    tokenOrCode: string;
+    userId?: string;
+    userRole?: UserRole;
+  }) {
+    const { tokenOrCode, userId, userRole } = params;
+    let cleanInput = (tokenOrCode || '').trim();
+
+    if (cleanInput.includes('token=')) {
+      const match = cleanInput.match(/token=([^&]+)/);
+      if (match) cleanInput = decodeURIComponent(match[1]);
+    } else if (cleanInput.includes('code=')) {
+      const match = cleanInput.match(/code=([^&]+)/);
+      if (match) cleanInput = decodeURIComponent(match[1]);
+    } else if (cleanInput.startsWith('http://') || cleanInput.startsWith('https://')) {
+      try {
+        const parsedUrl = new URL(cleanInput);
+        const token = parsedUrl.searchParams.get('token');
+        const code = parsedUrl.searchParams.get('code');
+        if (token) cleanInput = token;
+        else if (code) cleanInput = code;
+      } catch {}
+    }
+
+    if (!cleanInput) {
+      const err: any = new Error('No ticket token or code provided.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    let targetTicketId: string | null = null;
+    const isJwt = cleanInput.startsWith('eyJ');
+
+    if (isJwt) {
+      try {
+        const payload = verifyTicketToken(cleanInput);
+        targetTicketId = payload.ticketId;
+      } catch {
+        // Fall back to database lookup by token string or code
+      }
+    }
+
+    let ticketRes;
+    if (targetTicketId) {
+      ticketRes = await query(
+        `SELECT t.*, u.id as user_id, u.full_name, u.email, u.phone, u.avatar_url, u.organization,
+                e.id as event_id, e.title as event_title, e.description as event_description,
+                e.event_date, e.event_type, e.location as event_location, e.venue_name,
+                e.organizer_id, e.custom_questions, e.start_time, e.end_time,
+                org.full_name as organizer_name, org.organization as organizer_org, org.email as organizer_email,
+                r.id as registration_id, r.registered_at, r.answers, r.status as reg_status
+         FROM tickets t
+         JOIN users u ON t.user_id = u.id
+         JOIN events e ON t.event_id = e.id
+         JOIN users org ON e.organizer_id = org.id
+         JOIN registrations r ON t.registration_id = r.id
+         WHERE t.id = $1`,
+        [targetTicketId]
+      );
+    }
+
+    if (!ticketRes || ticketRes.rowCount === 0) {
+      ticketRes = await query(
+        `SELECT t.*, u.id as user_id, u.full_name, u.email, u.phone, u.avatar_url, u.organization,
+                e.id as event_id, e.title as event_title, e.description as event_description,
+                e.event_date, e.event_type, e.location as event_location, e.venue_name,
+                e.organizer_id, e.custom_questions, e.start_time, e.end_time,
+                org.full_name as organizer_name, org.organization as organizer_org, org.email as organizer_email,
+                r.id as registration_id, r.registered_at, r.answers, r.status as reg_status
+         FROM tickets t
+         JOIN users u ON t.user_id = u.id
+         JOIN events e ON t.event_id = e.id
+         JOIN users org ON e.organizer_id = org.id
+         JOIN registrations r ON t.registration_id = r.id
+         WHERE UPPER(t.ticket_code) = UPPER($1) OR t.qr_token = $1`,
+        [cleanInput]
+      );
+    }
+
+    if (!ticketRes || ticketRes.rowCount === 0) {
+      const err: any = new Error('No ticket found matching this QR code or ticket code.');
+      err.statusCode = 404;
+      err.code = 'TICKET_NOT_FOUND';
+      throw err;
+    }
+
+    const row = ticketRes.rows[0];
+    const now = new Date();
+    const isExpired = row.expires_at ? now > new Date(row.expires_at) : false;
+    const isCancelled = row.status === 'CANCELLED' || row.reg_status === 'cancelled';
+
+    // Check active check-in
+    const ciRes = await query(
+      `SELECT ci.id, ci.approved_at, ci.approved_by, u.full_name as approved_by_name
+       FROM check_ins ci
+       LEFT JOIN users u ON ci.approved_by = u.id
+       WHERE ci.registration_id = $1 AND ci.voided_at IS NULL`,
+      [row.registration_id]
+    );
+    const activeCheckIn = ciRes.rowCount && ciRes.rowCount > 0 ? ciRes.rows[0] : null;
+    const isAlreadyCheckedIn = Boolean(activeCheckIn || row.status === 'CHECKED_IN');
+
+    // Check attended badge
+    const badgeRes = await query(
+      `SELECT id, badge_label, awarded_at
+       FROM badge_awards
+       WHERE event_id = $1 AND user_id = $2 AND badge_code = 'attended' AND revoked_at IS NULL`,
+      [row.event_id, row.user_id]
+    );
+    const hasAttendedBadge = Boolean(badgeRes.rowCount && badgeRes.rowCount > 0);
+
+    // Is viewer the organizer of this event or an admin?
+    const isOrganizer = Boolean(
+      userId && (userId === row.organizer_id || userRole?.toLowerCase() === 'admin')
+    );
+
+    const answers = typeof row.answers === 'string' ? JSON.parse(row.answers) : row.answers || {};
+    let questions: any[] = [];
+    if (row.custom_questions) {
+      questions = typeof row.custom_questions === 'string' ? JSON.parse(row.custom_questions) : row.custom_questions;
+    }
+
+    return {
+      ticket: {
+        id: row.id,
+        ticketCode: row.ticket_code,
+        status: isExpired ? 'EXPIRED' : isCancelled ? 'CANCELLED' : isAlreadyCheckedIn ? 'CHECKED_IN' : row.status,
+        rawStatus: row.status,
+        expiresAt: row.expires_at,
+        isPaid: Boolean(row.is_paid),
+        ticketPrice: parseFloat(row.ticket_price || '0'),
+        currency: row.currency || 'ETB',
+      },
+      event: {
+        id: row.event_id,
+        title: row.event_title,
+        description: row.event_description,
+        date: row.event_date ? new Date(row.event_date).toISOString().split('T')[0] : '',
+        time: row.start_time && row.end_time ? `${row.start_time} - ${row.end_time}` : row.start_time || 'Full Day',
+        location: row.event_location,
+        venueName: row.venue_name,
+        organizerId: row.organizer_id,
+        organizerName: row.organizer_org || row.organizer_name || 'Event Organizer',
+      },
+      attendee: {
+        id: row.user_id,
+        name: row.full_name,
+        email: row.email,
+        phone: isOrganizer ? row.phone : undefined,
+        organization: row.organization,
+        avatarUrl: row.avatar_url,
+        registrationDate: row.registered_at,
+        answers,
+        customQuestions: questions,
+      },
+      checkIn: activeCheckIn ? {
+        id: activeCheckIn.id,
+        approvedAt: activeCheckIn.approved_at,
+        approvedByName: activeCheckIn.approved_by_name || 'Organizer',
+      } : null,
+      hasAttendedBadge,
+      isOrganizer,
+      canCheckIn: isOrganizer && !isExpired && !isCancelled && !isAlreadyCheckedIn,
+      isAlreadyCheckedIn,
+      isExpired,
+      isCancelled,
+    };
+  }
+
   // Dedicated verification endpoint for Organizer Scanner
   static async verifyTicketForScanner(params: {
     eventId: string;
@@ -190,7 +362,23 @@ export class CheckinService {
       throw err;
     }
 
-    const cleanInput = (tokenOrCode || '').trim();
+    let cleanInput = (tokenOrCode || '').trim();
+    if (cleanInput.includes('token=')) {
+      const match = cleanInput.match(/token=([^&]+)/);
+      if (match) cleanInput = decodeURIComponent(match[1]);
+    } else if (cleanInput.includes('code=')) {
+      const match = cleanInput.match(/code=([^&]+)/);
+      if (match) cleanInput = decodeURIComponent(match[1]);
+    } else if (cleanInput.startsWith('http://') || cleanInput.startsWith('https://')) {
+      try {
+        const parsedUrl = new URL(cleanInput);
+        const token = parsedUrl.searchParams.get('token');
+        const code = parsedUrl.searchParams.get('code');
+        if (token) cleanInput = token;
+        else if (code) cleanInput = code;
+      } catch {}
+    }
+
     if (!cleanInput) {
       const err: any = new Error('Please scan a QR code or enter a ticket token / code.');
       err.statusCode = 400;
@@ -465,6 +653,11 @@ export class CheckinService {
 
       await client.query('COMMIT');
 
+      // Invalidate event cache, roster, and reports
+      CacheService.delPrefix(`event:${realEventId}`);
+      CacheService.del(`report:${realEventId}`);
+      CacheService.delPrefix('events:list');
+
       const updatedAttendee = await this.lookupAttendee(realEventId, attendeeId);
       const rawBadge = badgeRes.rows[0];
 
@@ -557,6 +750,11 @@ export class CheckinService {
       );
 
       await client.query('COMMIT');
+
+      // Invalidate event cache, roster, and reports
+      CacheService.delPrefix(`event:${realEventId}`);
+      CacheService.del(`report:${realEventId}`);
+      CacheService.delPrefix('events:list');
 
       const updatedAttendee = await this.lookupAttendee(realEventId, attendeeId);
 
@@ -718,6 +916,11 @@ export class CheckinService {
       }
 
       await client.query('COMMIT');
+
+      // Invalidate event cache, roster, and reports
+      CacheService.delPrefix(`event:${realEventId}`);
+      CacheService.del(`report:${realEventId}`);
+      CacheService.delPrefix('events:list');
 
       const updatedAttendee = await this.lookupAttendee(realEventId, userId);
 
