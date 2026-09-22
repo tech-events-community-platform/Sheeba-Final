@@ -502,6 +502,7 @@ export const api = {
             ticketPrice: Number(data.ticketPrice) || 0,
             currency: 'ETB',
             customQuestions: data.customQuestions || [],
+            includeDefaultQuestions: data.includeDefaultQuestions !== undefined ? data.includeDefaultQuestions : true,
             bannerUrl: data.bannerUrl,
           }),
         });
@@ -536,6 +537,7 @@ export const api = {
         currency: 'ETB',
         shareLinkToken: `shb-${Math.random().toString(36).substring(2, 8)}`,
         customQuestions: data.customQuestions || [],
+        includeDefaultQuestions: data.includeDefaultQuestions !== undefined ? data.includeDefaultQuestions : true,
         bannerUrl: data.bannerUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
         createdAt: new Date().toISOString(),
       };
@@ -1069,12 +1071,18 @@ export const api = {
       try {
         const res = await requestApi(`/reports/events/${eventId}`);
         if (res.data) return res.data;
-      } catch {
+      } catch (err: any) {
+        if (err?.status === 403 || err?.status === 401) {
+          throw err;
+        }
         try {
           const res2 = await requestApi(`/reports/${eventId}`);
           if (res2.data) return res2.data;
-        } catch (err) {
-          console.warn('Backend report fetch fallback:', err);
+        } catch (err2: any) {
+          if (err2?.status === 403 || err2?.status === 401) {
+            throw err2;
+          }
+          console.warn('Backend report fetch fallback:', err2);
         }
       }
       return api.reports.getSponsorReport(eventId);
@@ -1084,7 +1092,10 @@ export const api = {
       const event = await api.events.getById(eventId);
       const roster = await api.roster.getByEventId(eventId);
       
-      const isDemo = eventId === 'demo-impact-event-2026' || (!event && (!roster || roster.length === 0));
+      const isDemo = eventId === 'demo-impact-event-2026';
+      if (!event && !isDemo) {
+        throw new Error('Event report not found or unauthorized.');
+      }
       const title = event?.title || (isDemo ? 'AI & Future of Work Summit 2026' : 'Tech Community Event');
       const totalReg = (roster && roster.length > 0) ? roster.length : (event?.registeredCount || 250);
       const totalTurnout = (roster && roster.length > 0) ? roster.filter((r) => r.status === 'Checked in').length : (event?.checkedInCount || 187);
@@ -1240,7 +1251,8 @@ export const api = {
         let res: any;
         try {
           res = await requestApi(`/reports/events/${eventId}/export`);
-        } catch {
+        } catch (err: any) {
+          if (err?.status === 403 || err?.status === 401) throw err;
           res = await requestApi(`/reports/${eventId}/export`);
         }
         if (res instanceof Blob) {
@@ -1253,13 +1265,20 @@ export const api = {
           document.body.removeChild(link);
           return;
         }
-      } catch (e) {
+      } catch (e: any) {
+        if (e?.status === 403 || e?.status === 401) {
+          throw e;
+        }
         console.warn('Export CSV fallback:', e);
       }
       return api.reports.exportSponsorReportCsv(eventId);
     },
 
     exportSponsorReportCsv: async (eventId: string): Promise<void> => {
+      const event = await api.events.getById(eventId);
+      if (!event && eventId !== 'demo-impact-event-2026') {
+        throw new Error('Event not found or unauthorized.');
+      }
       const roster = await api.roster.getByEventId(eventId);
       const headers = ['Attendee Name', 'Email', 'Registered At', 'Status', 'Check-In Time', 'Badges'];
       const rows = roster.map((r) => [

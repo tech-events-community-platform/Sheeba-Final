@@ -40,6 +40,7 @@ export interface Event {
   currency: 'ETB';
   shareLinkToken: string;
   customQuestions: RegistrationQuestion[];
+  includeDefaultQuestions?: boolean;
   bannerUrl?: string;
   posterImageUrl?: string;
   isFull?: boolean;

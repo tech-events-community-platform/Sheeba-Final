@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { TelegramIcon, XIcon, TikTokIcon, YouTubeIcon } from '../../components/ui/SocialIcons';
+import { OrganizerDefaultQuestionsSettings } from '../../components/organizer/OrganizerDefaultQuestionsSettings';
 
 export const AccountSettingsPage: React.FC = () => {
   const { user, logout, switchRole } = useAuth();
@@ -328,6 +329,11 @@ export const AccountSettingsPage: React.FC = () => {
           </div>
         </form>
       </div>
+
+      {/* Organizer Default Registration Questions */}
+      {!isSponsor && !isAdmin && user?.role === 'ORGANIZER' && (
+        <OrganizerDefaultQuestionsSettings user={user} />
+      )}
 
       {/* 2. Personal Attendee Account */}
       <div className="pt-6 border-t border-[#E8DDD7] space-y-4 max-w-3xl">
