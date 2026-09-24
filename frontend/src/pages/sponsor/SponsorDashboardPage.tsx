@@ -65,9 +65,9 @@ export const SponsorDashboardPage: React.FC = () => {
           </div>
 
           <div className="shrink-0 flex flex-col sm:flex-row md:flex-col gap-2.5">
-            <Link to="/search">
+            <Link to="/sponsor/explore">
               <Button size="md" variant="accent" icon={<Sparkles className="w-4 h-4" />}>
-                Explore Tech Events
+                Explore Pitches
               </Button>
             </Link>
           </div>
@@ -144,9 +144,9 @@ export const SponsorDashboardPage: React.FC = () => {
           </p>
         </div>
         <div className="pt-3">
-          <Link to="/search">
+          <Link to="/sponsor/explore">
             <Button size="sm" variant="primary" icon={<ArrowRight className="w-4 h-4" />}>
-              Browse Events Seeking Sponsors
+              Browse Pitches Seeking Sponsors
             </Button>
           </Link>
         </div>

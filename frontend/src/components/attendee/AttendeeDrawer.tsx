@@ -5,7 +5,6 @@ import {
   X,
   User,
   Settings,
-  Search,
   LogOut,
   Award,
   ExternalLink,
@@ -124,23 +123,6 @@ export const AttendeeDrawer: React.FC<AttendeeDrawerProps> = ({ isOpen, onClose 
                   <div>
                     <span className="text-sm font-semibold block">Account Settings</span>
                     <span className="text-[11px] text-gray-500 font-light">Privacy, email, and password controls</span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-
-              <Link
-                to="/search"
-                onClick={onClose}
-                className="flex items-center justify-between p-3 rounded-xl hover:bg-white/80 text-gray-700 hover:text-sheeba-dark transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-sheeba-indigo/10 text-sheeba-indigo flex items-center justify-center">
-                    <Search className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold block">Discover Events & Badges</span>
-                    <span className="text-[11px] text-gray-500 font-light">Search upcoming community gatherings</span>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />

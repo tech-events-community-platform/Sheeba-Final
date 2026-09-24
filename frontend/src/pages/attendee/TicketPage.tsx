@@ -70,9 +70,9 @@ export const TicketPage: React.FC = () => {
               ? `You haven't registered for "${event.title}" yet.`
               : 'Please register through the event organizer share link to obtain a dynamic QR pass.'}
           </p>
-          <Link to="/search">
+          <Link to="/app/events">
             <Button variant="primary" size="sm">
-              Search Active Events
+              View My Events
             </Button>
           </Link>
         </div>

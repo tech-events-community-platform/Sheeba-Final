@@ -10,7 +10,6 @@ import {
   Settings,
   Ticket,
   Home,
-  Compass,
   ArrowLeft,
   LogIn,
 } from 'lucide-react';
@@ -248,14 +247,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAttendeeDrawer: _onOpenAtt
                     >
                       <Home className="w-4 h-4 text-[#63474D]" />
                       Attendee Hub
-                    </Link>
-                    <Link
-                      to="/search"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="px-3 py-2 rounded-lg text-sm font-semibold text-[#2D1F23] hover:bg-white flex items-center gap-2"
-                    >
-                      <Compass className="w-4 h-4 text-[#63474D]" />
-                      Events
                     </Link>
                     <Link
                       to="/app/events"

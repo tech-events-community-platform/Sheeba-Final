@@ -11,7 +11,6 @@ import {
   Menu,
   X,
   Sparkles,
-  ExternalLink,
   ChevronRight,
   ChevronLeft,
 } from 'lucide-react';
@@ -216,19 +215,6 @@ export const SponsorLayout: React.FC = () => {
 
           {/* Sidebar Footer */}
           <div className="p-3 border-t border-white/10 space-y-2 bg-black/20">
-            <Link
-              to="/search"
-              title={isCollapsed ? 'Public Events Site' : undefined}
-              className={`flex items-center ${
-                isCollapsed ? 'md:justify-center p-2' : 'justify-between px-3 py-2'
-              } text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors`}
-            >
-              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
-                <ExternalLink className="w-3.5 h-3.5 text-[#FFA686]" />
-                {!isCollapsed && <span>Public Events</span>}
-              </div>
-            </Link>
-
             <button
               type="button"
               onClick={handleLogout}
