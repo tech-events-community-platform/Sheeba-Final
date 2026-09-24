@@ -1,19 +1,16 @@
 import { Router } from 'express';
 import { EventController } from '../controllers/event.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, optionalAuthenticate } from '../middlewares/auth.middleware';
 import { authorizeRoles } from '../middlewares/role.middleware';
 import { validateEvent } from '../middlewares/validate.middleware';
 import { cacheResponse } from '../middlewares/cache.middleware';
 
 const router = Router();
 
-// Public & Share links
-router.get('/', EventController.getEvents);
-router.get('/share/:token', EventController.getEventByShareToken);
-router.get('/:id', EventController.getEventById);
-router.get('/', cacheResponse({ ttlSeconds: 30 }), EventController.getEvents);
+// Events & Share links
+router.get('/', optionalAuthenticate, cacheResponse({ ttlSeconds: 15, isPrivate: true }), EventController.getEvents);
 router.get('/share/:token', cacheResponse({ ttlSeconds: 60 }), EventController.getEventByShareToken);
-router.get('/:id', cacheResponse({ ttlSeconds: 60 }), EventController.getEventById);
+router.get('/:id', optionalAuthenticate, cacheResponse({ ttlSeconds: 60 }), EventController.getEventById);
 
 // Organizer Event Management
 router.post(

@@ -128,11 +128,11 @@ export const PublicProfilePage: React.FC = () => {
     return (
       <div className="max-w-xl mx-auto py-16 px-4 space-y-6 text-center">
         <Link
-          to="/search"
+          to="/"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#63474D] hover:underline mb-2"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Search
+          Back to Home
         </Link>
         <div className="bg-white rounded-3xl p-8 border border-[#E8DDD7] shadow-xs space-y-5">
           <div className="w-16 h-16 rounded-full bg-[#FAF7F5] border border-[#E8DDD7] flex items-center justify-center mx-auto text-[#63474D]">
@@ -165,11 +165,11 @@ export const PublicProfilePage: React.FC = () => {
   return (
     <div className="max-w-3xl mx-auto py-10 px-4 space-y-8 pb-16">
       <Link
-        to="/search"
+        to="/"
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#63474D] hover:underline"
       >
         <ArrowLeft className="w-4 h-4" />
-        Search All Profiles
+        Back to Home
       </Link>
 
       {isOwnerPreview && (

@@ -16,7 +16,6 @@ import { PublicRegisterPage } from '../pages/public/PublicRegisterPage';
 import { EventRegistrationCheckoutPage } from '../pages/public/EventRegistrationCheckoutPage';
 import { PublicProfilePage } from '../pages/public/PublicProfilePage';
 import { BadgeDetailPage } from '../pages/public/BadgeDetailPage';
-import { PublicSearchPage } from '../pages/public/PublicSearchPage';
 import { VerifyTicketPage } from '../pages/public/VerifyTicketPage';
 
 // Sponsor Pages & Layout
@@ -68,7 +67,7 @@ export const router = createBrowserRouter([
       { path: 'register', element: <LoginPage /> },
       { path: 'pending-approval', element: <PendingApprovalPage /> },
       { path: 'contact', element: <LoginPage /> },
-      { path: 'search', element: <PublicSearchPage /> },
+      { path: 'search', element: <Navigate to="/" replace /> },
       { path: 'e/:token', element: <PublicRegisterPage /> },
       { path: 'e/:token/register', element: <EventRegistrationCheckoutPage /> },
       { path: 'events/:id/register', element: <PublicRegisterPage /> },

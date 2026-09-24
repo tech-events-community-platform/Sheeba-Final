@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   Award,
   ChevronDown,
-  Compass,
   Ticket,
   PlusCircle,
   BarChart3,
@@ -86,11 +85,9 @@ export default function Header() {
         { name: 'Features', href: '#features', isInternal: true },
         { name: 'How It Works', href: '#how-it-works', isInternal: true },
         { name: 'Live Simulator', href: '#simulator', isInternal: true },
-        { name: 'Explore Events', href: '/search', isInternal: false },
       ]
     : [
         { name: 'Home', href: '/', isInternal: false },
-        { name: 'Explore Events', href: '/search', isInternal: false },
       ];
 
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
@@ -215,15 +212,6 @@ export default function Header() {
                           <span>My Profile & Badges</span>
                         </Link>
                       )}
-
-                      <Link
-                        to="/search"
-                        onClick={() => setUserDropdownOpen(false)}
-                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-[#FAF7F5] hover:text-[#63474D] transition-colors"
-                      >
-                        <Compass className="w-4 h-4 text-[#AA767C]" />
-                        <span>Explore Events</span>
-                      </Link>
                     </div>
 
                     <div className="pt-1 border-t border-[#E8DDD7]/60">
@@ -339,18 +327,6 @@ export default function Header() {
                 </Link>
 
                 <Link
-                  to="/app/explore"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/app/explore') || isTabActive('/search')
-                      ? 'bg-[#63474D] text-white shadow-xs'
-                      : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
-                >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>🔍 Explore Events</span>
-                </Link>
-
-                <Link
                   to="/app/profile"
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
                     isTabActive('/app/profile') && location.pathname !== '/app/profile/attendance'
@@ -413,18 +389,6 @@ export default function Header() {
                   <BarChart3 className="w-3.5 h-3.5" />
                   <span>📈 Reports & Badges</span>
                 </Link>
-
-                <Link
-                  to="/search"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/search')
-                      ? 'bg-[#63474D] text-white shadow-xs'
-                      : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
-                >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>🔍 Explore Events</span>
-                </Link>
               </>
             )}
 
@@ -464,18 +428,6 @@ export default function Header() {
                 >
                   <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain" />
                   <span>Events Moderation</span>
-                </Link>
-
-                <Link
-                  to="/search"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/search')
-                      ? 'bg-[#63474D] text-white shadow-xs'
-                      : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
-                >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span>🔍 Explore Events</span>
                 </Link>
               </>
             )}
@@ -554,15 +506,6 @@ export default function Header() {
                       </Link>
                     </>
                   )}
-
-                  <Link
-                    to="/search"
-                    onClick={() => setIsOpen(false)}
-                    className="flex items-center gap-2 py-2 px-3 rounded-xl hover:bg-gray-50 text-xs font-medium text-gray-700"
-                  >
-                    <Compass className="w-4 h-4 text-[#AA767C]" />
-                    <span>🔍 Explore Events</span>
-                  </Link>
                 </div>
               </div>
             ) : null}

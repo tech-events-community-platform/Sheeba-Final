@@ -46,9 +46,14 @@ export class EventController {
     }
   }
 
-  static async getEvents(req: Request, res: Response, next: NextFunction) {
+  static async getEvents(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { search, type, status, organizerId } = req.query;
+
+      // Platform events are private/share-link only; public listing of all events is disabled
+      if (!organizerId && (!req.user || !['admin', 'organizer'].includes(req.user.role?.toLowerCase() || ''))) {
+        return sendSuccess(res, [], 'Public event listing is disabled.');
+      }
 
       const events = await EventService.getEvents({
         search: search as string,

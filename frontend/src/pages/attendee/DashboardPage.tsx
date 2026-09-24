@@ -283,14 +283,8 @@ export const AttendeeDashboardPage: React.FC = () => {
             <div className="p-12 text-center border border-dashed border-gray-200 rounded-2xl space-y-3">
               <p className="font-serif text-base font-bold text-sheeba-dark">No event records found</p>
               <p className="text-xs text-gray-500 font-light max-w-sm mx-auto">
-                Discover upcoming hackathons and meetups on Sheeba to start building your verified event timeline.
+                When you register and check in to events using direct organizer links, your verified timeline and credentials will appear here.
               </p>
-              <Link
-                to="/app/explore"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sheeba-purple text-white text-xs font-semibold hover:bg-sheeba-indigo transition-colors"
-              >
-                Browse Upcoming Events
-              </Link>
             </div>
           ) : (
             tickets.map((t) => {

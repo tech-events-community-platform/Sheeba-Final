@@ -1,6 +1,5 @@
 import { query } from '../config/db';
 import { AuthService } from './auth.service';
-import { EventService } from './event.service';
 
 export class SearchService {
   static async searchPublic(searchQuery: string) {
@@ -25,12 +24,10 @@ export class SearchService {
       })
     );
 
-    // Search public events
-    const events = await EventService.getEvents({ search: q });
-
+    // Sheeba events are private / direct-link only, not public
     return {
       attendees,
-      events,
+      events: [],
     };
   }
 }

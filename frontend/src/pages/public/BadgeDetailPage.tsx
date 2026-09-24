@@ -77,10 +77,10 @@ export const BadgeDetailPage: React.FC = () => {
           This badge may have been revoked or the identifier is invalid.
         </p>
         <Link
-          to="/search"
+          to="/"
           className="inline-block px-4 py-2 text-xs font-semibold text-[#63474D] border border-[#63474D]/30 rounded-xl"
         >
-          Search Other Credentials
+          Back to Home
         </Link>
       </div>
     );
