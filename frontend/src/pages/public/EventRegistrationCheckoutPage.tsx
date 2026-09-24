@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Lock,
 } from 'lucide-react';
+import { getCalendarTile } from '../../utils/date';
 
 export const SHEEBA_ROLES = [
   'Student',
@@ -260,22 +261,7 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
     }
   };
 
-  const getCalendarTile = (dateStr?: string) => {
-    if (!dateStr) return { month: 'EVENT', day: '•', weekday: '', fullDate: '' };
-    try {
-      const d = new Date(dateStr);
-      if (!isNaN(d.getTime())) {
-        const month = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-        const day = d.getDate();
-        const weekday = d.toLocaleString('en-US', { weekday: 'long' });
-        const fullDate = d.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        return { month, day, weekday, fullDate };
-      }
-    } catch {
-      // ignore
-    }
-    return { month: 'EVENT', day: '•', weekday: '', fullDate: dateStr };
-  };
+
 
   if (loading) {
     return (

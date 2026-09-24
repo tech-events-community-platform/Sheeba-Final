@@ -21,6 +21,7 @@ import {
   getCloudinaryConfig,
   saveCloudinaryConfig,
 } from '../../utils/cloudinary';
+import { formatDateForInput, getCalendarTile } from '../../utils/date';
 
 interface EditEventModalProps {
   event: Event | null;
@@ -65,19 +66,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
 
   useEffect(() => {
     if (event && isOpen) {
-      let eventDate = '';
-      if (event.date) {
-        try {
-          const d = new Date(event.date);
-          if (!isNaN(d.getTime())) {
-            eventDate = d.toISOString().split('T')[0];
-          } else {
-            eventDate = event.date;
-          }
-        } catch {
-          eventDate = event.date;
-        }
-      }
+      const eventDate = formatDateForInput(event.date);
 
       const standardTypes: EventType[] = ['summit', 'workshop', 'meetup', 'hackathon', 'conference'];
       const isStandard = standardTypes.includes(event.type as EventType);
@@ -313,6 +302,11 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                 />
+                {formData.date && (
+                  <p className="text-[10.5px] font-semibold text-[#63474D] flex items-center gap-1 mt-1">
+                    <span>🗓️ {getCalendarTile(formData.date).weekday}, {getCalendarTile(formData.date).fullDate}</span>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">

@@ -15,6 +15,7 @@ import {
   TikTokIcon,
   YouTubeIcon,
 } from '../../components/ui/SocialIcons';
+import { getCalendarTile } from '../../utils/date';
 
 export const PublicRegisterPage: React.FC = () => {
   const { token, id } = useParams<{ token?: string; id?: string }>();
@@ -80,23 +81,7 @@ export const PublicRegisterPage: React.FC = () => {
 
 
 
-  const getCalendarTile = (dateStr?: string) => {
-    if (!dateStr) return { month: 'EVENT', day: '•', weekday: '', fullDate: '', monthYear: '' };
-    try {
-      const d = new Date(dateStr);
-      if (!isNaN(d.getTime())) {
-        const month = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-        const day = d.getDate();
-        const weekday = d.toLocaleString('en-US', { weekday: 'long' });
-        const fullDate = d.toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        const monthYear = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-        return { month, day, weekday, fullDate, monthYear };
-      }
-    } catch {
-      // ignore
-    }
-    return { month: 'EVENT', day: '•', weekday: '', fullDate: dateStr, monthYear: '' };
-  };
+
 
   if (loading) {
     return (

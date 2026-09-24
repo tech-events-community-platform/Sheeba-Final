@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { EditEventQuestionsModal } from './EditEventQuestionsModal';
 import { EditEventModal } from './EditEventModal';
+import { getCalendarTile } from '../../utils/date';
 
 interface EventDetailModalProps {
   event: Event | null;
@@ -114,7 +115,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" /> Schedule & Time
                   </td>
                   <td className="py-3 px-4 font-medium text-gray-800">
-                    {event.date} • {event.time || `${event.startTime} - ${event.endTime}`}
+                    {getCalendarTile(event.date).weekday ? `${getCalendarTile(event.date).weekday}, ${getCalendarTile(event.date).fullDate}` : event.date} • {event.time || `${event.startTime} - ${event.endTime}`}
                   </td>
                   <td className="py-3 px-4 text-right text-gray-400 font-light">
                     Single-Day Session

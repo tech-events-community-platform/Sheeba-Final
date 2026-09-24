@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 import { EditEventModal } from '../../components/organizer/EditEventModal';
+import { getCalendarTile } from '../../utils/date';
 
 export const EventDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -273,7 +274,7 @@ export const EventDetailPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-xs text-[#756366]">
               <span className="flex items-center gap-1.5">
                 <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
-                {event.date}
+                {getCalendarTile(event.date).weekday ? `${getCalendarTile(event.date).weekday}, ${getCalendarTile(event.date).fullDate}` : event.date}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-[#AA767C]" />
