@@ -660,7 +660,6 @@ export class ReportService {
 
     // Invalidate cache
     const cacheKey = `report:${eventId}`;
-    CacheService.delete(cacheKey);
     CacheService.del(cacheKey);
 
     return this.getEventReport(eventId, userId, userRole, true);
@@ -690,7 +689,6 @@ export class ReportService {
     await query(`DELETE FROM event_reports WHERE event_id = $1`, [event.id]);
 
     const cacheKey = `report:${eventId}`;
-    CacheService.delete(cacheKey);
     CacheService.del(cacheKey);
 
     return this.getEventReport(eventId, userId, userRole, true);
