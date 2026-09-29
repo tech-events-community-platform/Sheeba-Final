@@ -1437,6 +1437,66 @@ export const api = {
       link.click();
       document.body.removeChild(link);
     },
+
+    updateEventReport: async (
+      eventId: string,
+      data: {
+        aiNarrative?: Partial<SponsorReportData['aiNarrative']>;
+        customNotes?: string;
+      }
+    ): Promise<SponsorReportData> => {
+      try {
+        const res = await requestApi(`/reports/events/${eventId}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        });
+        if (res.data) return res.data;
+      } catch (err: any) {
+        if (err?.status === 403 || err?.status === 401) throw err;
+        try {
+          const res2 = await requestApi(`/reports/${eventId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+          });
+          if (res2.data) return res2.data;
+        } catch (err2: any) {
+          if (err2?.status === 403 || err2?.status === 401) throw err2;
+          console.warn('Backend report update fallback:', err2);
+        }
+      }
+      const report = await api.reports.getSponsorReport(eventId);
+      return {
+        ...report,
+        aiNarrative: {
+          ...report.aiNarrative,
+          ...(data.aiNarrative || {}),
+        } as any,
+        customNotes: data.customNotes !== undefined ? data.customNotes : report.customNotes,
+        isCustomized: true,
+        updatedAt: new Date().toISOString(),
+      };
+    },
+
+    resetEventReport: async (eventId: string): Promise<SponsorReportData> => {
+      try {
+        const res = await requestApi(`/reports/events/${eventId}/reset`, {
+          method: 'POST',
+        });
+        if (res.data) return res.data;
+      } catch (err: any) {
+        if (err?.status === 403 || err?.status === 401) throw err;
+        try {
+          const res2 = await requestApi(`/reports/${eventId}/reset`, {
+            method: 'POST',
+          });
+          if (res2.data) return res2.data;
+        } catch (err2: any) {
+          if (err2?.status === 403 || err2?.status === 401) throw err2;
+          console.warn('Backend report reset fallback:', err2);
+        }
+      }
+      return api.reports.getSponsorReport(eventId);
+    },
   },
 
   // Public Search & Discovery

@@ -279,3 +279,18 @@ CREATE INDEX IF NOT EXISTS idx_sponsorship_applications_status ON sponsorship_ap
 CREATE INDEX IF NOT EXISTS idx_sponsorship_deals_application_id ON sponsorship_deals(application_id);
 CREATE INDEX IF NOT EXISTS idx_sponsorship_deals_sponsor_id ON sponsorship_deals(sponsor_id);
 CREATE INDEX IF NOT EXISTS idx_sponsorship_deals_status ON sponsorship_deals(status);
+
+-- Event Reports Table (Persists organizer customizations & notes for event impact reports)
+CREATE TABLE IF NOT EXISTS event_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    ai_narrative JSONB NOT NULL DEFAULT '{}'::jsonb,
+    custom_notes TEXT,
+    updated_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_event_report UNIQUE (event_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_reports_event_id ON event_reports(event_id);
+

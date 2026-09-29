@@ -107,4 +107,7 @@ export interface SponsorReportData {
     recommendations?: string[];
     strategicConclusion?: string;
   };
+  customNotes?: string;
+  isCustomized?: boolean;
+  updatedAt?: string;
 }

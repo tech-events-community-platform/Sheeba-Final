@@ -437,9 +437,34 @@ export class ReportService {
         sampleAnswers: answers.slice(0, 10),
       }));
 
-    // 11. Generate AI report narrative.
-    const aiNarrative =
-      await GeminiService.generateReportNarrative(
+        // 11. Check if organizer has saved a customized report in event_reports
+    let finalNarrative: any = null;
+    let isCustomized = false;
+    let customNotes = '';
+    let reportUpdatedAt = '';
+
+    if (!forceRefresh) {
+      try {
+        const savedRes = await query(
+          `SELECT ai_narrative, custom_notes, updated_at FROM event_reports WHERE event_id = $1`,
+          [event.id]
+        );
+        if (savedRes.rowCount && savedRes.rowCount > 0) {
+          const savedRow = savedRes.rows[0];
+          finalNarrative = typeof savedRow.ai_narrative === 'string'
+            ? JSON.parse(savedRow.ai_narrative)
+            : savedRow.ai_narrative;
+          isCustomized = true;
+          customNotes = savedRow.custom_notes || '';
+          reportUpdatedAt = savedRow.updated_at ? new Date(savedRow.updated_at).toISOString() : '';
+        }
+      } catch (dbErr) {
+        console.warn('Error reading saved event report:', dbErr);
+      }
+    }
+
+    if (!finalNarrative) {
+      finalNarrative = await GeminiService.generateReportNarrative(
         {
           title: event.title,
           description: event.description,
@@ -467,6 +492,7 @@ export class ReportService {
           customQA,
         }
       );
+    }
 
     // 12. Build the complete report.
     const reportData: SponsorReportData = {
@@ -494,7 +520,10 @@ export class ReportService {
       topOrganizations,
       goalsBreakdown,
       sampleInterests: sampleInterests.slice(0, 10),
-      aiNarrative,
+      aiNarrative: finalNarrative,
+      customNotes,
+      isCustomized,
+      updatedAt: reportUpdatedAt || undefined,
     };
 
     // Cache the generated report for 10 minutes.
@@ -580,5 +609,90 @@ export class ReportService {
       filename,
       csvContent,
     };
+  }
+
+  // Update report narrative & custom notes by organizer
+  static async updateEventReport(
+    eventId: string,
+    data: {
+      aiNarrative?: Partial<SponsorReportData['aiNarrative']>;
+      customNotes?: string;
+    },
+    userId?: string,
+    userRole?: UserRole
+  ): Promise<SponsorReportData> {
+    const event = await EventService.getEventById(eventId);
+    if (!event) {
+      const err: any = new Error('Event not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const isOwner = event.organizerId === userId;
+    const isAdmin = userRole?.toLowerCase() === 'admin';
+    if (!isOwner && !isAdmin) {
+      const err: any = new Error('Forbidden. You are not authorized to edit this report.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // Get current baseline report
+    const currentReport = await this.getEventReport(eventId, userId, userRole, false);
+
+    const mergedNarrative = {
+      ...(currentReport.aiNarrative || {}),
+      ...(data.aiNarrative || {}),
+    };
+
+    const notesToSave = data.customNotes !== undefined ? data.customNotes : (currentReport.customNotes || '');
+
+    await query(
+      `INSERT INTO event_reports (event_id, ai_narrative, custom_notes, updated_by, updated_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (event_id)
+       DO UPDATE SET
+         ai_narrative = EXCLUDED.ai_narrative,
+         custom_notes = EXCLUDED.custom_notes,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = NOW()`,
+      [event.id, JSON.stringify(mergedNarrative), notesToSave, userId]
+    );
+
+    // Invalidate cache
+    const cacheKey = `report:${eventId}`;
+    CacheService.delete(cacheKey);
+    CacheService.del(cacheKey);
+
+    return this.getEventReport(eventId, userId, userRole, true);
+  }
+
+  // Reset report to fresh AI draft
+  static async resetEventReport(
+    eventId: string,
+    userId?: string,
+    userRole?: UserRole
+  ): Promise<SponsorReportData> {
+    const event = await EventService.getEventById(eventId);
+    if (!event) {
+      const err: any = new Error('Event not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const isOwner = event.organizerId === userId;
+    const isAdmin = userRole?.toLowerCase() === 'admin';
+    if (!isOwner && !isAdmin) {
+      const err: any = new Error('Forbidden. You are not authorized to reset this report.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    await query(`DELETE FROM event_reports WHERE event_id = $1`, [event.id]);
+
+    const cacheKey = `report:${eventId}`;
+    CacheService.delete(cacheKey);
+    CacheService.del(cacheKey);
+
+    return this.getEventReport(eventId, userId, userRole, true);
   }
 }

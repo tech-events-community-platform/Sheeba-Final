@@ -212,6 +212,95 @@ export const ReportPage: React.FC = () => {
 
   const reportContainerRef = useRef<HTMLDivElement>(null);
 
+  // Edit Report State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTab, setEditTab] = useState<'summary' | 'context' | 'notes' | 'conclusion'>('summary');
+  const [editForm, setEditForm] = useState({
+    executiveSummary: '',
+    eventBackground: '',
+    objectives: '',
+    customNotes: '',
+    partnerImpactSummary: '',
+    strategicConclusion: '',
+  });
+  const [isSavingReport, setIsSavingReport] = useState(false);
+  const [isResettingReport, setIsResettingReport] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+
+  const handleOpenEditModal = () => {
+    if (!report) return;
+    setEditForm({
+      executiveSummary: report.aiNarrative?.executiveSummary || '',
+      eventBackground: report.aiNarrative?.eventBackground || '',
+      objectives: report.aiNarrative?.objectives || '',
+      customNotes: report.customNotes || '',
+      partnerImpactSummary: report.aiNarrative?.partnerImpactSummary || '',
+      strategicConclusion: report.aiNarrative?.strategicConclusion || '',
+    });
+    setEditTab('summary');
+    setSaveFeedback(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveReport = async () => {
+    if (!selectedEventId || !report) return;
+    setIsSavingReport(true);
+    setSaveFeedback(null);
+    try {
+      const updated = await api.reports.updateEventReport(selectedEventId, {
+        aiNarrative: {
+          executiveSummary: editForm.executiveSummary,
+          eventBackground: editForm.eventBackground,
+          objectives: editForm.objectives,
+          partnerImpactSummary: editForm.partnerImpactSummary,
+          strategicConclusion: editForm.strategicConclusion,
+        },
+        customNotes: editForm.customNotes,
+      });
+      setReport(updated);
+      setSaveFeedback('Report saved successfully!');
+      setTimeout(() => {
+        setIsEditModalOpen(false);
+        setSaveFeedback(null);
+      }, 1000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save report updates.');
+    } finally {
+      setIsSavingReport(false);
+    }
+  };
+
+  const handleResetToAi = async () => {
+    if (!selectedEventId) return;
+    const confirmReset = window.confirm(
+      'Are you sure you want to revert manual edits? This will restore the original Gemini AI narrative draft.'
+    );
+    if (!confirmReset) return;
+
+    setIsResettingReport(true);
+    try {
+      const freshReport = await api.reports.resetEventReport(selectedEventId);
+      setReport(freshReport);
+      setEditForm({
+        executiveSummary: freshReport.aiNarrative?.executiveSummary || '',
+        eventBackground: freshReport.aiNarrative?.eventBackground || '',
+        objectives: freshReport.aiNarrative?.objectives || '',
+        customNotes: '',
+        partnerImpactSummary: freshReport.aiNarrative?.partnerImpactSummary || '',
+        strategicConclusion: freshReport.aiNarrative?.strategicConclusion || '',
+      });
+      setSaveFeedback('Reverted to AI draft!');
+      setTimeout(() => {
+        setIsEditModalOpen(false);
+        setSaveFeedback(null);
+      }, 1000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to reset report.');
+    } finally {
+      setIsResettingReport(false);
+    }
+  };
+
   // 1. Fetch events list strictly for the current organizer
   useEffect(() => {
     const fetchEvents = async () => {

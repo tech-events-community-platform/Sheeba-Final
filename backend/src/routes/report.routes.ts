@@ -19,5 +19,19 @@ router.get(
   ReportController.exportEventReportCsv
 );
 
+router.put(
+  ['/events/:id', '/:id'],
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  ReportController.updateEventReport
+);
+
+router.post(
+  ['/events/:id/reset', '/:id/reset'],
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  ReportController.resetEventReport
+);
+
 export default router;
 

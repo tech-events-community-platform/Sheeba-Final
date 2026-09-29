@@ -60,4 +60,58 @@ export class ReportController {
       next(error);
     }
   }
+
+  static async updateEventReport(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const eventId = req.params.id as string;
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+      const { aiNarrative, customNotes } = req.body;
+
+      const report = await ReportService.updateEventReport(
+        eventId,
+        { aiNarrative, customNotes },
+        userId,
+        userRole
+      );
+
+      return sendSuccess(
+        res,
+        report,
+        'Event report updated successfully.'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async resetEventReport(
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const eventId = req.params.id as string;
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+
+      const report = await ReportService.resetEventReport(
+        eventId,
+        userId,
+        userRole
+      );
+
+      return sendSuccess(
+        res,
+        report,
+        'Event report reset to AI draft successfully.'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
 }
