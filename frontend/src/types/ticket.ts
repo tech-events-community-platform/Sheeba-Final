@@ -24,4 +24,6 @@ export interface Ticket {
   isPaid: boolean;
   ticketPrice: number;
   currency: 'ETB';
+  isExpired?: boolean;
+  rawEventDate?: string;
 }

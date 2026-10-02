@@ -1,5 +1,5 @@
 import { getClient, query } from '../config/db';
-import { verifyTicketToken } from '../utils/qr.util';
+import { verifyTicketToken, computeEventDayExpiration } from '../utils/qr.util';
 import { UserRole } from '../types';
 import { BadgeService } from './badge.service';
 import { EventService } from './event.service';
@@ -277,7 +277,8 @@ export class CheckinService {
 
     const row = ticketRes.rows[0];
     const now = new Date();
-    const isExpired = row.expires_at ? now > new Date(row.expires_at) : false;
+    const expDate = row.expires_at ? new Date(row.expires_at) : (row.event_date ? computeEventDayExpiration(row.event_date) : null);
+    const isExpired = expDate ? now.getTime() > expDate.getTime() : false;
     const isCancelled = row.status === 'CANCELLED' || row.reg_status === 'cancelled';
 
     // Check active check-in
@@ -465,7 +466,8 @@ export class CheckinService {
 
     const row = ticketRes.rows[0];
     const now = new Date();
-    const isExpired = row.expires_at ? now > new Date(row.expires_at) : false;
+    const expDate = row.expires_at ? new Date(row.expires_at) : (row.event_date ? computeEventDayExpiration(row.event_date) : null);
+    const isExpired = expDate ? now.getTime() > expDate.getTime() : false;
     const isCancelled = row.status === 'CANCELLED' || row.reg_status === 'cancelled';
 
     const ciRes = await query(
@@ -592,7 +594,8 @@ export class CheckinService {
           err.code = 'TICKET_CANCELLED';
           throw err;
         }
-        if (ticketRow.expires_at && new Date() > new Date(ticketRow.expires_at)) {
+        const ticketExp = ticketRow.expires_at ? new Date(ticketRow.expires_at) : (event.date ? computeEventDayExpiration(event.date) : null);
+        if (ticketExp && new Date().getTime() > ticketExp.getTime()) {
           const err: any = new Error('Cannot check in. This ticket has expired (valid until end of event day).');
           err.statusCode = 400;
           err.code = 'TICKET_EXPIRED';

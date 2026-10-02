@@ -110,10 +110,6 @@ export const BadgesPage: React.FC = () => {
       {/* SECTION 5: STATE 1 — Designed Empty State */}
       {badges.length === 0 ? (
         <div className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-12 shadow-xs text-center space-y-6 max-w-2xl mx-auto">
-          <div className="w-20 h-20 rounded-3xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center mx-auto shadow-inner">
-            <Sparkles className="w-10 h-10 text-[#63474D]" />
-          </div>
-
           <div className="space-y-2">
             <h2 className="font-serif text-2xl font-bold text-[#2D1F23]">
               Your Badges Will Unlock Here
@@ -160,9 +156,13 @@ export const BadgesPage: React.FC = () => {
 
           <div className="pt-2 border-t border-[#E8DDD7] flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link to="/app/events">
-              <Button variant="primary" size="md" className="flex items-center gap-2">
-                <TicketIcon className="w-4 h-4" />
-                <span>View Registered Events & Passes</span>
+              <Button
+                variant="primary"
+                size="md"
+                icon={<TicketIcon className="w-4 h-4 shrink-0" />}
+                className="whitespace-nowrap flex-row items-center justify-center"
+              >
+                View Registered Events & Passes
               </Button>
             </Link>
           </div>

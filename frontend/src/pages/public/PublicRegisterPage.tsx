@@ -15,7 +15,7 @@ import {
   TikTokIcon,
   YouTubeIcon,
 } from '../../components/ui/SocialIcons';
-import { getCalendarTile } from '../../utils/date';
+import { getCalendarTile, isEventPassed } from '../../utils/date';
 
 export const PublicRegisterPage: React.FC = () => {
   const { token, id } = useParams<{ token?: string; id?: string }>();
@@ -111,8 +111,9 @@ export const PublicRegisterPage: React.FC = () => {
     );
   }
 
+  const isPassed = Boolean(event.isPassed || isEventPassed(event.date || (event as any).rawDate));
   const isFull = Boolean(
-    event.isFull || (event.capacity > 0 && event.registeredCount >= event.capacity) || event.status === 'closed'
+    isPassed || event.isFull || (event.capacity > 0 && event.registeredCount >= event.capacity) || event.status === 'closed' || event.status === 'completed'
   );
 
   const posterImage =
@@ -204,15 +205,19 @@ export const PublicRegisterPage: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-[#756366]">
                   Registration
                 </span>
-                {isFull && (
+                {isPassed ? (
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-700 border border-stone-300">
+                    Event Ended • Registration Closed
+                  </span>
+                ) : isFull ? (
                   <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
                     Registration Full / Closed
                   </span>
-                )}
+                ) : null}
               </div>
 
-              {/* Already Registered State */}
-              {isAlreadyRegistered ? (
+              {/* Event Has Passed State: The tag above ('Event Ended • Registration Closed') is sufficient; white box removed to bring About Event upward */}
+              {isPassed ? null : isAlreadyRegistered ? (
                 <div className="space-y-3 pt-1 text-left">
                   <div className="flex items-center justify-start gap-2 text-xs font-semibold text-emerald-800">
                     <img src="/tick.webp" alt="Done" className="w-5 h-5 object-contain shrink-0" />

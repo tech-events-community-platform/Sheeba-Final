@@ -24,6 +24,7 @@ import {
   Sparkles,
   QrCode,
 } from 'lucide-react';
+import { isEventPassed } from '../../utils/date';
 
 export const VerifyTicketPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -193,6 +194,12 @@ export const VerifyTicketPage: React.FC = () => {
   }
 
   const { ticket, event, attendee, checkIn, hasAttendedBadge, isOrganizer, canCheckIn, isAlreadyCheckedIn } = verificationData;
+  const isTicketExpired = Boolean(
+    ticket.isExpired ||
+    ticket.status === 'EXPIRED' ||
+    ticket.status === 'Expired' ||
+    isEventPassed(ticket.rawEventDate || event.date || ticket.expiresAt)
+  );
 
   return (
     <div className="min-h-screen bg-[#FAF7F5] py-8 px-4 sm:px-6">
@@ -212,7 +219,7 @@ export const VerifyTicketPage: React.FC = () => {
           </span>
         </div>
 
-        {/* TOP STATUS & ORGANIZER VERIFICATION ACTION (Prompt Requirement) */}
+        {/* TOP STATUS & ORGANIZER VERIFICATION ACTION */}
         {successMessage && (
           <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-center gap-3 text-emerald-900 shadow-sm animate-fade-in">
             <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
@@ -255,8 +262,36 @@ export const VerifyTicketPage: React.FC = () => {
               Attended Badge Active
             </span>
           </div>
+        ) : isTicketExpired ? (
+          /* EXPIRED PASS BANNER */
+          <div className="p-5 bg-white border-2 border-stone-300 rounded-3xl shadow-sm space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 block">
+                  Ticket Status
+                </span>
+                <h2 className="text-xl sm:text-2xl font-serif font-bold text-stone-800">
+                  PASS EXPIRED • EVENT CONCLUDED
+                </h2>
+                <p className="text-xs text-stone-600 mt-0.5">
+                  This event took place on {event.date}. Ticket passes expired at 11:59 PM EAT on the event day.
+                </p>
+              </div>
+
+              <Badge variant="secondary" icon={<Clock className="w-3.5 h-3.5 text-stone-600" />}>
+                Expired
+              </Badge>
+            </div>
+
+            <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl text-xs text-stone-700 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                This pass can no longer be used for door check-in or badge accreditation because the event has already concluded.
+              </span>
+            </div>
+          </div>
         ) : (
-          /* NOT YET CHECKED IN - ORGANIZER CAN CLICK TO VERIFY AT TOP */
+          /* NOT YET CHECKED IN & NOT EXPIRED - ORGANIZER CAN CLICK TO VERIFY AT TOP */
           <div className="p-5 bg-white border-2 border-[#E8DDD7] rounded-3xl shadow-sm space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>

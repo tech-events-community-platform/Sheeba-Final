@@ -25,6 +25,23 @@ export class EventService {
     const posterImageUrl = row.poster_image_url || row.banner_url || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
     const posterUrl = row.poster_image_url || row.banner_url || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
 
+    const expDate = computeEventDayExpiration(row.event_date || formattedDate);
+    const now = new Date();
+    const isPassed = now.getTime() > expDate.getTime();
+
+    const startOfDayEAT = new Date(expDate.getTime() - 24 * 60 * 60 * 1000 + 1);
+    let timeState: 'ongoing' | 'upcoming' | 'past' = 'upcoming';
+    if (isPassed) {
+      timeState = 'past';
+    } else if (now.getTime() >= startOfDayEAT.getTime() && now.getTime() <= expDate.getTime()) {
+      timeState = 'ongoing';
+    }
+
+    let effectiveStatus = row.status || 'open';
+    if (isPassed && (effectiveStatus === 'open' || effectiveStatus === 'published')) {
+      effectiveStatus = 'completed';
+    }
+
     return {
       id: row.id,
       organizerId: row.organizer_id,
@@ -45,8 +62,11 @@ export class EventService {
       capacity,
       registeredCount,
       checkedInCount: parseInt(row.checked_in_count || '0', 10),
-      isFull,
-      status: row.status || 'open',
+      isFull: isFull || isPassed,
+      status: effectiveStatus,
+      rawStatus: row.status || 'open',
+      isPassed,
+      timeState,
       isPaid,
       ticketPrice,
       currency: row.currency || 'ETB',
@@ -54,6 +74,7 @@ export class EventService {
       customQuestions: typeof row.custom_questions === 'string' ? JSON.parse(row.custom_questions) : row.custom_questions || [],
       bannerUrl: posterUrl,
       posterImageUrl: posterUrl,
+      expiresAt: expDate.toISOString(),
       createdAt: row.created_at,
     };
   }
@@ -396,6 +417,15 @@ export class EventService {
     if (!event) {
       const err: any = new Error('Event not found.');
       err.statusCode = 404;
+      throw err;
+    }
+
+    const eventDate = event.rawDate || event.date;
+    const expiresAt = computeEventDayExpiration(eventDate);
+    if (new Date().getTime() > expiresAt.getTime() || event.isPassed || event.status === 'completed' || event.status === 'closed') {
+      const err: any = new Error('This event has already passed. Registration is closed.');
+      err.statusCode = 400;
+      err.code = 'EVENT_PASSED';
       throw err;
     }
 

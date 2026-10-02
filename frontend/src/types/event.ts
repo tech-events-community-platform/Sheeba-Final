@@ -45,5 +45,8 @@ export interface Event {
   bannerUrl?: string;
   posterImageUrl?: string;
   isFull?: boolean;
+  isPassed?: boolean;
+  timeState?: 'ongoing' | 'upcoming' | 'past';
+  expiresAt?: string;
   createdAt?: string;
 }

@@ -16,15 +16,17 @@ import {
   CheckCircle2,
   Sparkles,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 import { printTicketPass } from '../../utils/printTicket';
+import { isEventPassed } from '../../utils/date';
 
 export const MyEventsPage: React.FC = () => {
   const { user } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'Upcoming' | 'Tickets'>('Upcoming');
+  const [activeTab, setActiveTab] = useState<'Upcoming' | 'Past' | 'Tickets'>('Upcoming');
   const [highlightedTicketId, setHighlightedTicketId] = useState<string | null>(null);
   const [selectedAttendeeTicket, setSelectedAttendeeTicket] = useState<Ticket | null>(null);
 
@@ -47,25 +49,39 @@ export const MyEventsPage: React.FC = () => {
     fetchData();
   }, [user]);
 
-  // Combine tickets with event details to form the list of upcoming registered events
+  // Combine tickets with event details and categorize into Upcoming vs Past
   const registeredEvents = tickets.map((ticket) => {
     const matchedEvent = allEvents.find((e) => e.id === ticket.eventId);
+    const eventObj = matchedEvent || ({
+      id: ticket.eventId,
+      title: ticket.eventTitle,
+      type: ticket.eventType,
+      date: ticket.eventDate,
+      time: ticket.eventTime,
+      location: ticket.eventLocation,
+      organizerName: 'Community Organizer',
+      status: 'open',
+      isPaid: ticket.isPaid,
+      ticketPrice: ticket.ticketPrice,
+    } as Partial<Event>);
+
+    const isPassed = Boolean(
+      eventObj.isPassed ||
+      ticket.isExpired ||
+      isEventPassed((ticket as any).rawEventDate || eventObj.date || ticket.eventDate || ticket.expiresAt)
+    );
+    const isAttended = ticket.status === 'Checked in' || ticket.status === 'Used';
+
     return {
       ticket,
-      event: matchedEvent || {
-        id: ticket.eventId,
-        title: ticket.eventTitle,
-        type: ticket.eventType,
-        date: ticket.eventDate,
-        time: ticket.eventTime,
-        location: ticket.eventLocation,
-        organizerName: 'Community Organizer',
-        status: 'open',
-        isPaid: ticket.isPaid,
-        ticketPrice: ticket.ticketPrice,
-      } as Partial<Event>,
+      event: eventObj,
+      isPassed,
+      isAttended,
     };
   });
+
+  const upcomingEvents = registeredEvents.filter((item) => !item.isPassed);
+  const pastEvents = registeredEvents.filter((item) => item.isPassed);
 
   const handleViewTicketQr = (ticketId: string) => {
     setActiveTab('Tickets');
@@ -98,7 +114,7 @@ export const MyEventsPage: React.FC = () => {
         </p>
       </div>
 
-      {/* 2 Clean Tabs: Upcoming & My Tickets */}
+      {/* 3 Clean Tabs: Upcoming, Past Events & My Tickets */}
       <div className="flex border-b border-[#E8DDD7] gap-8 overflow-x-auto">
         <button
           type="button"
@@ -110,7 +126,20 @@ export const MyEventsPage: React.FC = () => {
           }`}
         >
           <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain" />
-          <span>Upcoming ({registeredEvents.length})</span>
+          <span>Upcoming ({upcomingEvents.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Past')}
+          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'Past'
+              ? 'border-[#63474D] text-[#63474D]'
+              : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Past Events ({pastEvents.length})</span>
         </button>
 
         <button
@@ -137,17 +166,24 @@ export const MyEventsPage: React.FC = () => {
       ) : activeTab === 'Upcoming' ? (
         /* TAB 1: Upcoming Events */
         <div className="space-y-4">
-          {registeredEvents.length === 0 ? (
+          {upcomingEvents.length === 0 ? (
             <div className="bg-white rounded-3xl p-10 text-center border border-[#E8DDD7] space-y-3 shadow-xs">
               <img src="/calendar.webp" alt="Calendar" className="w-10 h-10 object-contain mx-auto" />
               <h3 className="font-serif text-base font-bold text-[#2D1F23]">No Upcoming Registrations</h3>
               <p className="text-xs text-[#756366] font-light max-w-md mx-auto">
-                You haven't registered for any upcoming events yet. Once you register for workshops, hackathons, or meetups, they will appear here so you can prepare to attend.
+                You haven't registered for any upcoming events yet. {pastEvents.length > 0 ? `You have ${pastEvents.length} past event${pastEvents.length > 1 ? 's' : ''} in your history.` : ''}
               </p>
+              {pastEvents.length > 0 && (
+                <div className="pt-2">
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab('Past')}>
+                    View Past Events ({pastEvents.length})
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {registeredEvents.map(({ ticket, event }) => (
+              {upcomingEvents.map(({ ticket, event }) => (
                 <div
                   key={ticket.id}
                   className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E8DDD7] hover:border-[#63474D] transition-all shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5"
@@ -228,6 +264,109 @@ export const MyEventsPage: React.FC = () => {
             </div>
           )}
         </div>
+      ) : activeTab === 'Past' ? (
+        /* TAB 2: Past Events (Registered & Attended) */
+        <div className="space-y-4">
+          {pastEvents.length === 0 ? (
+            <div className="bg-white rounded-3xl p-10 text-center border border-[#E8DDD7] space-y-3 shadow-xs">
+              <Clock className="w-10 h-10 text-[#AA767C] mx-auto" />
+              <h3 className="font-serif text-base font-bold text-[#2D1F23]">No Past Events</h3>
+              <p className="text-xs text-[#756366] font-light max-w-md mx-auto">
+                Once events you have registered for pass their scheduled dates, they will automatically appear here with your turnout records and badges.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {pastEvents.map(({ ticket, event, isAttended }) => (
+                <div
+                  key={ticket.id}
+                  className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E8DDD7] transition-all shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5"
+                >
+                  <div className="space-y-2.5 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="primary" className="uppercase font-mono text-[10px]">
+                        {event.type || ticket.eventType}
+                      </Badge>
+                      {isAttended ? (
+                        <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1b4332] bg-[#1b4332]/10 px-2.5 py-0.5 rounded-full border border-[#1b4332]/20">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Verified Attended</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-700 bg-stone-100 px-2.5 py-0.5 rounded-full border border-stone-300">
+                          <Clock className="w-3.5 h-3.5 text-stone-500" />
+                          <span>Event Concluded • Pass Expired</span>
+                        </div>
+                      )}
+                      <span className="font-mono text-[10px] text-[#756366] bg-[#FAF7F5] border border-[#E8DDD7] px-2 py-0.5 rounded">
+                        Pass: {ticket.id}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="font-serif font-bold text-lg text-[#2D1F23] leading-snug">
+                        {event.title || ticket.eventTitle}
+                      </h3>
+                      {event.organizerName && (
+                        <p className="text-xs font-semibold text-[#AA767C] mt-0.5">
+                          Hosted by {event.organizerName}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[#756366] pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        <span className="font-medium text-[#2D1F23]">{event.date || ticket.eventDate}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-[#63474D]" />
+                        <span>{event.time || ticket.eventTime}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
+                        <span className="truncate">{event.venueName || event.location || ticket.eventLocation}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions for Past Event */}
+                  <div className="flex flex-row md:flex-col items-center sm:items-end gap-2 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-[#E8DDD7]">
+                    {isAttended ? (
+                      <Link to="/app/badges" className="w-full md:w-auto">
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          className="w-full md:w-auto"
+                        >
+                          View Badges
+                        </Button>
+                      </Link>
+                    ) : null}
+
+                    <Link
+                      to={`/app/ticket/${ticket.eventId}`}
+                      className="w-full md:w-auto"
+                    >
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        icon={<ExternalLink className="w-3.5 h-3.5" />}
+                        className="w-full md:w-auto"
+                      >
+                        Pass Record
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       ) : (
         /* TAB 2: My Tickets (QR Codes per Event) */
         <div className="space-y-4">
@@ -243,6 +382,9 @@ export const MyEventsPage: React.FC = () => {
             <div className="grid grid-cols-1 gap-6">
               {tickets.map((ticket) => {
                 const isHighlighted = highlightedTicketId === ticket.id;
+                const isPassed = Boolean(ticket.isExpired || isEventPassed((ticket as any).rawEventDate || ticket.eventDate || ticket.expiresAt));
+                const isAttended = ticket.status === 'Checked in' || ticket.status === 'Used';
+
                 return (
                   <div
                     key={ticket.id}
@@ -270,9 +412,19 @@ export const MyEventsPage: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <Badge variant="success" icon={<ShieldCheck className="w-3 h-3" />}>
-                          {ticket.status === 'Valid' ? 'Valid for Entry' : ticket.status}
-                        </Badge>
+                        {isAttended ? (
+                          <Badge variant="success" icon={<ShieldCheck className="w-3 h-3" />}>
+                            Attended • Badge Earned
+                          </Badge>
+                        ) : isPassed ? (
+                          <Badge variant="secondary" icon={<Clock className="w-3 h-3 text-[#756366]" />}>
+                            Pass Expired • Event Concluded
+                          </Badge>
+                        ) : (
+                          <Badge variant="success" icon={<ShieldCheck className="w-3 h-3" />}>
+                            {ticket.status === 'Valid' ? 'Valid for Entry' : ticket.status}
+                          </Badge>
+                        )}
                       </div>
                     </div>
 
@@ -284,7 +436,7 @@ export const MyEventsPage: React.FC = () => {
                         title="Click QR Code to view Attendee Information Box"
                         className="flex flex-col items-center justify-center p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] shrink-0 text-center w-full md:w-auto cursor-pointer hover:border-[#63474D] hover:shadow-md transition-all group"
                       >
-                        <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] shadow-2xs group-hover:scale-105 transition-transform">
+                        <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] shadow-2xs group-hover:scale-105 transition-transform relative">
                           <QRCodeSVG
                             value={ticket.attendeeName || 'Attendee'}
                             size={160}
@@ -292,7 +444,15 @@ export const MyEventsPage: React.FC = () => {
                             fgColor="#2D1F23"
                             level="M"
                             includeMargin={false}
+                            className={isPassed && !isAttended ? 'opacity-30 grayscale' : ''}
                           />
+                          {isPassed && !isAttended && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-white/70 backdrop-blur-[1px] rounded-xl">
+                              <span className="text-[10px] font-bold text-[#8C2838] bg-[#8C2838]/10 px-2 py-0.5 rounded-full border border-[#8C2838]/20 shadow-xs">
+                                Pass Expired
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="mt-2.5 text-center w-full max-w-[180px]">
                           <span className="text-[10px] font-bold text-[#63474D] bg-[#63474D]/10 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 group-hover:bg-[#63474D] group-hover:text-white transition-colors">
@@ -305,10 +465,22 @@ export const MyEventsPage: React.FC = () => {
                           <p className="text-[11px] font-mono font-bold text-[#63474D]">
                             {ticket.ticketCode || 'SHB-PASS'}
                           </p>
-                          <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center justify-center gap-1">
-                            <Sparkles className="w-3 h-3 text-[#2A7B5F]" />
-                            <span>Scan to Verify Attendee</span>
-                          </span>
+                          {isAttended ? (
+                            <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center justify-center gap-1">
+                              <ShieldCheck className="w-3 h-3 text-[#2A7B5F]" />
+                              <span>Attended & Verified</span>
+                            </span>
+                          ) : isPassed ? (
+                            <span className="text-[10px] font-bold text-[#756366] mt-1 flex items-center justify-center gap-1">
+                              <Clock className="w-3 h-3 text-[#756366]" />
+                              <span>Expired at End of Day</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center justify-center gap-1">
+                              <Sparkles className="w-3 h-3 text-[#2A7B5F]" />
+                              <span>Scan to Verify Attendee</span>
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -361,9 +533,23 @@ export const MyEventsPage: React.FC = () => {
 
                         {/* Action Buttons */}
                         <div className="pt-2 border-t border-[#E8DDD7] flex flex-wrap items-center justify-between gap-3 no-print">
-                          <div className="flex items-center gap-1.5 text-xs text-[#2A7B5F] font-semibold">
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>Present live QR at the door for badge accreditation</span>
+                          <div className="flex items-center gap-1.5 text-xs font-semibold">
+                            {isAttended ? (
+                              <div className="flex items-center gap-1.5 text-[#2A7B5F]">
+                                <ShieldCheck className="w-4 h-4" />
+                                <span>Attendance verified at event door</span>
+                              </div>
+                            ) : isPassed ? (
+                              <div className="flex items-center gap-1.5 text-[#756366]">
+                                <Clock className="w-4 h-4 text-[#756366]" />
+                                <span>Event concluded. Pass expired at 11:59 PM EAT.</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-[#2A7B5F]">
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>Present live QR at the door for badge accreditation</span>
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2">
