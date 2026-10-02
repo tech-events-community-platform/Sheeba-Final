@@ -1199,131 +1199,6 @@ export const ReportPage: React.FC = () => {
                 <p className="font-serif text-2xl font-black text-[#63474D] mt-1">{report.attendanceRate}%</p>
               </div>
             </div>
-
-            {/* Graphical Representation: Hourly Arrival Velocity & Gate Scan Distribution */}
-            {(() => {
-              const isDemo = report.eventId === DEMO_EVENT.id;
-              const rawHourly = (report.hourlyCheckIns && report.hourlyCheckIns.length > 0)
-                ? report.hourlyCheckIns
-                : isDemo
-                ? [
-                    { label: '08:00 AM', count: 38 },
-                    { label: '09:00 AM', count: 86 },
-                    { label: '10:00 AM', count: 45 },
-                    { label: '11:00 AM', count: 18 },
-                  ]
-                : (report.totalAttended && report.totalAttended > 0)
-                ? [{ label: 'Gate Opening', count: report.totalAttended }]
-                : [];
-
-              const hourlyData = rawHourly.map((h: any) => ({
-                label: h?.hour || h?.time || h?.label || 'Time',
-                count: Number(h?.count) || 0,
-              }));
-
-              const maxCount = hourlyData.length > 0 ? Math.max(...hourlyData.map((d) => d.count), 1) : 1;
-              const peakHour = hourlyData.length > 0
-                ? hourlyData.reduce((prev, curr) => (curr.count > prev.count ? curr : prev), hourlyData[0])
-                : null;
-
-              return (
-                <div className="p-6 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-200/80 pb-3">
-                    <div>
-                      <h4 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-[#63474D]" />
-                        Hourly Gate Check-In Velocity Distribution
-                      </h4>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        Timestamped scan distribution recorded by Sheeba door QR scanner during morning check-in
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
-                      Peak Velocity Window: {peakHour ? `${peakHour.label} (${peakHour.count} Arrivals)` : 'No check-ins recorded'}
-                    </span>
-                  </div>
-
-                  {/* Histogram Chart */}
-                  {hourlyData.length === 0 ? (
-                    <div className="h-44 flex flex-col items-center justify-center text-gray-400 text-xs border-b border-gray-200">
-                      <p>No gate check-in scans recorded yet.</p>
-                    </div>
-                  ) : (
-                    <div className="pt-4 pb-2">
-                      <div className="flex items-end justify-around gap-3 sm:gap-6 h-44 border-b border-gray-200 px-2 pb-2">
-                        {hourlyData.map((item, idx) => {
-                          const heightPercent = Math.max(Math.round(((item.count || 0) / maxCount) * 100), 12);
-                          const isPeak = peakHour ? item.label === peakHour.label : false;
-                          const pctOfAttended = report.totalAttended > 0
-                            ? Math.round(((item.count || 0) / report.totalAttended) * 100)
-                            : 0;
-                          return (
-                            <div key={idx} className="flex flex-col items-center h-full justify-end group flex-1 max-w-20">
-                              {/* Value tooltip pill above bar */}
-                              <div className="flex flex-col items-center mb-1.5 transition-transform group-hover:scale-105">
-                                <span
-                                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md shadow-2xs ${
-                                    isPeak
-                                      ? 'bg-[#63474D] text-white ring-2 ring-[#63474D]/20'
-                                      : 'bg-white text-gray-700 border border-gray-200'
-                                  }`}
-                                >
-                                  {item.count}
-                                </span>
-                                <span className="text-[9px] font-mono text-gray-400 mt-0.5">
-                                  {pctOfAttended}%
-                                </span>
-                              </div>
-                              {/* Bar element */}
-                              <div className="w-full max-w-16 bg-white rounded-t-xl overflow-hidden p-0.5 h-full flex items-end border border-gray-200/60 shadow-inner">
-                                <div
-                                  className={`w-full rounded-t-lg transition-all duration-700 ${
-                                    isPeak
-                                      ? 'bg-gradient-to-t from-[#63474D] to-[#AA767C] shadow-sm'
-                                      : 'bg-gradient-to-t from-[#8C626C] to-[#C9A9AF]'
-                                  }`}
-                                  style={{ height: `${heightPercent}%` }}
-                                />
-                              </div>
-                              {/* X-axis Label */}
-                              <span className={`text-[10px] font-bold mt-2 text-center whitespace-nowrap ${isPeak ? 'text-[#63474D]' : 'text-gray-500'}`}>
-                                {item.label}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Velocity Metrics Legend */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-center text-xs">
-                    <div className="p-2.5 rounded-xl bg-white border border-gray-200">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block">Opening Rush Concentration</span>
-                      <strong className="text-[#2D1F23]">
-                        {(() => {
-                          if (hourlyData.length === 0 || !report.totalAttended) return '0%';
-                          const peakIdx = peakHour ? hourlyData.findIndex((h) => h.label === peakHour.label) : -1;
-                          const cutoffIdx = peakIdx >= 0 ? peakIdx : Math.min(1, hourlyData.length - 1);
-                          const earlyCount = hourlyData.slice(0, cutoffIdx + 1).reduce((acc, curr) => acc + curr.count, 0);
-                          const pct = Math.min(100, Math.round((earlyCount / report.totalAttended) * 100));
-                          const label = hourlyData[cutoffIdx]?.label || 'Peak';
-                          return `${pct}% by ${label}`;
-                        })()}
-                      </strong>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white border border-gray-200">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block">Check-in Scan Latency</span>
-                      <strong className="text-emerald-800">&lt; 2.5s per attendee</strong>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-white border border-gray-200">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase block">Audited Check-in Total</span>
-                      <strong className="text-[#63474D]">{report.totalAttended} Physical Entrants</strong>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
           </section>
 
           {/* ========================================================================= */}
@@ -1418,22 +1293,53 @@ export const ReportPage: React.FC = () => {
               )}
             </div>
 
-            {/* Organizations Represented Table/Grid */}
+            {/* Main Organizing Entities & Summit Partners */}
             <div className="space-y-3">
               <h3 className="font-serif font-bold text-sm text-[#2D1F23]">
-                Key Academic & Corporate Organizations Represented
+                Main Organizing Entities & Summit Partners
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { name: "Ministry of Innovation and Technology (MInT)", role: 'Lead Host & Convening Ministry' },
+                  { name: 'STRIDE Ethiopia 2.0', role: 'National Summit Initiative' },
+                  { name: 'Wingu Africa (wingu.africa)', role: 'Digital Infrastructure Partner' },
+                  { name: 'Space Science and Geospatial Institute (SSGI)', role: 'Research & Space Science' },
+                  { name: 'Ethio telecom', role: 'National Telecom Partner' },
+                  { name: 'Ethiopian Technology Authority (ETA)', role: 'Regulatory & Tech Authority' },
+                  { name: 'Betin', role: 'Ecosystem Innovation Partner' },
+                  { name: 'Ethiopian Intellectual Property Authority (EIPA)', role: 'IP & Patents Partner' },
+                ].map((partner, i) => (
+                  <div
+                    key={i}
+                    className="p-3.5 rounded-xl border border-[#63474D]/20 bg-[#FAF7F5] space-y-1 text-xs"
+                  >
+                    <span className="font-bold text-gray-900 block truncate" title={partner.name}>
+                      {partner.name}
+                    </span>
+                    <span className="text-[10px] font-medium text-[#63474D] block">
+                      {partner.role}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Participating Startups & Ecosystem Ventures Represented */}
+            <div className="space-y-3 pt-2">
+              <h3 className="font-serif font-bold text-sm text-[#2D1F23]">
+                Participating Startups & Ecosystem Ventures Represented
               </h3>
               {report.topOrganizations && report.topOrganizations.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {report.topOrganizations.map((org, i) => (
                     <div
                       key={i}
-                      className="p-3.5 rounded-xl border border-gray-200 bg-[#FAF7F5] flex items-center justify-between gap-2 text-xs"
+                      className="p-3.5 rounded-xl border border-gray-200 bg-white flex items-center justify-between gap-2 text-xs shadow-2xs"
                     >
                       <span className="font-medium text-gray-900 truncate" title={org.name}>
                         {org.name}
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 font-bold text-[10px] text-[#63474D] shrink-0">
+                      <span className="px-2 py-0.5 rounded-full bg-[#FAF7F5] border border-gray-200 font-bold text-[10px] text-[#63474D] shrink-0">
                         {org.count ?? 0} {(org.count ?? 0) === 1 ? 'attendee' : 'attendees'}
                       </span>
                     </div>
@@ -2012,7 +1918,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-ledger"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-4 print:border-none print:shadow-none print:p-0 print:break-after-page"
+            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0 print:break-after-page"
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
@@ -2022,64 +1928,29 @@ export const ReportPage: React.FC = () => {
                 </h2>
               </div>
               <span className="text-[11px] text-gray-500 font-mono">
-                {report.attendees?.length || 0} Total Records
+                {report.totalRegistered} Registered · {report.totalAttended} Verified In-Person
               </span>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-gray-200">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#FAF7F5] border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="py-2.5 px-3">Name</th>
-                    <th className="py-2.5 px-3">Organization</th>
-                    <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3">Check-in</th>
-                    <th className="py-2.5 px-3">Badges Awarded</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {(report.attendees || []).slice(0, 20).map((att) => {
-                    const ans = att.answers || {};
-                    return (
-                      <tr key={att.id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="py-2.5 px-3 font-bold text-[#2D1F23]">{att.name}</td>
-                        <td className="py-2.5 px-3 text-gray-600">
-                          {att.organization ||
-                            ans.sheba_organization ||
-                            ans.organization ||
-                            ans['q_1790072950392'] ||
-                            Object.entries(ans).find(([k]) => k.toLowerCase().includes('startup') || k.toLowerCase().includes('org'))?.[1] ||
-                            '—'}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
-                              att.status === 'Checked in'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            {att.status}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 font-mono text-[10px] text-gray-500">
-                          {att.checkInTime || '—'}
-                        </td>
-                        <td className="py-2.5 px-3 font-mono text-[10px] text-gray-700">
-                          {att.badges && att.badges.length > 0 ? att.badges.join(', ') : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="p-6 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="space-y-1 text-center sm:text-left">
+                <h3 className="font-serif font-bold text-sm text-[#2D1F23]">
+                  Full Cryptographic Attendee Ledger
+                </h3>
+                <p className="text-xs text-gray-600">
+                  Complete attendee roster with timestamped QR check-ins, startup affiliations, and verified credentials.
+                </p>
+              </div>
+              <Button
+                onClick={handleExportCSV}
+                variant="primary"
+                size="md"
+                icon={<FileSpreadsheet className="w-4 h-4" />}
+                className="shrink-0"
+              >
+                Export Attendee CSV ({report.totalRegistered} Records)
+              </Button>
             </div>
-
-            {(report.attendees?.length || 0) > 20 && (
-              <p className="text-[11px] text-gray-500 italic text-center pt-1 print:hidden">
-                Displaying first 20 records for report presentation. Full unclipped ledger is available via the <strong>Export CSV</strong> button above.
-              </p>
-            )}
 
             {/* Official Certification Seal */}
             <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex items-center justify-between gap-4 mt-4">
