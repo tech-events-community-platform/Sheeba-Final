@@ -9,6 +9,9 @@ import { Button } from '../../components/ui/Button';
 import {
   BarChart3,
   FileSpreadsheet,
+  FileText,
+  Edit3,
+  X,
   Printer,
   ShieldCheck,
   CheckCircle2,
@@ -20,6 +23,72 @@ import {
   PlusCircle,
   AlertCircle,
 } from 'lucide-react';
+
+
+const renderInlineMarkdown = (line: string) => {
+  const parts = line.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={i} className="font-bold text-[#2D1F23]">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    return part;
+  });
+};
+
+const renderFormattedNotes = (text: string) => {
+  if (!text) return null;
+  const blocks = text.split(/\n\n+/);
+  return blocks.map((block, idx) => {
+    const trimmed = block.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.startsWith('# ')) {
+      return (
+        <h2 key={idx} className="font-serif text-xl sm:text-2xl font-bold text-[#2D1F23] pt-2">
+          {trimmed.replace(/^#\s+/, '')}
+        </h2>
+      );
+    }
+    if (trimmed.startsWith('## ')) {
+      return (
+        <h3 key={idx} className="font-serif text-base sm:text-lg font-bold text-[#2D1F23] pt-3 pb-1 border-b border-[#E8DDD7]/60">
+          {trimmed.replace(/^##\s+/, '')}
+        </h3>
+      );
+    }
+    if (trimmed.startsWith('### ')) {
+      return (
+        <h4 key={idx} className="font-serif text-sm sm:text-base font-bold text-[#63474D] pt-2">
+          {trimmed.replace(/^###\s+/, '')}
+        </h4>
+      );
+    }
+    if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+      const items = trimmed.split(/\n[*|-]\s+/).filter(Boolean);
+      return (
+        <ul key={idx} className="space-y-2.5 pl-1 my-2">
+          {items.map((item, itemIdx) => (
+            <li key={itemIdx} className="flex items-start gap-2.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FFA686] mt-2 shrink-0" />
+              <span className="flex-1 leading-relaxed">
+                {renderInlineMarkdown(item.replace(/^[*|-]\s+/, ''))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    return (
+      <p key={idx} className="leading-relaxed">
+        {renderInlineMarkdown(trimmed)}
+      </p>
+    );
+  });
+};
 
 const DEMO_EVENT: Event = {
   id: 'demo-impact-event-2026',
@@ -944,6 +1013,27 @@ export const ReportPage: React.FC = () => {
                 )}
               </div>
             </div>
+
+            
+            {/* Official Summit Proceedings & Custom Notes */}
+            {report.customNotes && (
+              <div className="p-6 sm:p-8 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] space-y-5">
+                <div className="flex items-center justify-between border-b border-[#E8DDD7] pb-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-[#63474D]" />
+                    <h3 className="font-serif font-bold text-base sm:text-lg text-[#2D1F23]">
+                      Official Summit Proceedings & Session Notes
+                    </h3>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-[#63474D] bg-[#63474D]/10 px-2.5 py-1 rounded-full border border-[#63474D]/20">
+                    Verified Proceedings
+                  </span>
+                </div>
+                <div className="space-y-4 text-xs sm:text-sm text-gray-800 leading-relaxed">
+                  {renderFormattedNotes(report.customNotes)}
+                </div>
+              </div>
+            )}
 
             {/* Graphical Representation: Pre-Event Registration Demand & Acquisition Momentum */}
             {(() => {

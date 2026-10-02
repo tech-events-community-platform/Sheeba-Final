@@ -4,6 +4,7 @@ import Hero from '../../components/sections/Hero';
 import { RoleSpotlightSection } from '../../components/sections/RoleSpotlightSection';
 import { HowItWorksSection } from '../../components/sections/HowItWorksSection';
 import { LiveTicketSimulatorSection } from '../../components/sections/LiveTicketSimulatorSection';
+import { StrideMilestoneCard } from '../../components/sections/StrideMilestoneCard';
 import FadeIn from '../../components/FadeIn';
 import { ArrowRight } from 'lucide-react';
 
@@ -12,6 +13,13 @@ export const LandingPage: React.FC = () => {
     <div className="space-y-24 sm:space-y-28 pb-24 overflow-hidden">
       {/* 1. HERO SECTION */}
       <Hero />
+
+      {/* WHO WE WORKED WITH SECTION */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 -mt-4 sm:-mt-6 relative z-20">
+        <FadeIn direction="up">
+          <StrideMilestoneCard />
+        </FadeIn>
+      </section>
 
       {/* 2. ROLE SPOTLIGHT (FEATURES SECTION - SCREENSHOT 1 ALTERNATING LAYOUT) */}
       <RoleSpotlightSection />

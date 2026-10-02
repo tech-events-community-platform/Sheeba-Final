@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import type { Ticket } from '../../types/ticket';
 import { isEventPassed } from '../../utils/date';
+import { StrideMilestoneCard } from '../../components/sections/StrideMilestoneCard';
 import {
   Download,
   Share2,
@@ -245,6 +246,9 @@ export const AttendeeDashboardPage: React.FC = () => {
           <path d="M0,3 Q500,6 1000,3 Q500,0 0,3 Z" fill="currentColor" />
         </svg>
       </div>
+
+      {/* STRIDE 2.0 × MInT Milestone Showcase */}
+      <StrideMilestoneCard compact />
 
       {/* 3. The Core Event Attendance Showcase */}
       <div className="space-y-4 pt-1">
