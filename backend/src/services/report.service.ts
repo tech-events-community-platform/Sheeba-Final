@@ -96,17 +96,18 @@ export class ReportService {
           }))
         : [{ date: event.date, count: roster.length || 1 }];
 
-    // 4. Hourly check-in distribution.
+    // 4. Hourly check-in distribution (chronological).
     const hourlyRes = await query(
       `SELECT
         TO_CHAR(checked_in_at, 'HH12:00 AM') AS checkin_hour,
+        DATE_TRUNC('hour', checked_in_at) AS trunc_hour,
         COUNT(*)::INTEGER AS count
        FROM tickets
        WHERE event_id = $1
          AND status = 'CHECKED_IN'
          AND checked_in_at IS NOT NULL
-       GROUP BY checkin_hour
-       ORDER BY checkin_hour ASC`,
+       GROUP BY checkin_hour, trunc_hour
+       ORDER BY trunc_hour ASC`,
       [event.id]
     );
 
@@ -127,6 +128,7 @@ export class ReportService {
     const roleCounts: Record<string, number> = {};
     const orgCounts: Record<string, number> = {};
     const goalCounts: Record<string, number> = {};
+    const interestCounts: Record<string, number> = {};
     const sampleInterests: string[] = [];
 
     // Prepare custom question lookup.
@@ -185,7 +187,8 @@ export class ReportService {
             questionText.includes('best describes you') ||
             questionText.includes('role') ||
             questionText.includes('profession') ||
-            questionText.includes('occupation')
+            questionText.includes('occupation') ||
+            questionText.includes('stage')
           ) {
             foundRole = String(value).trim();
             break;
@@ -224,10 +227,22 @@ export class ReportService {
           ).toLowerCase();
 
           if (
+            questionText.includes('stage') ||
+            questionText.includes('industry') ||
+            questionText.includes('sector') ||
+            questionText.includes('hoping')
+          ) {
+            continue;
+          }
+
+          if (
             questionText.includes('organization') ||
             questionText.includes('institution') ||
             questionText.includes('company') ||
-            questionText.includes('affiliated')
+            questionText.includes('affiliated') ||
+            questionText.includes('name of your startup') ||
+            questionText.includes('startup name') ||
+            questionText.includes('startup')
           ) {
             foundOrg = String(value).trim();
             break;
@@ -267,7 +282,10 @@ export class ReportService {
           if (
             questionText.includes('interest') ||
             questionText.includes('expertise') ||
-            questionText.includes('skills')
+            questionText.includes('skills') ||
+            questionText.includes('industry') ||
+            questionText.includes('sector') ||
+            questionText.includes('domain')
           ) {
             foundInterests = value;
             break;
@@ -283,11 +301,11 @@ export class ReportService {
         interestList.forEach((item: any) => {
           const cleaned = String(item).trim();
 
-          if (
-            cleaned &&
-            !sampleInterests.includes(cleaned)
-          ) {
-            sampleInterests.push(cleaned);
+          if (cleaned && cleaned.toUpperCase() !== 'N/A') {
+            interestCounts[cleaned] = (interestCounts[cleaned] || 0) + 1;
+            if (!sampleInterests.includes(cleaned)) {
+              sampleInterests.push(cleaned);
+            }
           }
         });
       }
@@ -316,8 +334,11 @@ export class ReportService {
 
           if (
             questionText.includes('hoping to gain') ||
+            questionText.includes('hoping to get') ||
             questionText.includes('goal') ||
-            questionText.includes('motivation')
+            questionText.includes('motivation') ||
+            questionText.includes('objective') ||
+            questionText.includes('why are you attending')
           ) {
             foundGoals = value;
             break;
@@ -333,7 +354,7 @@ export class ReportService {
         goalList.forEach((item: any) => {
           const cleaned = String(item).trim();
 
-          if (cleaned) {
+          if (cleaned && cleaned.toUpperCase() !== 'N/A') {
             goalCounts[cleaned] =
               (goalCounts[cleaned] || 0) + 1;
           }
@@ -341,38 +362,54 @@ export class ReportService {
       }
     });
 
-    // 7. Calculate role percentages.
-    const rolesBreakdown = Object.entries(roleCounts).map(
-      ([role, count]) => ({
+    // 7. Calculate role percentages (sorted descending).
+    const rolesBreakdown = Object.entries(roleCounts)
+      .filter(([role]) => role && role.toUpperCase() !== 'N/A')
+      .map(([role, count]) => ({
         role,
         count,
         percentage:
           roster.length > 0
             ? Math.round((count / roster.length) * 100)
             : 0,
-      })
-    );
+      }))
+      .sort((a, b) => b.count - a.count);
 
-    // 8. Calculate goal percentages.
-    const goalsBreakdown = Object.entries(goalCounts).map(
-      ([goal, count]) => ({
+    // 8. Calculate goal percentages (sorted descending).
+    const goalsBreakdown = Object.entries(goalCounts)
+      .filter(([goal]) => goal && goal.toUpperCase() !== 'N/A')
+      .map(([goal, count]) => ({
         goal,
         count,
         percentage:
           roster.length > 0
             ? Math.round((count / roster.length) * 100)
             : 0,
-      })
-    );
+      }))
+      .sort((a, b) => b.count - a.count);
 
-    // 9. Rank organizations by attendee count.
+    // 8b. Calculate interests & sector percentages (sorted descending).
+    const interestsBreakdown = Object.entries(interestCounts)
+      .filter(([name]) => name && name.toUpperCase() !== 'N/A')
+      .map(([name, count]) => ({
+        name: name === 'Other' ? 'Other / Cross-Sector Tech' : name,
+        count,
+        percentage:
+          roster.length > 0
+            ? Math.round((count / roster.length) * 100)
+            : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // 9. Rank organizations by attendee count (clean invalid names).
     const topOrganizations = Object.entries(orgCounts)
+      .filter(([name]) => name && name.trim().length > 1 && !['n/a', 'none', 'na', 'nil', '-', 'unknown'].includes(name.trim().toLowerCase()))
       .map(([name, count]) => ({
         name,
         count,
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+      .slice(0, 30);
 
     // 10. Extract custom question responses.
     const customQAMap: Record<string, string[]> = {};
@@ -519,7 +556,8 @@ export class ReportService {
       rolesBreakdown,
       topOrganizations,
       goalsBreakdown,
-      sampleInterests: sampleInterests.slice(0, 10),
+      interestsBreakdown,
+      sampleInterests: interestsBreakdown.map((i) => i.name),
       aiNarrative: finalNarrative,
       customNotes,
       isCustomized,

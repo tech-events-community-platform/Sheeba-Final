@@ -14,8 +14,8 @@ export const LandingPage: React.FC = () => {
       {/* 1. HERO SECTION */}
       <Hero />
 
-      {/* WHO WE WORKED WITH SECTION */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 -mt-4 sm:-mt-6 relative z-20">
+      {/* STRIDE 2.0 × MInT NATIONAL SUMMIT SHOWCASE */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 -mt-6 sm:-mt-8 relative z-20">
         <FadeIn direction="up">
           <StrideMilestoneCard />
         </FadeIn>

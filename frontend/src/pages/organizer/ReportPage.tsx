@@ -775,7 +775,7 @@ export const ReportPage: React.FC = () => {
                   <span className="w-2 h-2 rounded-full bg-[#AA767C] mt-1.5 shrink-0" />
                   <div>
                     <strong className="text-[#2D1F23] block">Audience Alignment:</strong>
-                    <span>Cohort balanced between working software practitioners and emerging university talent, with technical interests focused on <strong>{(report.sampleInterests || ['AI', 'Software Engineering', 'FinTech']).slice(0, 4).join(', ')}</strong>.</span>
+                    <span>Cohort comprised verified ecosystem participants, with priority focus on <strong>{(report.sampleInterests && report.sampleInterests.length > 0 ? report.sampleInterests.slice(0, 4).join(', ') : 'National innovation, startup designation, and digital ecosystem growth')}</strong>.</span>
                   </div>
                 </div>
 
@@ -1303,9 +1303,11 @@ export const ReportPage: React.FC = () => {
                       <strong className="text-[#2D1F23]">
                         {(() => {
                           if (hourlyData.length === 0 || !report.totalAttended) return '0%';
-                          const earlyCount = (hourlyData[0]?.count || 0) + (hourlyData[1]?.count || 0);
+                          const peakIdx = peakHour ? hourlyData.findIndex((h) => h.label === peakHour.label) : -1;
+                          const cutoffIdx = peakIdx >= 0 ? peakIdx : Math.min(1, hourlyData.length - 1);
+                          const earlyCount = hourlyData.slice(0, cutoffIdx + 1).reduce((acc, curr) => acc + curr.count, 0);
                           const pct = Math.min(100, Math.round((earlyCount / report.totalAttended) * 100));
-                          const label = hourlyData[1]?.label || hourlyData[0]?.label || '09:00 AM';
+                          const label = hourlyData[cutoffIdx]?.label || 'Peak';
                           return `${pct}% by ${label}`;
                         })()}
                       </strong>
@@ -1346,7 +1348,7 @@ export const ReportPage: React.FC = () => {
               <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
                 {report.aiNarrative?.audienceOverview || (
                   <p>
-                    The event attracted participants from multiple segments of the technology ecosystem. Software developers and students represented the largest cohorts, complemented by entrepreneurs, researchers, and participants from other professional backgrounds. This composition indicates that the event was able to attract both individuals actively practicing in technology and individuals actively developing their professional pathways.
+                    The event convened a broad and active cross-section of registered participants from across the innovation ecosystem, encompassing founders, builders, technical practitioners, researchers, and institutional leaders.
                   </p>
                 )}
               </div>
@@ -1355,33 +1357,28 @@ export const ReportPage: React.FC = () => {
             {/* Primary Roles Visual Distribution */}
             <div className="p-5 rounded-2xl border border-gray-200 bg-white space-y-3">
               <h4 className="font-serif font-bold text-xs uppercase tracking-wider text-gray-600">
-                Primary Professional Roles
+                Primary Participant Profile & Startup Maturity
               </h4>
-              <div className="space-y-3">
-                {(report.rolesBreakdown && report.rolesBreakdown.length > 0
-                  ? report.rolesBreakdown
-                  : [
-                      { role: 'Student', count: Math.ceil(report.totalRegistered * 0.4), percentage: 40 },
-                      { role: 'Professional', count: Math.ceil(report.totalRegistered * 0.35), percentage: 35 },
-                      { role: 'Entrepreneur / Business Owner', count: Math.ceil(report.totalRegistered * 0.15), percentage: 15 },
-                      { role: 'Researcher / Academic', count: Math.ceil(report.totalRegistered * 0.05), percentage: 5 },
-                      { role: 'Job Seeker / Other', count: Math.ceil(report.totalRegistered * 0.05), percentage: 5 },
-                    ]
-                ).map((r, idx) => (
-                  <div key={idx} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-gray-800">{r.role}</span>
-                      <span className="font-bold text-[#2D1F23]">{r.percentage}% ({r.count ?? 0} attendees)</span>
+              {report.rolesBreakdown && report.rolesBreakdown.length > 0 ? (
+                <div className="space-y-3">
+                  {report.rolesBreakdown.map((r, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-gray-800">{r.role}</span>
+                        <span className="font-bold text-[#2D1F23]">{r.percentage}% ({r.count ?? 0} attendees)</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className="bg-[#63474D] h-full rounded-full transition-all duration-500"
+                          style={{ width: `${r.percentage}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                      <div
-                        className="bg-[#63474D] h-full rounded-full transition-all duration-500"
-                        style={{ width: `${r.percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 italic">No participant profile or demographic data recorded.</p>
+              )}
             </div>
 
             {/* Professional Experience Narrative */}
@@ -1426,31 +1423,25 @@ export const ReportPage: React.FC = () => {
               <h3 className="font-serif font-bold text-sm text-[#2D1F23]">
                 Key Academic & Corporate Organizations Represented
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {(report.topOrganizations && report.topOrganizations.length > 0
-                  ? report.topOrganizations
-                  : [
-                      { name: 'Addis Ababa University', count: 18 },
-                      { name: 'Gebeya Inc.', count: 12 },
-                      { name: 'Commercial Bank of Ethiopia', count: 9 },
-                      { name: 'Independent / Freelancers', count: 24 },
-                      { name: 'ALX Ethiopia', count: 8 },
-                      { name: 'Various Tech Startups', count: 15 },
-                    ]
-                ).map((org, i) => (
-                  <div
-                    key={i}
-                    className="p-3.5 rounded-xl border border-gray-200 bg-[#FAF7F5] flex items-center justify-between gap-2 text-xs"
-                  >
-                    <span className="font-medium text-gray-900 truncate" title={org.name}>
-                      {org.name}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 font-bold text-[10px] text-[#63474D] shrink-0">
-                      {org.count ?? 0} {(org.count ?? 0) === 1 ? 'attendee' : 'attendees'}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              {report.topOrganizations && report.topOrganizations.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {report.topOrganizations.map((org, i) => (
+                    <div
+                      key={i}
+                      className="p-3.5 rounded-xl border border-gray-200 bg-[#FAF7F5] flex items-center justify-between gap-2 text-xs"
+                    >
+                      <span className="font-medium text-gray-900 truncate" title={org.name}>
+                        {org.name}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-white border border-gray-200 font-bold text-[10px] text-[#63474D] shrink-0">
+                        {org.count ?? 0} {(org.count ?? 0) === 1 ? 'attendee' : 'attendees'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 italic">No organization or startup affiliations reported.</p>
+              )}
             </div>
           </section>
 
@@ -1470,33 +1461,25 @@ export const ReportPage: React.FC = () => {
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
               {report.aiNarrative?.interestsNarrative || (
-                <>
-                  <p>
-                    Artificial intelligence was the most frequently selected area of interest among attendees, followed by software engineering, fintech, and entrepreneurship. This indicates that participants were interested not only in technical development but also in the broader application of technology to careers and business.
-                  </p>
-                  <p>
-                    The concentration of interest around core emerging technologies is particularly relevant to the event's theme and confirms that advanced technical capabilities are currently commanding significant attention from ambitious members of the community.
-                  </p>
-                </>
+                <p>
+                  Participants indicated focused interest across key domains and industry sectors relevant to the summit theme, reflecting strong demand for practical implementation and ecosystem collaboration.
+                </p>
               )}
             </div>
 
-            {/* Graphical Representation: Technology Discipline Interest Density */}
+            {/* Graphical Representation: Industry & Technology Domain Distribution */}
             {(() => {
-              const defaultInterests = [
-                { name: 'Machine Learning & Applied AI', pct: 86 },
-                { name: 'Backend & Distributed Systems', pct: 68 },
-                { name: 'Generative AI & LLM Engineering', pct: 64 },
-                { name: 'Cloud Infrastructure & DevOps', pct: 52 },
-                { name: 'FinTech & Digital Payments', pct: 44 },
-                { name: 'Mobile App Architecture', pct: 36 },
-              ];
-              const interestData = (report.sampleInterests && report.sampleInterests.length > 0)
-                ? report.sampleInterests.slice(0, 6).map((item, idx) => ({
-                    name: item,
-                    pct: Math.max(88 - idx * 11, 30),
-                  }))
-                : defaultInterests;
+              const interestData = (report.interestsBreakdown && report.interestsBreakdown.length > 0)
+                ? report.interestsBreakdown
+                : [];
+
+              if (interestData.length === 0) {
+                return (
+                  <div className="p-6 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] text-center text-xs text-gray-500 italic">
+                    No industry or area of interest data recorded for this event.
+                  </div>
+                );
+              }
 
               return (
                 <div className="p-6 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] space-y-4">
@@ -1504,43 +1487,40 @@ export const ReportPage: React.FC = () => {
                     <div>
                       <h4 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-2">
                         <BarChart3 className="w-4 h-4 text-[#63474D]" />
-                        Technology Domain Interest Density Distribution
+                        Industry & Technology Domain Distribution
                       </h4>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        Relative selection frequency and technical affinity indicated across verified registrants
+                        Relative selection frequency indicated across registered participants
                       </p>
                     </div>
                     <span className="text-[10px] font-bold text-[#63474D] bg-white px-2.5 py-1 rounded-full border border-gray-200 self-start sm:self-auto">
-                      #1 Core Demand: {interestData[0]?.name || 'Technology'}
+                      #1 Core Focus: {interestData[0]?.name || 'N/A'}
                     </span>
                   </div>
 
                   <div className="space-y-3 pt-1">
-                    {interestData.map((item, idx) => {
-                      const estCount = Math.round((item.pct / 100) * report.totalRegistered);
-                      return (
-                        <div key={idx} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                              <span className="w-4 h-4 rounded bg-[#63474D]/10 text-[#63474D] text-[10px] font-bold flex items-center justify-center">
-                                {idx + 1}
-                              </span>
-                              <span className="font-semibold text-gray-800">{item.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2 font-mono text-[11px]">
-                              <span className="text-gray-500 font-normal">~{estCount} signups</span>
-                              <span className="font-bold text-[#2D1F23]">{item.pct}%</span>
-                            </div>
+                    {interestData.map((item, idx) => (
+                      <div key={idx} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-4 h-4 rounded bg-[#63474D]/10 text-[#63474D] text-[10px] font-bold flex items-center justify-center">
+                              {idx + 1}
+                            </span>
+                            <span className="font-semibold text-gray-800">{item.name}</span>
                           </div>
-                          <div className="w-full bg-gray-200/70 rounded-full h-2.5 overflow-hidden p-0.5">
-                            <div
-                              className="h-full rounded-full bg-gradient-to-r from-[#63474D] via-[#8C626C] to-[#AA767C] transition-all duration-700"
-                              style={{ width: `${item.pct}%` }}
-                            />
+                          <div className="flex items-center gap-2 font-mono text-[11px]">
+                            <span className="text-gray-500 font-normal">{item.count} participants</span>
+                            <span className="font-bold text-[#2D1F23]">{item.percentage}%</span>
                           </div>
                         </div>
-                      );
-                    })}
+                        <div className="w-full bg-gray-200/70 rounded-full h-2.5 overflow-hidden p-0.5">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-[#63474D] via-[#8C626C] to-[#AA767C] transition-all duration-700"
+                            style={{ width: `${item.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
@@ -1595,30 +1575,26 @@ export const ReportPage: React.FC = () => {
               <h3 className="font-serif font-bold text-xs uppercase tracking-wider text-gray-600">
                 Reported Motivation Breakdown
               </h3>
-              <div className="space-y-2.5">
-                {(report.goalsBreakdown && report.goalsBreakdown.length > 0
-                  ? report.goalsBreakdown
-                  : [
-                      { goal: 'Learn new skills & practical knowledge', count: Math.ceil(report.totalRegistered * 0.72), percentage: 72 },
-                      { goal: 'Network with peers & industry professionals', count: Math.ceil(report.totalRegistered * 0.58), percentage: 58 },
-                      { goal: 'Explore career & job opportunities', count: Math.ceil(report.totalRegistered * 0.44), percentage: 44 },
-                      { goal: 'Discover new tools & frameworks', count: Math.ceil(report.totalRegistered * 0.35), percentage: 35 },
-                    ]
-                ).map((g, idx) => (
-                  <div key={idx} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-gray-800">{g.goal}</span>
-                      <span className="font-bold text-[#2D1F23]">{g.percentage}%</span>
+              {report.goalsBreakdown && report.goalsBreakdown.length > 0 ? (
+                <div className="space-y-2.5">
+                  {report.goalsBreakdown.map((g, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-gray-800">{g.goal}</span>
+                        <span className="font-bold text-[#2D1F23]">{g.percentage}% ({g.count ?? 0} attendees)</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className="bg-[#AA767C] h-full rounded-full transition-all duration-500"
+                          style={{ width: `${g.percentage}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                      <div
-                        className="bg-[#AA767C] h-full rounded-full transition-all duration-500"
-                        style={{ width: `${g.percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 italic">No attendee motivation data recorded for this event.</p>
+              )}
             </div>
           </section>
 
@@ -1641,7 +1617,7 @@ export const ReportPage: React.FC = () => {
                 <p>
                   Attendance data provides evidence that participants arrived at the event, while participation data provides additional context regarding how they engaged with the program.
                   <br /><br />
-                  Of the {report.totalAttended} verified attendees, {report.badgeDistribution?.participant || Math.round(report.totalAttended * 0.75)} received verified participant badges, while {report.badgeDistribution?.speaker || 0} individuals contributed as speakers and {report.badgeDistribution?.winner || 0} were recognized as competition winners. These distinctions provide a more detailed picture of participation than attendance alone.
+                  Of the {report.totalAttended} verified attendees, {report.badgeDistribution?.participant ?? 0} received verified participant badges, while {report.badgeDistribution?.speaker || 0} individuals contributed as speakers and {report.badgeDistribution?.winner || 0} were recognized as competition winners. These distinctions provide a more detailed picture of participation than attendance alone.
                 </p>
               )}
             </div>
@@ -1777,28 +1753,24 @@ export const ReportPage: React.FC = () => {
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {(report.aiNarrative?.keyFindings && report.aiNarrative.keyFindings.length > 0
-                ? report.aiNarrative.keyFindings
-                : [
-                    { title: 'Finding 1 — Strong early-career and talent reach', evidence: 'High representation of university students and early-career software developers demonstrating sustained learning commitment.' },
-                    { title: 'Finding 2 — Concentrated demand around emerging technology', evidence: 'Strongest clustering of attendee queries and interests concentrated on practical software engineering and applied AI.' },
-                    { title: 'Finding 3 — High institutional heterogeneity', evidence: 'Audience mobilized across universities, enterprise corporations, and startups, acting as an ecosystem cross-pollination point.' },
-                    { title: 'Finding 4 — Clear demand for competency-based learning', evidence: 'Attendees prioritized hands-on practical skills over passive listening by a 2:1 margin in motivation scores.' },
-                  ]
-              ).map((f, i) => (
-                <div
-                  key={i}
-                  className="p-5 rounded-2xl border border-gray-200 bg-[#FAF7F5] space-y-2"
-                >
-                  <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-[#2A7B5F] shrink-0" />
-                    {f.title}
-                  </h3>
-                  <p className="text-xs text-gray-700 leading-relaxed">{f.evidence}</p>
-                </div>
-              ))}
-            </div>
+            {report.aiNarrative?.keyFindings && report.aiNarrative.keyFindings.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {report.aiNarrative.keyFindings.map((f, i) => (
+                  <div
+                    key={i}
+                    className="p-5 rounded-2xl border border-gray-200 bg-[#FAF7F5] space-y-2"
+                  >
+                    <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-[#2A7B5F] shrink-0" />
+                      {f.title}
+                    </h3>
+                    <p className="text-xs text-gray-700 leading-relaxed">{f.evidence}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 italic">Key findings will appear once generated from verified attendance data.</p>
+            )}
           </section>
 
           {/* ========================================================================= */}
@@ -1938,22 +1910,22 @@ export const ReportPage: React.FC = () => {
                     Ecosystem Reach
                   </span>
                   <p className="font-serif text-2xl font-black text-blue-900">
-                    {report.topOrganizations?.length || 6}+
+                    {report.topOrganizations?.length || 0}+
                   </p>
                   <span className="text-[10px] text-blue-700 block">
-                    Partner & academic entities
+                    Affiliated Organizations
                   </span>
                 </div>
 
                 <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50/50 space-y-1 text-center">
                   <span className="text-[9px] uppercase font-bold text-purple-700 block tracking-wider">
-                    Talent Density
+                    Primary Cohort
                   </span>
                   <p className="font-serif text-2xl font-black text-purple-900">
-                    {report.rolesBreakdown?.[0]?.percentage || 44}%
+                    {report.rolesBreakdown?.[0]?.percentage || 0}%
                   </p>
-                  <span className="text-[10px] text-purple-700 block">
-                    Active students & engineers
+                  <span className="text-[10px] text-purple-700 block truncate" title={report.rolesBreakdown?.[0]?.role}>
+                    {report.rolesBreakdown?.[0]?.role || 'Registered Cohort'}
                   </span>
                 </div>
 
@@ -1993,7 +1965,7 @@ export const ReportPage: React.FC = () => {
                     <h4 className="text-xs font-bold text-gray-900">Mid-Term (30–90 Days)</h4>
                   </div>
                   <p className="text-[11px] text-gray-600 leading-relaxed">
-                    Form technical study cohorts around high-demand interest areas ({report.sampleInterests?.[0] || 'AI & Machine Learning'}) and host curated partner challenge sessions.
+                    Form technical study cohorts around high-demand interest areas ({report.interestsBreakdown?.[0]?.name || report.sampleInterests?.[0] || 'Key Sector Priorities'}) and host curated partner challenge sessions.
                   </p>
                 </div>
 
@@ -2071,7 +2043,14 @@ export const ReportPage: React.FC = () => {
                     return (
                       <tr key={att.id} className="hover:bg-gray-50/70 transition-colors">
                         <td className="py-2.5 px-3 font-bold text-[#2D1F23]">{att.name}</td>
-                        <td className="py-2.5 px-3 text-gray-600">{ans.sheba_organization || '—'}</td>
+                        <td className="py-2.5 px-3 text-gray-600">
+                          {att.organization ||
+                            ans.sheba_organization ||
+                            ans.organization ||
+                            ans['q_1790072950392'] ||
+                            Object.entries(ans).find(([k]) => k.toLowerCase().includes('startup') || k.toLowerCase().includes('org'))?.[1] ||
+                            '—'}
+                        </td>
                         <td className="py-2.5 px-3">
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${

@@ -232,6 +232,7 @@ export interface SponsorReportData {
   rolesBreakdown?: Array<{ role: string; count: number; percentage: number }>;
   topOrganizations?: Array<{ name: string; count: number }>;
   goalsBreakdown?: Array<{ goal: string; count: number; percentage: number }>;
+  interestsBreakdown?: Array<{ name: string; count: number; percentage: number }>;
   sampleInterests?: string[];
   aiNarrative?: {
     executiveSummary: string;

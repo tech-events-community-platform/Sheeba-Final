@@ -71,6 +71,7 @@ export interface SponsorReportData {
   rolesBreakdown?: { role: string; count: number; percentage: number }[];
   topOrganizations?: { name: string; count: number }[];
   goalsBreakdown?: { goal: string; count: number; percentage: number }[];
+  interestsBreakdown?: { name: string; count: number; percentage: number }[];
   sampleInterests?: string[];
   aiNarrative?: {
     executiveSummary: string;
