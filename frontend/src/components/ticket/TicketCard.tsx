@@ -21,6 +21,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { printTicketPass } from '../../utils/printTicket';
+import { isEventPassed } from '../../utils/date';
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -35,6 +36,9 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
   );
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const isPassed = Boolean(ticket.isExpired || isEventPassed((ticket as any).rawEventDate || ticket.eventDate || ticket.expiresAt));
+  const isAttended = Boolean(checkInDone || ticket.status === 'Checked in' || ticket.status === 'Used');
 
   const handlePrint = () => {
     if (onDownload) {
@@ -102,10 +106,19 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
                 SHEEBA<span className="text-[#FFA686]">.</span>
               </span>
             </div>
-            <Badge variant="success" icon={<ShieldCheck className="w-3 h-3" />}>
-              {ticket.status}
-              {checkInDone ? 'Attended' : ticket.status}
-            </Badge>
+            {isAttended ? (
+              <Badge variant="success" icon={<ShieldCheck className="w-3 h-3" />}>
+                Attended
+              </Badge>
+            ) : isPassed ? (
+              <Badge variant="secondary" icon={<Clock className="w-3 h-3 text-[#756366]" />}>
+                Pass Expired
+              </Badge>
+            ) : (
+              <Badge variant="success" icon={<ShieldCheck className="w-3 h-3" />}>
+                {(ticket.status as string) === 'ISSUED' || ticket.status === 'Valid' ? 'Valid' : ticket.status}
+              </Badge>
+            )}
           </div>
           <h2 className="font-serif text-2xl font-bold mb-1">{ticket.eventTitle}</h2>
           <p className="text-xs text-[#FFA686] font-medium tracking-wide">
@@ -157,15 +170,34 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
               title="Click QR Code to view Attendee Information"
               className="bg-[#FAF7F5] p-5 rounded-2xl border-2 border-[#D6A184]/50 inline-block shadow-inner w-full max-w-[280px] cursor-pointer hover:border-[#63474D] hover:shadow-md transition-all group"
             >
-              <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] inline-block shadow-xs group-hover:scale-105 transition-transform">
-                <QRCodeSVG
-                  value={qrAttendeeOnlyValue}
-                  size={190}
-                  bgColor="#ffffff"
-                  fgColor="#63474D"
-                  level="M"
-                  includeMargin={false}
-                />
+              <div className="relative inline-block">
+                <div className={`bg-white p-3 rounded-xl border border-[#E8DDD7] inline-block shadow-xs group-hover:scale-105 transition-transform ${isPassed && !isAttended ? 'opacity-35 grayscale' : ''}`}>
+                  <QRCodeSVG
+                    value={qrAttendeeOnlyValue}
+                    size={190}
+                    bgColor="#ffffff"
+                    fgColor="#63474D"
+                    level="M"
+                    includeMargin={false}
+                  />
+                </div>
+                {isPassed && !isAttended && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="bg-[#2D1F23]/90 text-white font-mono text-xs font-bold px-3 py-1.5 rounded-lg shadow-lg tracking-wider uppercase border border-white/20">
+                      Pass Expired
+                    </span>
+                    <span className="text-[10px] text-white/90 font-semibold mt-1 bg-black/60 px-2 py-0.5 rounded">
+                      Event Concluded
+                    </span>
+                  </div>
+                )}
+                {isAttended && (
+                  <div className="absolute top-2 right-2 pointer-events-none">
+                    <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3" /> Verified
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Click prompt badge */}
@@ -193,21 +225,45 @@ export const TicketCard: React.FC<TicketCardProps> = ({ ticket, onDownload }) =>
                     <span className="text-[9px] uppercase font-bold text-[#756366] block">Pass Code</span>
                     <span className="font-mono font-bold text-[#63474D] text-xs">{ticket.ticketCode || 'SHB-PASS'}</span>
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                    Verified Pass
-                  </span>
+                  {isAttended ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                      Attended
+                    </span>
+                  ) : isPassed ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full border border-stone-300">
+                      <Clock className="w-3 h-3 text-stone-500" />
+                      Expired
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                      Verified Pass
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-1.5 text-xs text-[#2A7B5F] font-semibold bg-[#2A7B5F]/10 py-2 px-4 rounded-xl border border-[#2A7B5F]/20">
-              <img src="/tick.webp" alt="Valid" className="w-4 h-4 object-contain shrink-0" />
-              <span>Scanning returns attendee name. Click QR for profile box.</span>
-            </div>
+            {isAttended ? (
+              <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-800 font-semibold bg-emerald-50 py-2 px-4 rounded-xl border border-emerald-200">
+                <img src="/tick.webp" alt="Attended" className="w-4 h-4 object-contain shrink-0" />
+                <span>Attendance confirmed at event door. Official credential awarded.</span>
+              </div>
+            ) : isPassed ? (
+              <div className="flex items-center justify-center gap-1.5 text-xs text-stone-700 font-medium bg-stone-100 py-2 px-4 rounded-xl border border-stone-300">
+                <Clock className="w-4 h-4 text-stone-500 shrink-0" />
+                <span>Pass expired at the end of event day ({ticket.eventDate}). No longer valid for entry.</span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-1.5 text-xs text-[#2A7B5F] font-semibold bg-[#2A7B5F]/10 py-2 px-4 rounded-xl border border-[#2A7B5F]/20">
+                <img src="/tick.webp" alt="Valid" className="w-4 h-4 object-contain shrink-0" />
+                <span>Scanning returns attendee name. Click QR for profile box.</span>
+              </div>
+            )}
 
             <p className="text-[11px] text-[#756366]">
-              Displays attendee info and validates entry credentials.
+              {isPassed ? 'Archived digital pass record.' : 'Displays attendee info and validates entry credentials.'}
             </p>
           </div>
         </div>

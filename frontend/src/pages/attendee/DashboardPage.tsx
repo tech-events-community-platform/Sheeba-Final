@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import type { Ticket } from '../../types/ticket';
+import { isEventPassed } from '../../utils/date';
 import {
   Download,
   Share2,
@@ -290,6 +291,7 @@ export const AttendeeDashboardPage: React.FC = () => {
             tickets.map((t) => {
               const badgeImg = getBadgeImage(t.eventType);
               const isCheckedIn = (t.status as string) === 'Checked in' || (t.status as string) === 'Used';
+              const isPassed = Boolean(t.isExpired || isEventPassed((t as any).rawEventDate || t.eventDate || t.expiresAt));
 
               return (
                 <div
@@ -307,7 +309,7 @@ export const AttendeeDashboardPage: React.FC = () => {
                           title="Verified Attendance Badge Earned"
                         />
                       ) : (
-                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/70 border border-black/10 flex items-center justify-center text-[#4f0820] shrink-0 shadow-2xs">
+                        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/70 border border-black/10 flex items-center justify-center text-[#4f0820] shrink-0 shadow-2xs ${isPassed ? 'opacity-60' : ''}`}>
                           <TicketIcon className="w-6 h-6 text-[#63474D]" />
                         </div>
                       )}
@@ -319,6 +321,11 @@ export const AttendeeDashboardPage: React.FC = () => {
                           <p className="text-xs text-[#1b4332] font-bold capitalize mt-0.5 flex items-center gap-1">
                             <img src="/tick.webp" alt="Done" className="w-3.5 h-3.5 object-contain" />
                             <span>{t.eventType} • Verified Turnout & Official Badge Earned</span>
+                          </p>
+                        ) : isPassed ? (
+                          <p className="text-xs text-[#756366] font-semibold capitalize mt-0.5 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-[#756366]" />
+                            <span>{t.eventType} • Event Concluded • Pass Expired at End of Day</span>
                           </p>
                         ) : (
                           <p className="text-xs text-[#4f0820] font-semibold capitalize mt-0.5 flex items-center gap-1">
@@ -335,10 +342,15 @@ export const AttendeeDashboardPage: React.FC = () => {
                           <img src="/tick.webp" alt="Done" className="w-3.5 h-3.5 object-contain" />
                           Verified Attended
                         </span>
+                      ) : isPassed ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/60 text-xs font-bold text-[#756366] border border-black/10 shadow-2xs">
+                          <Clock className="w-3.5 h-3.5 text-[#756366]" />
+                          Event Passed • Expired
+                        </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/80 text-xs font-bold text-[#63474D] border border-black/10 shadow-2xs">
                           <QrCode className="w-3.5 h-3.5 text-[#AA767C]" />
-                          Registered (Pending Check-in)
+                          Registered (Upcoming)
                         </span>
                       )}
                     </div>
@@ -374,7 +386,7 @@ export const AttendeeDashboardPage: React.FC = () => {
                         className="inline-flex items-center gap-1 text-[#4f0820] hover:text-black font-bold text-xs pt-0.5 underline"
                       >
                         <QrCode className="w-3 h-3 text-sheeba-pink" />
-                        <span>View Dynamic QR Pass →</span>
+                        <span>{isPassed && !isCheckedIn ? 'View Expired Pass Record →' : 'View Dynamic QR Pass →'}</span>
                       </Link>
                     </div>
                   </div>

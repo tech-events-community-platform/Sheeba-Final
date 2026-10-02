@@ -4,25 +4,43 @@ import { ENV } from '../config/env';
 import { IQrTicketPayload } from '../types';
 
 export const computeEventDayExpiration = (eventDate: string | Date): Date => {
-  let dateStr: string;
+  let year: number;
+  let month: number;
+  let day: number;
+
   if (eventDate instanceof Date) {
-    dateStr = eventDate.toISOString().split('T')[0];
+    year = eventDate.getUTCFullYear();
+    month = eventDate.getUTCMonth() + 1;
+    day = eventDate.getUTCDate();
   } else {
-    dateStr = String(eventDate).split('T')[0];
+    const cleanStr = String(eventDate).trim();
+    const isoMatch = cleanStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      year = parseInt(isoMatch[1], 10);
+      month = parseInt(isoMatch[2], 10);
+      day = parseInt(isoMatch[3], 10);
+    } else {
+      const parsed = new Date(cleanStr);
+      if (!isNaN(parsed.getTime())) {
+        year = parsed.getUTCFullYear();
+        month = parsed.getUTCMonth() + 1;
+        day = parsed.getUTCDate();
+      } else {
+        const now = new Date();
+        year = now.getUTCFullYear();
+        month = now.getUTCMonth() + 1;
+        day = now.getUTCDate();
+      }
+    }
   }
 
-  // End of event day in East Africa Time (EAT, UTC+3)
-  try {
-    const endOfDayEAT = new Date(`${dateStr}T23:59:59+03:00`);
-    if (!isNaN(endOfDayEAT.getTime())) {
-      return endOfDayEAT;
-    }
-  } catch {}
+  // End of event day in East Africa Time (EAT, UTC+3) is 23:59:59.999 EAT, which is exactly 20:59:59.999 UTC
+  return new Date(Date.UTC(year, month - 1, day, 20, 59, 59, 999));
+};
 
-  // Fallback: 23:59:59 UTC
-  const fallback = new Date(dateStr);
-  fallback.setUTCHours(23, 59, 59, 999);
-  return fallback;
+export const isEventDayPassed = (eventDate: string | Date): boolean => {
+  const exp = computeEventDayExpiration(eventDate);
+  return Date.now() > exp.getTime();
 };
 
 export const generateTicketCode = (eventDate?: string | Date): string => {

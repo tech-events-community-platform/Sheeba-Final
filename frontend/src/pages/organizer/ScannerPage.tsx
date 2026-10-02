@@ -25,6 +25,7 @@ import {
   Sparkles,
   HelpCircle,
 } from 'lucide-react';
+import { isEventPassed } from '../../utils/date';
 
 interface VerifiedScannerResult {
   ticket: {
@@ -560,6 +561,19 @@ export const ScannerPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Post-Event Notice Banner */}
+      {event && isEventPassed(event.date) && (
+        <div className="max-w-6xl mx-auto mb-4 p-4 bg-stone-100 border border-stone-300 rounded-2xl flex items-center gap-3 text-stone-800 text-xs sm:text-sm">
+          <Clock className="w-5 h-5 text-stone-600 shrink-0" />
+          <div>
+            <span className="font-bold">Notice: This event has concluded ({event.date}).</span>{' '}
+            <span className="text-stone-600">
+              Unattended ticket passes automatically expired at 11:59 PM EAT on event day. Scans of expired passes will be rejected.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid: Left Scanner / Inputs, Right Verification Card */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

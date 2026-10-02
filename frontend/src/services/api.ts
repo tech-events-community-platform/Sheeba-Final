@@ -2,6 +2,7 @@ import type { Event, EventType } from '../types/event';
 import type { Ticket } from '../types/ticket';
 import type { BadgeAward, BadgeCode, SponsorReportData, AttendeeRosterItem } from '../types/attendance';
 import type { User, UserRole, ProfileVisibility } from '../types/user';
+import { getEndOfEventDay } from '../utils/date';
 
 /**
  * Smart API Base URL Resolver:
@@ -848,54 +849,18 @@ export const api = {
   getEventTimeStatus(event: { date: string; startTime?: string; endTime?: string }): 'ongoing' | 'upcoming' | 'past' {
     try {
       const now = new Date();
-      const eventDateStr = event.date.includes('T') ? event.date.split('T')[0] : event.date;
-      
-      // Parse event start and end
-      const [year, month, day] = eventDateStr.split('-').map(Number);
-      if (!year || !month || !day) return 'upcoming';
-
-      // Default start 00:00 and end 23:59 if time string isn't parsed
-      let startHour = 8;
-      let startMin = 0;
-      let endHour = 18;
-      let endMin = 0;
-
-      if (event.startTime) {
-        const match = event.startTime.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-        if (match) {
-          let h = parseInt(match[1], 10);
-          const m = parseInt(match[2], 10);
-          const p = match[3]?.toUpperCase();
-          if (p === 'PM' && h < 12) h += 12;
-          if (p === 'AM' && h === 12) h = 0;
-          startHour = h;
-          startMin = m;
-        }
-      }
-
-      if (event.endTime) {
-        const match = event.endTime.match(/(\d+):(\d+)\s*(AM|PM)?/i);
-        if (match) {
-          let h = parseInt(match[1], 10);
-          const m = parseInt(match[2], 10);
-          const p = match[3]?.toUpperCase();
-          if (p === 'PM' && h < 12) h += 12;
-          if (p === 'AM' && h === 12) h = 0;
-          endHour = h;
-          endMin = m;
-        }
-      }
-
-      const startDateTime = new Date(year, month - 1, day, startHour, startMin, 0);
-      const endDateTime = new Date(year, month - 1, day, endHour, endMin, 59);
-
-      if (now < startDateTime) {
-        return 'upcoming';
-      } else if (now > endDateTime) {
+      const endOfDay = getEndOfEventDay(event.date);
+      if (now.getTime() > endOfDay.getTime()) {
         return 'past';
-      } else {
-        return 'ongoing';
       }
+
+      // Start of event day in EAT (24 hours prior to endOfDay)
+      const startOfDay = new Date(endOfDay.getTime() - 24 * 60 * 60 * 1000 + 1);
+      if (now.getTime() < startOfDay.getTime()) {
+        return 'upcoming';
+      }
+
+      return 'ongoing';
     } catch {
       return 'upcoming';
     }

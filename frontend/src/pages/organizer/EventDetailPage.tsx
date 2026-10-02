@@ -228,17 +228,25 @@ export const EventDetailPage: React.FC = () => {
       {/* Event Details Section (Unboxed) */}
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row gap-6 items-start">
-          {/* Poster / Banner Image Container (Wholly visible, no cropping) */}
+          {/* Poster / Banner Image Container (Fully utilized, edge-to-edge, uncropped fidelity) */}
           {event.posterImageUrl || event.bannerUrl ? (
-            <div className="w-full md:w-72 lg:w-80 h-44 sm:h-48 bg-[#FAF7F5] border border-gray-200/80 rounded-2xl p-2.5 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+            <div className="relative w-auto max-w-full md:max-w-md h-44 sm:h-48 bg-[#FAF7F5] border border-gray-200/80 rounded-2xl shrink-0 overflow-hidden shadow-2xs flex items-center justify-center">
+              {/* Ambient blurred backdrop so 100% of the box space is visually utilized */}
+              <img
+                src={event.posterImageUrl || event.bannerUrl}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover blur-xl scale-110 opacity-35 select-none pointer-events-none"
+              />
+              {/* Foreground original image: 100% fully shown, no cut, no distortion */}
               <img
                 src={event.posterImageUrl || event.bannerUrl}
                 alt={event.title}
-                className="w-full h-full object-contain rounded-xl"
+                className="relative z-10 h-full w-auto max-w-full object-contain rounded-2xl"
               />
             </div>
           ) : (
-            <div className="w-full md:w-72 lg:w-80 h-44 sm:h-48 bg-[#FAF7F5] border border-gray-200/80 rounded-2xl flex items-center justify-center text-gray-400 shrink-0">
+            <div className="w-44 sm:w-48 h-44 sm:h-48 bg-[#FAF7F5] border border-gray-200/80 rounded-2xl flex items-center justify-center text-gray-400 shrink-0">
               <Image className="w-8 h-8" />
             </div>
           )}

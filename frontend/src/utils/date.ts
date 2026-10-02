@@ -121,3 +121,54 @@ export function formatDateForInput(dateStr?: string): string {
   }
   return dateStr;
 }
+
+/**
+ * Returns a Date object representing 23:59:59.999 in East Africa Time (EAT, UTC+3)
+ * for the given event date, which is exactly 20:59:59.999 UTC.
+ */
+export function getEndOfEventDay(dateStr?: string | Date): Date {
+  if (!dateStr) return new Date();
+
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (dateStr instanceof Date) {
+    year = dateStr.getUTCFullYear();
+    month = dateStr.getUTCMonth() + 1;
+    day = dateStr.getUTCDate();
+  } else {
+    const cleanStr = String(dateStr).trim();
+    const isoMatch = cleanStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      year = parseInt(isoMatch[1], 10);
+      month = parseInt(isoMatch[2], 10);
+      day = parseInt(isoMatch[3], 10);
+    } else {
+      const parsed = new Date(cleanStr);
+      if (!isNaN(parsed.getTime())) {
+        year = parsed.getUTCFullYear();
+        month = parsed.getUTCMonth() + 1;
+        day = parsed.getUTCDate();
+      } else {
+        const now = new Date();
+        year = now.getUTCFullYear();
+        month = now.getUTCMonth() + 1;
+        day = now.getUTCDate();
+      }
+    }
+  }
+
+  // 23:59:59.999 in EAT (UTC+3) is exactly 20:59:59.999 UTC
+  return new Date(Date.UTC(year, month - 1, day, 20, 59, 59, 999));
+}
+
+/**
+ * Calculates whether an event has passed (i.e. the current timestamp is past the end of the event day)
+ */
+export function isEventPassed(dateStr?: string | Date): boolean {
+  if (!dateStr) return false;
+  const endOfDay = getEndOfEventDay(dateStr);
+  return Date.now() > endOfDay.getTime();
+}
+

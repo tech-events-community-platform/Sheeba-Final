@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Lock,
 } from 'lucide-react';
-import { getCalendarTile } from '../../utils/date';
+import { getCalendarTile, isEventPassed } from '../../utils/date';
 
 export const SHEEBA_ROLES = [
   'Student',
@@ -293,6 +293,34 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
 
   const cal = getCalendarTile(event.date);
   const backUrl = `/e/${token || event.shareLinkToken || event.id}`;
+  const isPassed = Boolean(event.isPassed || isEventPassed(event.date || (event as any).rawDate));
+
+  // If event has passed and user is not registered, block registration form entirely
+  if (!isAlreadyRegistered && isPassed) {
+    return (
+      <div className="max-w-md mx-auto py-20 px-4 text-center space-y-4 animate-fade-in">
+        <div className="w-14 h-14 rounded-2xl bg-[#63474D]/10 flex items-center justify-center mx-auto text-[#63474D]">
+          <Clock className="w-7 h-7" />
+        </div>
+        <h2 className="font-serif text-2xl font-bold text-black">This Event Has Passed</h2>
+        <p className="text-xs text-gray-700 leading-relaxed">
+          This event took place on {cal.weekday ? `${cal.weekday}, ${cal.fullDate}` : event.date}. Registration has closed and new registrations can no longer be processed.
+        </p>
+        <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
+          <Link to={backUrl}>
+            <Button variant="outline" size="sm">
+              Back to Event
+            </Button>
+          </Link>
+          <Link to="/events">
+            <Button variant="primary" size="sm">
+              Explore Events
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   // Success / Confirmed Registration View (Uses tick.png, text black)
   if (isConfirmed || isAlreadyRegistered) {

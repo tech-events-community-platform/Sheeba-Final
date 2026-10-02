@@ -1,8 +1,28 @@
 import { query } from '../config/db';
 import { ITicket, EventType } from '../types';
+import { computeEventDayExpiration } from '../utils/qr.util';
 
 export class TicketService {
   static formatTicket(row: any) {
+    const now = new Date();
+    const expiresAtDate = row.expires_at
+      ? new Date(row.expires_at)
+      : row.event_date
+      ? computeEventDayExpiration(row.event_date)
+      : null;
+    const isExpired = expiresAtDate ? now.getTime() > expiresAtDate.getTime() : false;
+
+    let computedStatus = row.status;
+    if (row.status === 'CHECKED_IN') {
+      computedStatus = 'Used';
+    } else if (row.status === 'CANCELLED') {
+      computedStatus = 'Cancelled';
+    } else if (isExpired) {
+      computedStatus = 'Expired';
+    } else if (row.status === 'ISSUED') {
+      computedStatus = 'Valid';
+    }
+
     return {
       id: row.ticket_code || row.id,
       rawId: row.id,
@@ -12,6 +32,7 @@ export class TicketService {
       eventTitle: row.event_title || 'Tech Event',
       eventType: (row.event_type || 'workshop') as EventType,
       eventDate: row.event_date ? new Date(row.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
+      rawEventDate: row.event_date,
       eventTime: row.time_str || `${row.start_time || '09:00 AM'} - ${row.end_time || '05:00 PM'} EAT`,
       eventLocation: row.event_location || row.location,
       venueName: row.venue_name || row.event_location,
@@ -20,12 +41,14 @@ export class TicketService {
       attendeeEmail: row.attendee_email || row.email,
       qrToken: row.qr_token,
       qrDataUrl: row.qr_code_data_url,
-      status: row.status === 'CHECKED_IN' ? 'Used' : row.status === 'ISSUED' ? 'Valid' : row.status,
+      status: computedStatus,
+      rawStatus: row.status,
+      isExpired,
       isPaid: Boolean(row.is_paid),
       ticketPrice: parseFloat(row.ticket_price || '0'),
       currency: row.currency || 'ETB',
       issuedAt: row.created_at,
-      expiresAt: row.expires_at,
+      expiresAt: expiresAtDate ? expiresAtDate.toISOString() : row.expires_at,
       checkedInAt: row.checked_in_at,
     };
   }
