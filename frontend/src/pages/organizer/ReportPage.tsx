@@ -444,29 +444,29 @@ export const ReportPage: React.FC = () => {
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-32 font-sans text-[#2D1F23]">
       {/* Top Controls Header (Hidden when printing) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-4 print:hidden">
-        <div>
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-gray-200 pb-4 print:hidden">
+        <div className="shrink-0">
+          <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-bold uppercase tracking-wider text-[#63474D]">
               Proof-of-Performance Artifact
             </span>
             <Badge variant="primary" className="text-[10px]">
-              Institutional Sponsor Ready
+              Sponsor Ready
             </Badge>
           </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23]">
+          <h1 className="font-serif text-[22.5px] sm:text-[28.5px] font-extrabold text-[#2D1F23] whitespace-nowrap leading-tight">
             Sheeba Event Impact Report
           </h1>
         </div>
 
         {/* Event Selector & Action Buttons (Only visible if organizer has events) */}
         {!loading && events.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-64">
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+            <div className="w-64 sm:w-72 md:w-80">
               <select
                 value={selectedEventId}
                 onChange={(e) => handleSelectEvent(e.target.value)}
-                className="w-full px-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs font-bold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
+                className="w-full truncate px-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs font-bold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
               >
                 {events.map((e) => (
                   <option key={e.id} value={e.id}>
@@ -477,7 +477,7 @@ export const ReportPage: React.FC = () => {
             </div>
 
             {report && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <Button
                   onClick={handleExportCSV}
                   variant="outline"
@@ -597,16 +597,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <div className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-12 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0 print:break-after-page">
             <div className="border-b border-gray-200 pb-8 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#63474D] text-white">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Sheeba Verified Event Impact Report
-                  </span>
-                  <span className="text-[11px] font-bold text-gray-500">
-                    Official Sponsor & Stakeholder Evaluation
-                  </span>
-                </div>
+              <div className="flex items-center justify-end">
                 <span className="text-[10px] font-mono text-gray-400 font-semibold">
                   REPORT REF: SHEEBA-{report?.eventId ? report.eventId.slice(0, 8).toUpperCase() : 'EVENT'}
                 </span>

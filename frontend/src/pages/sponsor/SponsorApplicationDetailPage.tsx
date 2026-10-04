@@ -271,22 +271,32 @@ export const SponsorApplicationDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Pitch Deck Link if Provided */}
+      {/* Sheeba Event Report / Pitch Deck Links if Provided */}
       {application.pitch_deck_url && (
-        <div className="py-2 flex items-center justify-between">
+        <div className="py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">Organizer Pitch Deck / Slides</h3>
-            <p className="text-xs text-gray-500">Official presentation slides or proposal document</p>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">Past Sheeba Event Reports / Proposal</h3>
+            <p className="text-xs text-gray-500">Verified performance reports or proposal document</p>
           </div>
-          <a
-            href={application.pitch_deck_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#63474D] text-white text-xs font-bold shadow-xs hover:bg-[#523a3f] transition-all"
-          >
-            <span>View Pitch Deck</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            {application.pitch_deck_url.split(',').map((u, i) => {
+              const cleanUrl = u.trim();
+              if (!cleanUrl) return null;
+              const hasMultiple = application.pitch_deck_url!.includes(',');
+              return (
+                <a
+                  key={i}
+                  href={cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#63474D] text-white text-xs font-bold shadow-xs hover:bg-[#523a3f] transition-all"
+                >
+                  <span>{hasMultiple ? `View Report #${i + 1}` : 'View Event Report'}</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              );
+            })}
+          </div>
         </div>
       )}
 
