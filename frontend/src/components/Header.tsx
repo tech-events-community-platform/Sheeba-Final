@@ -96,7 +96,7 @@ export default function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 pointer-events-none transition-all duration-300">
       {/* Top Navbar Row: Floating Circular Pill */}
       <div
-        className={`pointer-events-auto mx-auto max-w-7xl rounded-full transition-all duration-300 px-4 sm:px-7 py-2 sm:py-2.5 ${
+        className={`pointer-events-auto mx-auto max-w-7xl rounded-full transition-all duration-300 px-4 sm:px-7 py-2 sm:py-2.5 relative z-30 ${
           isExternalRegistration
             ? 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg shadow-black/5'
             : scrolled
@@ -159,7 +159,7 @@ export default function Header() {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated && user ? (
               /* Logged In User Avatar Pill & Dropdown (No name displayed) */
-              <div className="relative" ref={dropdownRef}>
+              <div className="relative z-50" ref={dropdownRef}>
                 <button
                   type="button"
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
@@ -286,7 +286,7 @@ export default function Header() {
 
       {/* 1-LINE QUICK NAVIGATION SUBNAV (Visible When Logged In, Hidden on External Registration) */}
       {isAuthenticated && user && !isExternalRegistration && (
-        <div className="pointer-events-auto mt-2 mx-auto max-w-5xl rounded-full bg-[#FAF7F5]/95 backdrop-blur-md border border-[#E8DDD7] py-1.5 px-4 sm:px-6 shadow-sm overflow-x-auto scrollbar-none">
+        <div className="pointer-events-auto mt-2 mx-auto max-w-5xl rounded-full bg-[#FAF7F5]/95 backdrop-blur-md border border-[#E8DDD7] py-1.5 px-4 sm:px-6 shadow-sm overflow-x-auto scrollbar-none relative z-10">
           <div className="max-w-7xl mx-auto flex items-center justify-start sm:justify-center gap-2 sm:gap-4 whitespace-nowrap min-w-max text-xs">
             {user.role === 'ATTENDEE' && (
               <>
