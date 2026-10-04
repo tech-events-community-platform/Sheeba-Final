@@ -94,11 +94,32 @@ body.home-page::-webkit-scrollbar {
   height: 0 !important;
 }
 
-/* Print optimization for Attendee Ticket Passes: exactly 1 page, no tabs/headers/footers */
+/* Print optimization for Attendee Ticket Passes and Official Event Reports */
 @media print {
   @page {
-    size: portrait;
-    margin: 10mm auto;
+    size: A4 portrait;
+    margin: 10mm 12mm 12mm 12mm;
+  }
+
+  /* Universal print color fidelity: ensure browsers print background colors, fills, and gradients */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* General print hides for site navigation, sidebars, toolbars, and action buttons */
+  header,
+  footer,
+  aside,
+  nav,
+  .no-print,
+  .print-hide,
+  .print\:hidden {
+    display: none !important;
+    visibility: hidden !important;
   }
 
   /* When printing-ticket is active, hide everything on body except our dedicated portal */
@@ -115,8 +136,6 @@ body.home-page::-webkit-scrollbar {
     height: auto !important;
     min-height: 0 !important;
     overflow: visible !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
   }
 
   #sheeba-print-pass-portal {
@@ -133,11 +152,6 @@ body.home-page::-webkit-scrollbar {
     break-before: avoid !important;
   }
 
-  #sheeba-print-pass-portal * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
   #sheeba-print-pass-portal .no-print,
   #sheeba-print-pass-portal button,
   #sheeba-print-pass-portal a {
@@ -145,12 +159,29 @@ body.home-page::-webkit-scrollbar {
     visibility: hidden !important;
   }
 
-  /* General print hides when not using portal */
-  header,
-  footer,
-  aside,
-  nav,
-  .no-print {
-    display: none !important;
+  /* Official Event Impact Report print rules */
+  .sheeba-report-page {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #2D1F23 !important;
+  }
+
+  .sheeba-report-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 1.25rem !important;
+  }
+
+  .sheeba-report-card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .sheeba-report-heading {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 }

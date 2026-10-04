@@ -27,16 +27,16 @@ export const OrganizerLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
+    <div className="min-h-screen flex bg-white print:block print:min-h-0 print:w-full print:bg-white print:p-0">
       {/* Left: Full-Height Sidebar starting at top-0 */}
       <OrganizerSidebar />
 
       {/* Right: Content column (Navbar sits inside here so it NEVER overlaps with the sidebar!) */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen print:block print:w-full print:min-h-0">
         <Navbar />
 
-        {/* Mobile Top Sub-bar for Organizers */}
-        <div className="md:hidden bg-[#63474D] text-white py-2 px-3 border-b border-[#AA767C]/40 overflow-x-auto scrollbar-none flex gap-1.5 shrink-0 text-xs">
+        {/* Mobile Top Sub-bar for Organizers (hidden when printing) */}
+        <div className="md:hidden bg-[#63474D] text-white py-2 px-3 border-b border-[#AA767C]/40 overflow-x-auto scrollbar-none flex gap-1.5 shrink-0 text-xs print:hidden">
           <Link
             to="/organizer"
             className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1 ${
@@ -102,7 +102,7 @@ export const OrganizerLayout: React.FC = () => {
           </Link>
         </div>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-auto print:overflow-visible print:p-0 print:m-0 print:block print:w-full">
           <Outlet />
         </main>
       </div>

@@ -45,6 +45,9 @@ export interface AttendeeRosterItem {
   checkInTime?: string;
   badges: BadgeCode[];
   answers?: Record<string, any>;
+  approvalStatus?: 'registered' | 'pending' | 'approved' | 'rejected';
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
 }
 
 export interface SponsorReportData {

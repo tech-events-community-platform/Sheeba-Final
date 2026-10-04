@@ -62,7 +62,7 @@ export const OrganizerSidebar: React.FC = () => {
     <aside
       className={`${
         isCollapsed ? 'w-16' : 'w-64'
-      } bg-[#63474D] text-white flex flex-col hidden md:flex sticky top-0 h-screen shrink-0 self-start border-r border-[#AA767C]/40 overflow-y-auto transition-all duration-300 z-20`}
+      } bg-[#63474D] text-white flex flex-col hidden md:flex sticky top-0 h-screen shrink-0 self-start border-r border-[#AA767C]/40 overflow-y-auto transition-all duration-300 z-20 print:hidden`}
     >
       <div className={`${isCollapsed ? 'p-2 pt-3' : 'p-4 pt-3.5'} space-y-4`}>
         {/* Organizer Header & Minimizer */}

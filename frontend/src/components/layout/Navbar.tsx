@@ -47,7 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAttendeeDrawer: _onOpenAtt
   };
 
   return (
-    <header className="sticky top-0 z-30 px-3 sm:px-6 lg:px-8 pt-2.5 sm:pt-3 pointer-events-none transition-all duration-300">
+    <header className="sticky top-0 z-30 px-3 sm:px-6 lg:px-8 pt-2.5 sm:pt-3 pointer-events-none transition-all duration-300 print:hidden">
       <div className="pointer-events-auto max-w-7xl mx-auto rounded-full bg-white/15 backdrop-blur-xl border border-white/25 shadow-md shadow-black/5 px-4 sm:px-6">
         <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Brand Logo */}

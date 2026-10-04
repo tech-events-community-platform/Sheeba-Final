@@ -1,6 +1,15 @@
 import type { EventType } from './event';
 
-export type TicketStatus = 'Valid' | 'Checked in' | 'Used' | 'Expired' | 'Cancelled';
+export type TicketStatus =
+  | 'Valid'
+  | 'Checked in'
+  | 'Used'
+  | 'Expired'
+  | 'Cancelled'
+  | 'Pending Approval'
+  | 'Rejected'
+  | 'pending'
+  | 'rejected';
 
 export interface Ticket {
   id: string; // e.g. "SHB-8921-2026"
@@ -25,5 +34,7 @@ export interface Ticket {
   ticketPrice: number;
   currency: 'ETB';
   isExpired?: boolean;
+  approvalStatus?: string;
+  registrationStatus?: string;
   rawEventDate?: string;
 }

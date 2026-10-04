@@ -22,6 +22,9 @@ import {
   Compass,
   PlusCircle,
   AlertCircle,
+  RotateCcw,
+  Save,
+  Sparkles,
 } from 'lucide-react';
 
 
@@ -283,30 +286,34 @@ export const ReportPage: React.FC = () => {
 
   // Edit Report State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editTab, setEditTab] = useState<'summary' | 'context' | 'notes' | 'conclusion'>('summary');
+  const [editTab, setEditTab] = useState<'summary' | 'background' | 'delivery' | 'conclusion' | 'notes'>('summary');
   const [editForm, setEditForm] = useState({
     executiveSummary: '',
     eventBackground: '',
     objectives: '',
-    customNotes: '',
+    deliveryNarrative: '',
+    audienceOverview: '',
     partnerImpactSummary: '',
     strategicConclusion: '',
+    customNotes: '',
   });
   const [isSavingReport, setIsSavingReport] = useState(false);
   const [isResettingReport, setIsResettingReport] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
-  const handleOpenEditModal = () => {
+  const handleOpenEditModal = (targetTab: 'summary' | 'background' | 'delivery' | 'conclusion' | 'notes' = 'summary') => {
     if (!report) return;
     setEditForm({
       executiveSummary: report.aiNarrative?.executiveSummary || '',
       eventBackground: report.aiNarrative?.eventBackground || '',
       objectives: report.aiNarrative?.objectives || '',
-      customNotes: report.customNotes || '',
+      deliveryNarrative: report.aiNarrative?.deliveryNarrative || '',
+      audienceOverview: report.aiNarrative?.audienceOverview || '',
       partnerImpactSummary: report.aiNarrative?.partnerImpactSummary || '',
       strategicConclusion: report.aiNarrative?.strategicConclusion || '',
+      customNotes: report.customNotes || '',
     });
-    setEditTab('summary');
+    setEditTab(targetTab);
     setSaveFeedback(null);
     setIsEditModalOpen(true);
   };
@@ -321,6 +328,8 @@ export const ReportPage: React.FC = () => {
           executiveSummary: editForm.executiveSummary,
           eventBackground: editForm.eventBackground,
           objectives: editForm.objectives,
+          deliveryNarrative: editForm.deliveryNarrative,
+          audienceOverview: editForm.audienceOverview,
           partnerImpactSummary: editForm.partnerImpactSummary,
           strategicConclusion: editForm.strategicConclusion,
         },
@@ -354,9 +363,11 @@ export const ReportPage: React.FC = () => {
         executiveSummary: freshReport.aiNarrative?.executiveSummary || '',
         eventBackground: freshReport.aiNarrative?.eventBackground || '',
         objectives: freshReport.aiNarrative?.objectives || '',
-        customNotes: '',
+        deliveryNarrative: freshReport.aiNarrative?.deliveryNarrative || '',
+        audienceOverview: freshReport.aiNarrative?.audienceOverview || '',
         partnerImpactSummary: freshReport.aiNarrative?.partnerImpactSummary || '',
         strategicConclusion: freshReport.aiNarrative?.strategicConclusion || '',
+        customNotes: '',
       });
       setSaveFeedback('Reverted to AI draft!');
       setTimeout(() => {
@@ -511,31 +522,36 @@ export const ReportPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-32 font-sans text-[#2D1F23]">
+    <div className="sheeba-report-page w-full max-w-5xl mx-auto space-y-6 pb-32 font-sans text-[#2D1F23] print:max-w-none print:w-full print:m-0 print:p-0 print:pb-0 print:space-y-4">
       {/* Top Controls Header (Hidden when printing) */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-gray-200 pb-4 print:hidden">
-        <div className="shrink-0">
-          <div className="flex items-center gap-2 mb-1">
+      <div className="flex flex-col gap-4 border-b border-gray-200 pb-4 print:hidden">
+        <div>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-xs font-bold uppercase tracking-wider text-[#63474D]">
               Proof-of-Performance Artifact
             </span>
             <Badge variant="primary" className="text-[10px]">
               Sponsor Ready
             </Badge>
+            {report?.isCustomized && (
+              <Badge variant="outline" className="text-amber-800 bg-amber-50 border-amber-300 text-[10px]">
+                Customized by Organizer
+              </Badge>
+            )}
           </div>
-          <h1 className="font-serif text-[22.5px] sm:text-[28.5px] font-extrabold text-[#2D1F23] whitespace-nowrap leading-tight">
+          <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23] leading-tight">
             Sheeba Event Impact Report
           </h1>
         </div>
 
-        {/* Event Selector & Action Buttons (Only visible if organizer has events) */}
+        {/* Toolbar: Event Selector & Action Buttons */}
         {!loading && events.length > 0 && (
-          <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-            <div className="w-64 sm:w-72 md:w-80">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FAF7F5] p-3 rounded-2xl border border-[#E8DDD7]">
+            <div className="w-full sm:w-72 md:w-80">
               <select
                 value={selectedEventId}
                 onChange={(e) => handleSelectEvent(e.target.value)}
-                className="w-full truncate px-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs font-bold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
+                className="w-full truncate px-3 py-2 bg-white border border-[#E8DDD7] rounded-xl text-xs font-bold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
               >
                 {events.map((e) => (
                   <option key={e.id} value={e.id}>
@@ -546,12 +562,22 @@ export const ReportPage: React.FC = () => {
             </div>
 
             {report && (
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={() => handleOpenEditModal('summary')}
+                  variant="outline"
+                  size="sm"
+                  icon={<Edit3 className="w-4 h-4 text-[#63474D]" />}
+                  className="whitespace-nowrap bg-white text-xs"
+                >
+                  Edit Report
+                </Button>
                 <Button
                   onClick={handleExportCSV}
                   variant="outline"
                   size="sm"
                   icon={<FileSpreadsheet className="w-4 h-4 text-[#2A7B5F]" />}
+                  className="whitespace-nowrap bg-white text-xs"
                 >
                   Export CSV
                 </Button>
@@ -560,6 +586,7 @@ export const ReportPage: React.FC = () => {
                   variant="accent"
                   size="sm"
                   icon={<Printer className="w-4 h-4" />}
+                  className="whitespace-nowrap text-xs"
                 >
                   Print / Save PDF
                 </Button>
@@ -664,7 +691,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           {/* COVER & HEADER SECTION                                                    */}
           {/* ========================================================================= */}
-          <div className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-12 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0 print:break-after-page">
+          <div className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-12 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none">
             <div className="border-b border-gray-200 pb-8 space-y-4">
               <div className="flex items-center justify-end">
                 <span className="text-[10px] font-mono text-gray-400 font-semibold">
@@ -725,18 +752,29 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-exec-summary"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
                   1. Executive Summary & Impact Overview
                 </h2>
               </div>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-[#2A7B5F] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                Verified Performance
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('summary')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Executive Summary"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <span className="text-[10px] uppercase tracking-wider font-bold text-[#2A7B5F] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  Verified Performance
+                </span>
+              </div>
             </div>
 
             {/* At-a-Glance Event Key Parameters Bullet Points */}
@@ -963,13 +1001,35 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-about-event"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                2. About the Event
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  2. About the Event
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('background')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Background & Objectives"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Context
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('notes')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Add / Edit Summit Notes & Proceedings"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Edit Notes
+                </button>
+              </div>
             </div>
 
             {/* Event Background */}
@@ -1154,13 +1214,24 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-delivery"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0 print:break-after-page"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                3. Event Delivery
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  3. Event Delivery
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleOpenEditModal('delivery')}
+                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Edit Event Delivery Narrative"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                Edit Delivery
+              </button>
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed space-y-3 whitespace-pre-line">
@@ -1197,13 +1268,24 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-audience"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                4. Who the Event Reached
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  4. Who the Event Reached
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleOpenEditModal('delivery')}
+                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Edit Audience Overview"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                Edit Audience
+              </button>
             </div>
 
             {/* Audience Overview Narrative */}
@@ -1267,7 +1349,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-orgs"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
               <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
@@ -1347,7 +1429,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-interests"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
               <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
@@ -1448,7 +1530,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-motivations"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
               <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
@@ -1500,7 +1582,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-engagement"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0 print:break-after-page"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
               <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
@@ -1542,7 +1624,7 @@ export const ReportPage: React.FC = () => {
           {report.aiNarrative?.attendeeVoice && report.aiNarrative.attendeeVoice.length > 0 && (
             <section
               id="sec-voice"
-              className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+              className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
             >
               <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
@@ -1583,7 +1665,7 @@ export const ReportPage: React.FC = () => {
           {report.aiNarrative?.audienceDeepAnalysis && (
             <section
               id="sec-ai-analysis"
-              className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+              className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
             >
               <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
@@ -1641,7 +1723,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-findings"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
               <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
@@ -1675,7 +1757,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-recommendations"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
               <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
@@ -1720,15 +1802,29 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           {/* 13. SPONSOR / PARTNER IMPACT                                              */}
           {/* ========================================================================= */}
+          {/* ========================================================================= */}
+          {/* 13. SPONSOR / PARTNER IMPACT                                              */}
+          {/* ========================================================================= */}
           <section
             id="sec-partner-impact"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-4 print:border-none print:shadow-none print:p-0"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-4 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                13. Sponsor & Partner Impact
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  13. Sponsor & Partner Impact
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleOpenEditModal('conclusion')}
+                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Edit Partner Impact Summary"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                Edit Partners
+              </button>
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed space-y-3 whitespace-pre-line bg-[#FAF7F5] p-6 rounded-2xl border border-[#E8DDD7]">
@@ -1751,18 +1847,29 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-conclusion"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0 print:break-after-page"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
                   14. Strategic Conclusion & Executive Summary
                 </h2>
               </div>
-              <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 uppercase">
-                Audited Performance Verified
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('conclusion')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Strategic Conclusion"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Conclusion
+                </button>
+                <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 uppercase">
+                  Audited Performance Verified
+                </span>
+              </div>
             </div>
 
             {/* Strategic Narrative Multi-Paragraph Synthesis */}
@@ -1909,7 +2016,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           <section
             id="sec-ledger"
-            className="bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:border-none print:shadow-none print:p-0 print:break-after-page"
+            className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
@@ -1971,6 +2078,254 @@ export const ReportPage: React.FC = () => {
           </section>
         </div>
         </>
+      )}
+
+      {/* Edit Report Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm print:hidden">
+          <div className="bg-white rounded-3xl border border-[#E8DDD7] shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-[#FAF7F5] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center font-bold">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
+                    Edit Report Content & Narrative
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Customize the AI-generated executive summaries, event context, and official proceedings.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="px-6 pt-3 border-b border-gray-100 bg-white flex items-center gap-1 shrink-0 overflow-x-auto scrollbar-none">
+              {[
+                { id: 'summary', label: '1. Executive Summary' },
+                { id: 'background', label: '2. Background & Objectives' },
+                { id: 'delivery', label: '3 & 4. Delivery & Audience' },
+                { id: 'conclusion', label: '13 & 14. Partners & Conclusion' },
+                { id: 'notes', label: 'Summit Notes / Proceedings' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setEditTab(tab.id as any)}
+                  className={`px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
+                    editTab === tab.id
+                      ? 'border-[#63474D] text-[#63474D]'
+                      : 'border-transparent text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Modal Form Body */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1 text-[#2D1F23]">
+              {editTab === 'summary' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      1. Executive Summary Narrative
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      High-level narrative presented at the top of the report and in the executive briefing.
+                    </p>
+                    <textarea
+                      rows={10}
+                      value={editForm.executiveSummary}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, executiveSummary: e.target.value })
+                      }
+                      placeholder="Enter executive summary narrative..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'background' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      2. Event Background
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editForm.eventBackground}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, eventBackground: e.target.value })
+                      }
+                      placeholder="Historical context, national priorities, and organizing background..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      Event Objectives & Core Masterclasses
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editForm.objectives}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, objectives: e.target.value })
+                      }
+                      placeholder="Core objectives, key program deliverables, or masterclass tracks..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'delivery' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      3. Event Delivery Narrative
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editForm.deliveryNarrative}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, deliveryNarrative: e.target.value })
+                      }
+                      placeholder="How the event was delivered, registration management, and QR verification details..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      4. Audience Overview Narrative
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editForm.audienceOverview}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, audienceOverview: e.target.value })
+                      }
+                      placeholder="Participant cohort characteristics, startup maturity, and sector composition..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'conclusion' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      13. Sponsor & Partner Impact Summary
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editForm.partnerImpactSummary}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, partnerImpactSummary: e.target.value })
+                      }
+                      placeholder="Direct value created for institutional partners, sponsors, and stakeholders..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      14. Strategic Conclusion & Executive Sign-off
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editForm.strategicConclusion}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, strategicConclusion: e.target.value })
+                      }
+                      placeholder="Closing remarks, institutional impact verdict, and next cycle roadmap..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'notes' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      Official Summit Proceedings & Session Notes
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Formatted markdown notes displayed in Section 2. Supports <code className="bg-gray-100 px-1 py-0.5 rounded text-[11px]"># Heading</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-[11px]">## Subheading</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-[11px]">### Topic</code>, and <code className="bg-gray-100 px-1 py-0.5 rounded text-[11px]">* Bullet</code> points.
+                    </p>
+                    <textarea
+                      rows={12}
+                      value={editForm.customNotes}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, customNotes: e.target.value })
+                      }
+                      placeholder="## Morning Plenary Sessions&#10;* Keynote by JICA on startup ecosystem...&#10;&#10;## Afternoon Masterclasses&#10;* Startup Master Plan Briefing by BCG..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-6 border-t border-gray-100 bg-[#FAF7F5] flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetToAi}
+                  disabled={isResettingReport || isSavingReport}
+                  icon={<RotateCcw className="w-3.5 h-3.5 text-gray-500" />}
+                  className="text-xs text-gray-600 hover:text-gray-900"
+                >
+                  {isResettingReport ? 'Resetting...' : 'Revert to AI Draft'}
+                </Button>
+                {saveFeedback && (
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                    {saveFeedback}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditModalOpen(false)}
+                  disabled={isSavingReport}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSaveReport}
+                  disabled={isSavingReport || isResettingReport}
+                  icon={<Save className="w-4 h-4" />}
+                >
+                  {isSavingReport ? 'Saving Changes...' : 'Save & Apply Changes'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
