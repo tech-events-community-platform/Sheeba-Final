@@ -24,6 +24,13 @@ import {
   X,
 } from 'lucide-react';
 import type { ProfileVisibility } from '../../types/user';
+import {
+  attendeeProfileFormSchema,
+  updateVisibilityFormSchema,
+  applyOrganizerSchema,
+  switchRoleSchema,
+  validateForm,
+} from '../../schemas';
 
 export const AttendeeSettingsPage: React.FC = () => {
   const { user, logout, refreshUser, applyForOrganizer, switchRole } = useAuth();
@@ -80,13 +87,17 @@ export const AttendeeSettingsPage: React.FC = () => {
   }, [user]);
 
   const handleApplyOrganizer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!orgName.trim()) {
-      setApplyError('Please provide an organization or community name.');
-      return;
-    }
-    if (!applyPassword) {
-      setApplyError('Please enter your account password to authorize your application.');
+    const validation = validateForm(applyOrganizerSchema, {
+      organization: orgName,
+      applyPassword,
+      bio: orgBio,
+      phone: orgPhone,
+      telegram,
+      xHandle,
+    });
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors || {})[0] || 'Please complete all required application fields.';
+      setApplyError(firstError);
       return;
     }
 
@@ -118,9 +129,9 @@ export const AttendeeSettingsPage: React.FC = () => {
   };
 
   const handleSwitchToOrganizer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!switchPassword) {
-      setSwitchError('Please enter your account password.');
+    const validation = validateForm(switchRoleSchema, { switchPassword });
+    if (!validation.success) {
+      setSwitchError(validation.errors.switchPassword || 'Please enter your account password.');
       return;
     }
 
@@ -141,15 +152,25 @@ export const AttendeeSettingsPage: React.FC = () => {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    const profileData = {
+      name: name.trim(),
+      phone: phone.trim(),
+      bio: bio.trim(),
+      visibility,
+    };
+
+    const validation = validateForm(attendeeProfileFormSchema, profileData);
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0] || 'Invalid profile data.';
+      alert(firstError);
+      return;
+    }
+
     setIsSavingProfile(true);
     setSaveMsg(null);
     try {
-      await api.userAccount.updateProfile(user.id, {
-        name: name.trim(),
-        phone: phone.trim(),
-        bio: bio.trim(),
-        visibility,
-      });
+      await api.userAccount.updateProfile(user.id, profileData);
 
       if (refreshUser) {
         await refreshUser();
@@ -165,6 +186,12 @@ export const AttendeeSettingsPage: React.FC = () => {
   };
 
   const handleVisibilityChange = async (newVisibility: ProfileVisibility) => {
+    const validation = validateForm(updateVisibilityFormSchema, { visibility: newVisibility });
+    if (!validation.success) {
+      console.warn('Invalid visibility:', validation.errors);
+      return;
+    }
+
     setVisibility(newVisibility);
     if (!user) return;
     try {
@@ -628,11 +655,10 @@ export const AttendeeSettingsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => handleVisibilityChange('public')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-              visibility === 'public'
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${visibility === 'public'
                 ? 'bg-[#FAF7F5] border-[#63474D] ring-2 ring-[#63474D]/20 shadow-xs'
                 : 'bg-white border-[#E8DDD7] hover:border-[#63474D]/50'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2 mb-1.5">
               <Globe className={`w-4 h-4 ${visibility === 'public' ? 'text-[#63474D]' : 'text-gray-400'}`} />
@@ -651,11 +677,10 @@ export const AttendeeSettingsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => handleVisibilityChange('private')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-              visibility === 'private'
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${visibility === 'private'
                 ? 'bg-[#FAF7F5] border-[#63474D] ring-2 ring-[#63474D]/20 shadow-xs'
                 : 'bg-white border-[#E8DDD7] hover:border-[#63474D]/50'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2 mb-1.5">
               <Lock className={`w-4 h-4 ${visibility === 'private' ? 'text-[#63474D]' : 'text-gray-400'}`} />
@@ -781,9 +806,8 @@ export const AttendeeSettingsPage: React.FC = () => {
             <span className="font-serif font-bold text-sm">Account Danger Zone</span>
           </div>
           <ChevronDown
-            className={`w-4 h-4 text-red-600 transition-transform duration-200 ${
-              isDangerZoneOpen ? 'rotate-180' : ''
-            }`}
+            className={`w-4 h-4 text-red-600 transition-transform duration-200 ${isDangerZoneOpen ? 'rotate-180' : ''
+              }`}
           />
         </button>
 

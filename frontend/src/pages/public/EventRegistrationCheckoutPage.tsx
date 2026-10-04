@@ -15,6 +15,9 @@ import {
   Lock,
 } from 'lucide-react';
 import { getCalendarTile, isEventPassed } from '../../utils/date';
+import { validateForm } from '../../utils/validation';
+import { eventRegistrationCheckoutSchema } from '../../schemas/event.schema';
+import { switchRoleSchema } from '../../schemas/auth.schema';
 
 export const SHEEBA_ROLES = [
   'Student',
@@ -109,8 +112,9 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
   }, [token, id, user]);
 
   const handleOrganizerSwitchToAttendee = async () => {
-    if (!organizerSwitchPassword) {
-      setSwitchError('Please enter your account password.');
+    const roleValidation = validateForm(switchRoleSchema, { switchPassword: organizerSwitchPassword });
+    if (!roleValidation.success) {
+      setSwitchError(roleValidation.error);
       return;
     }
 
@@ -159,16 +163,15 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
       }
       attendeeToRegister = user;
     } else {
-      if (!guestName.trim()) {
-        setErrorMsg('Please enter your full name.');
-        return;
-      }
-      if (!guestEmail.trim() || !guestEmail.includes('@')) {
-        setErrorMsg('Please enter a valid email address.');
-        return;
-      }
-      if (!guestPassword || guestPassword.length < 6) {
-        setErrorMsg('Please enter a password with at least 6 characters for your attendee account.');
+      const guestValidation = validateForm(eventRegistrationCheckoutSchema, {
+        isAuthenticated,
+        guestName,
+        guestEmail,
+        guestPassword,
+      });
+
+      if (!guestValidation.success) {
+        setErrorMsg(guestValidation.error);
         return;
       }
 

@@ -1,6 +1,189 @@
 import { Request, Response, NextFunction } from 'express';
+import { ZodType, ZodError } from 'zod';
 import { sendError } from '../utils/apiResponse';
 
+export interface FormattedZodError {
+  field: string;
+  message: string;
+}
+
+/**
+ * Formats Zod validation issues into an array of structured field-message objects.
+ */
+export const formatZodIssues = (error: ZodError): FormattedZodError[] => {
+  return error.issues.map((issue) => ({
+    field: issue.path.join('.') || 'body',
+    message: issue.message,
+  }));
+};
+
+/**
+ * Middleware factory that validates req.body against a Zod schema.
+ * Replaces req.body with the parsed/transformed data on success.
+ */
+export const validateBody = (schema: ZodType<any>) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const result = schema.safeParse(req.body);
+
+    if (!result.success) {
+      const formatted = formatZodIssues(result.error);
+      const firstMessage = formatted[0]?.message || 'Validation failed.';
+
+      res.status(400).json({
+        success: false,
+        message: firstMessage,
+        error: 'VALIDATION_ERROR',
+        errors: formatted,
+      });
+      return;
+    }
+
+    req.body = result.data;
+    next();
+  };
+};
+
+/**
+ * Middleware factory that validates req.query against a Zod schema.
+ */
+export const validateQuery = (schema: ZodType<any>) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const result = schema.safeParse(req.query);
+
+    if (!result.success) {
+      const formatted = formatZodIssues(result.error);
+      const firstMessage = formatted[0]?.message || 'Invalid query parameters.';
+
+      res.status(400).json({
+        success: false,
+        message: firstMessage,
+        error: 'VALIDATION_ERROR',
+        errors: formatted,
+      });
+      return;
+    }
+
+    try {
+      Object.defineProperty(req, 'query', {
+        value: result.data,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      });
+    } catch {
+      (req as any).query = result.data;
+    }
+    next();
+  };
+};
+
+/**
+ * Middleware factory that validates req.params against a Zod schema.
+ */
+export const validateParams = (schema: ZodType<any>) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const result = schema.safeParse(req.params);
+
+    if (!result.success) {
+      const formatted = formatZodIssues(result.error);
+      const firstMessage = formatted[0]?.message || 'Invalid path parameters.';
+
+      res.status(400).json({
+        success: false,
+        message: firstMessage,
+        error: 'VALIDATION_ERROR',
+        errors: formatted,
+      });
+      return;
+    }
+
+    try {
+      Object.defineProperty(req, 'params', {
+        value: result.data,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      });
+    } catch {
+      req.params = result.data;
+    }
+    next();
+  };
+};
+
+/**
+ * Middleware factory that validates any combination of body, query, and params.
+ */
+export const validateRequest = (schemas: {
+  body?: ZodType<any>;
+  query?: ZodType<any>;
+  params?: ZodType<any>;
+}) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const allErrors: FormattedZodError[] = [];
+
+    if (schemas.body) {
+      const result = schemas.body.safeParse(req.body);
+      if (!result.success) {
+        allErrors.push(...formatZodIssues(result.error));
+      } else {
+        req.body = result.data;
+      }
+    }
+
+    if (schemas.query) {
+      const result = schemas.query.safeParse(req.query);
+      if (!result.success) {
+        allErrors.push(...formatZodIssues(result.error));
+      } else {
+        try {
+          Object.defineProperty(req, 'query', {
+            value: result.data,
+            writable: true,
+            configurable: true,
+            enumerable: true,
+          });
+        } catch {
+          (req as any).query = result.data;
+        }
+      }
+    }
+
+    if (schemas.params) {
+      const result = schemas.params.safeParse(req.params);
+      if (!result.success) {
+        allErrors.push(...formatZodIssues(result.error));
+      } else {
+        try {
+          Object.defineProperty(req, 'params', {
+            value: result.data,
+            writable: true,
+            configurable: true,
+            enumerable: true,
+          });
+        } catch {
+          req.params = result.data;
+        }
+      }
+    }
+
+    if (allErrors.length > 0) {
+      const firstMessage = allErrors[0]?.message || 'Validation failed.';
+
+      res.status(400).json({
+        success: false,
+        message: firstMessage,
+        error: 'VALIDATION_ERROR',
+        errors: allErrors,
+      });
+      return;
+    }
+
+    next();
+  };
+};
+
+// Legacy manual validators kept for backward compatibility until subsequent phases
 export const validateRegistration = (
   req: Request,
   res: Response,
@@ -86,17 +269,4 @@ export const validateEvent = (
   next();
 };
 
-export const validateCheckIn = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  const { qr_token, event_id, eventId, attendeeId, attendeeRosterId } = req.body;
 
-  if (!qr_token && !attendeeId && !attendeeRosterId) {
-    sendError(res, 'QR token or attendee ID is required.', 400);
-    return;
-  }
-
-  next();
-};

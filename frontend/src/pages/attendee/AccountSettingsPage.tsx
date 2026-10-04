@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { TelegramIcon, XIcon, TikTokIcon, YouTubeIcon } from '../../components/ui/SocialIcons';
 import { OrganizerDefaultQuestionsSettings } from '../../components/organizer/OrganizerDefaultQuestionsSettings';
+import { organizerProfileFormSchema, switchRoleSchema, validateForm } from '../../schemas';
 
 export const AccountSettingsPage: React.FC = () => {
   const { user, logout, switchRole } = useAuth();
@@ -42,9 +43,9 @@ export const AccountSettingsPage: React.FC = () => {
   const [switchError, setSwitchError] = useState<string | null>(null);
 
   const handleSwitchToAttendee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!switchPassword) {
-      setSwitchError('Please enter your account password.');
+    const validation = validateForm(switchRoleSchema, { switchPassword });
+    if (!validation.success) {
+      setSwitchError(validation.errors.switchPassword || 'Please enter your account password.');
       return;
     }
 
@@ -86,11 +87,24 @@ export const AccountSettingsPage: React.FC = () => {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    const profileData = {
+      name: name.trim(),
+      organization: organization.trim(),
+    };
+
+    const validation = validateForm(organizerProfileFormSchema, profileData);
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0] || 'Invalid profile data.';
+      alert(firstError);
+      return;
+    }
+
     setIsSavingProfile(true);
     try {
       await api.account.updateProfile(user.id, {
-        name,
-        organization,
+        name: profileData.name,
+        organization: profileData.organization,
       });
 
       const socialsData = {
@@ -121,7 +135,7 @@ export const AccountSettingsPage: React.FC = () => {
     } catch (err: any) {
       setDeleteError(
         err.message ||
-          'Cannot delete account: You have upcoming or ongoing events. Complete or cancel them first.'
+        'Cannot delete account: You have upcoming or ongoing events. Complete or cancel them first.'
       );
     }
   };
@@ -139,44 +153,44 @@ export const AccountSettingsPage: React.FC = () => {
   const roleTitle = isSponsor
     ? 'Sponsor Workspace Settings'
     : isAdmin
-    ? 'Administrator System Settings'
-    : 'Organizer Account Settings';
+      ? 'Administrator System Settings'
+      : 'Organizer Account Settings';
 
   const roleSubtitle = isSponsor
     ? 'Manage your corporate sponsor profile, company representative, and preferences.'
     : isAdmin
-    ? 'Manage your administrative identity, supervisory profile, and platform controls.'
-    : 'Manage your organizer community profile, socials, and account.';
+      ? 'Manage your administrative identity, supervisory profile, and platform controls.'
+      : 'Manage your organizer community profile, socials, and account.';
 
   const profileSectionTitle = isSponsor
     ? 'Corporate Sponsor Profile'
     : isAdmin
-    ? 'Administrator Profile Information'
-    : 'Organizer Profile Information';
+      ? 'Administrator Profile Information'
+      : 'Organizer Profile Information';
 
   const profileSectionSubtitle = isSponsor
     ? 'Your company name and official website appear to event organizers on sponsorship deals.'
     : isAdmin
-    ? 'Your supervisory credentials and governance identity on the Sheeba platform.'
-    : 'Your name, community organization, and social channels appear on public event pages.';
+      ? 'Your supervisory credentials and governance identity on the Sheeba platform.'
+      : 'Your name, community organization, and social channels appear on public event pages.';
 
   const orgLabel = isSponsor
     ? 'Company / Enterprise Name'
     : isAdmin
-    ? 'Administrative Department / Unit'
-    : 'Organization / Community Name';
+      ? 'Administrative Department / Unit'
+      : 'Organization / Community Name';
 
   const orgPlaceholder = isSponsor
     ? 'e.g. Telebirr, Safaricom, Chapa'
     : isAdmin
-    ? 'e.g. Sheeba Executive Platform Administration'
-    : 'e.g. GDG Addis, ALX Tech Community';
+      ? 'e.g. Sheeba Executive Platform Administration'
+      : 'e.g. GDG Addis, ALX Tech Community';
 
   const socialsSubtitle = isSponsor
     ? 'Provide your brand official social channels (LinkedIn, X, Telegram) for event listings.'
     : isAdmin
-    ? 'Official administrative and platform communication links.'
-    : 'Provide your community social links. These will appear beside your organizer name below event posters on public registration pages.';
+      ? 'Official administrative and platform communication links.'
+      : 'Provide your community social links. These will appear beside your organizer name below event posters on public registration pages.';
 
   return (
     <div className="w-full max-w-5xl mx-auto py-6 px-2 sm:px-4 space-y-8 pb-20">
@@ -346,8 +360,8 @@ export const AccountSettingsPage: React.FC = () => {
             {isSponsor
               ? 'Your single account includes corporate sponsor capabilities and a personal Attendee profile.'
               : isAdmin
-              ? 'Your single account includes supervisory administration privileges and an Attendee profile.'
-              : 'Your single account includes both Organizer capabilities and a personal Attendee profile.'}
+                ? 'Your single account includes supervisory administration privileges and an Attendee profile.'
+                : 'Your single account includes both Organizer capabilities and a personal Attendee profile.'}
           </p>
         </div>
 
@@ -363,8 +377,8 @@ export const AccountSettingsPage: React.FC = () => {
               {isSponsor
                 ? 'Want to browse events as a regular attendee, view your registered tickets, or earn attendance badges? Switch your active session to Attendee Workspace.'
                 : isAdmin
-                ? 'Audit ticket purchases, badge issuing, and live attendee check-in experience firsthand by switching to the Attendee Workspace.'
-                : 'Want to attend community meetups, view your registered tickets, or earn verifiable attendance badges? Switch your active session to your Attendee Workspace.'}
+                  ? 'Audit ticket purchases, badge issuing, and live attendee check-in experience firsthand by switching to the Attendee Workspace.'
+                  : 'Want to attend community meetups, view your registered tickets, or earn verifiable attendance badges? Switch your active session to your Attendee Workspace.'}
             </p>
           </div>
 
@@ -402,9 +416,8 @@ export const AccountSettingsPage: React.FC = () => {
             </div>
           </div>
           <ChevronDown
-            className={`w-5 h-5 text-red-700 transition-transform duration-200 ${
-              isDangerZoneOpen ? 'rotate-180' : ''
-            }`}
+            className={`w-5 h-5 text-red-700 transition-transform duration-200 ${isDangerZoneOpen ? 'rotate-180' : ''
+              }`}
           />
         </button>
 
@@ -463,8 +476,8 @@ export const AccountSettingsPage: React.FC = () => {
                   {isSponsor
                     ? 'This action is permanent. This will permanently erase your sponsor profile and preferences. Deletion is blocked if you have active sponsorship deals.'
                     : isAdmin
-                    ? 'Administrative account deletion is restricted. Please contact super-admin for permission.'
-                    : 'This action is permanent. This will permanently erase your organizer profile and data. Deletion is blocked if you have ongoing or upcoming events.'}
+                      ? 'Administrative account deletion is restricted. Please contact super-admin for permission.'
+                      : 'This action is permanent. This will permanently erase your organizer profile and data. Deletion is blocked if you have ongoing or upcoming events.'}
                 </p>
               </div>
             </div>

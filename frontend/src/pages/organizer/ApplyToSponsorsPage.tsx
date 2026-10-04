@@ -22,6 +22,7 @@ import {
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import type { ISponsorshipApplication, ISponsorshipPackage } from '../../types/sponsorship';
+import { applyToSponsorsFormSchema, validateForm } from '../../schemas';
 
 const CATEGORIES = [
   'Technology & AI',
@@ -143,32 +144,28 @@ export const ApplyToSponsorsPage: React.FC = () => {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    if (!formData.event_title.trim()) {
-      setErrorMessage('Please provide an event title.');
-      setLoading(false);
-      return;
-    }
+    const socialsMap: Record<string, string> = {};
+    socials.forEach((s) => {
+      if (s.platform.trim() && s.url.trim()) {
+        socialsMap[s.platform.trim()] = s.url.trim();
+      }
+    });
 
-    if (!formData.contact_phone.trim() || !formData.contact_email.trim()) {
-      setErrorMessage('Direct phone and email are required so sponsors can contact you.');
+    const payload = {
+      ...formData,
+      packages,
+      socials: socialsMap,
+    };
+
+    const validation = validateForm(applyToSponsorsFormSchema, payload);
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0] || 'Please provide valid pitch details.';
+      setErrorMessage(firstError);
       setLoading(false);
       return;
     }
 
     try {
-      const socialsMap: Record<string, string> = {};
-      socials.forEach((s) => {
-        if (s.platform.trim() && s.url.trim()) {
-          socialsMap[s.platform.trim()] = s.url.trim();
-        }
-      });
-
-      const payload = {
-        ...formData,
-        packages,
-        socials: socialsMap,
-      };
-
       await api.sponsorship.createApplication(payload);
       setSuccessMessage('Your pitch has been published to the Sponsor Marketplace! Verified sponsors can now discover your event and reach out directly.');
       

@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import { GoogleLogin } from '@react-oauth/google';
+import { loginSchema, registerSchema, forgotPasswordSchema, validateForm } from '../../schemas';
 import {
   Lock,
   User as UserIcon,
@@ -81,6 +82,14 @@ export const LoginPage: React.FC = () => {
 
     try {
       if (authMode === 'login') {
+        const validation = validateForm(loginSchema, { email, password, role: loginRole });
+        if (!validation.success) {
+          const firstError = Object.values(validation.errors || {})[0] || 'Invalid credentials.';
+          setErrorMsg(firstError);
+          setIsLoading(false);
+          return;
+        }
+
         const loggedUser = await login(email.trim(), password, loginRole);
         if (redirectTarget) {
           navigate(redirectTarget);
@@ -92,8 +101,17 @@ export const LoginPage: React.FC = () => {
           navigate('/app');
         }
       } else {
-        if (!fullName.trim()) {
-          setErrorMsg('Please enter your full name.');
+        const validation = validateForm(registerSchema, {
+          email,
+          password,
+          fullName,
+          full_name: fullName,
+          role: loginRole,
+          organization: loginRole === 'ORGANIZER' ? organization.trim() || undefined : undefined,
+        });
+        if (!validation.success) {
+          const firstError = Object.values(validation.errors || {})[0] || 'Please complete all required fields.';
+          setErrorMsg(firstError);
           setIsLoading(false);
           return;
         }
@@ -140,7 +158,8 @@ export const LoginPage: React.FC = () => {
 
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail.trim()) return;
+    const validation = validateForm(forgotPasswordSchema, { email: forgotEmail });
+    if (!validation.success) return;
     setForgotLoading(true);
     setForgotSuccess(null);
     try {
@@ -163,19 +182,19 @@ export const LoginPage: React.FC = () => {
               ? 'Organizer Portal'
               : 'Attendee Portal'
             : loginRole === 'ORGANIZER'
-            ? 'Create Organizer Account'
-            : 'Create Attendee Account'}
+              ? 'Create Organizer Account'
+              : 'Create Attendee Account'}
         </h1>
         <p className="text-xs text-[#756366] max-w-xs mx-auto leading-snug">
           {redirectTarget
             ? 'Sign in or create your account to proceed with your registration.'
             : authMode === 'login'
-            ? loginRole === 'ORGANIZER'
-              ? 'Sign in to access your event dashboard and check-ins.'
-              : 'Sign in to view your events and verifiable badges.'
-            : loginRole === 'ORGANIZER'
-            ? 'Host community events and issue tamper-proof badges in Ethiopia.'
-            : 'Verifiable credentials and tech events in Ethiopia.'}
+              ? loginRole === 'ORGANIZER'
+                ? 'Sign in to access your event dashboard and check-ins.'
+                : 'Sign in to view your events and verifiable badges.'
+              : loginRole === 'ORGANIZER'
+                ? 'Host community events and issue tamper-proof badges in Ethiopia.'
+                : 'Verifiable credentials and tech events in Ethiopia.'}
         </p>
       </div>
 
@@ -187,11 +206,10 @@ export const LoginPage: React.FC = () => {
             setAuthMode('login');
             setErrorMsg(null);
           }}
-          className={`pb-1 cursor-pointer transition-all ${
-            authMode === 'login'
+          className={`pb-1 cursor-pointer transition-all ${authMode === 'login'
               ? 'text-[#63474D] font-bold border-b-2 border-[#63474D]'
               : 'text-[#756366] hover:text-[#2D1F23]'
-          }`}
+            }`}
         >
           Sign In
         </button>
@@ -201,11 +219,10 @@ export const LoginPage: React.FC = () => {
             setAuthMode('signup');
             setErrorMsg(null);
           }}
-          className={`pb-1 cursor-pointer transition-all ${
-            authMode === 'signup'
+          className={`pb-1 cursor-pointer transition-all ${authMode === 'signup'
               ? 'text-[#63474D] font-bold border-b-2 border-[#63474D]'
               : 'text-[#756366] hover:text-[#2D1F23]'
-          }`}
+            }`}
         >
           Create Account
         </button>
@@ -222,11 +239,10 @@ export const LoginPage: React.FC = () => {
               setErrorMsg(null);
               setIsPendingNotice(false);
             }}
-            className={`flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-              loginRole === 'ATTENDEE'
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${loginRole === 'ATTENDEE'
                 ? 'bg-[#63474D] text-white shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
-            }`}
+              }`}
           >
             <UserCheck className="w-3.5 h-3.5" />
             <span>Attendee</span>
@@ -238,11 +254,10 @@ export const LoginPage: React.FC = () => {
               setErrorMsg(null);
               setIsPendingNotice(false);
             }}
-            className={`flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-              loginRole === 'ORGANIZER'
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${loginRole === 'ORGANIZER'
                 ? 'bg-[#63474D] text-white shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
-            }`}
+              }`}
           >
             <Briefcase className="w-3.5 h-3.5" />
             <span>Organizer</span>
@@ -400,8 +415,8 @@ export const LoginPage: React.FC = () => {
             {authMode === 'login'
               ? 'Sign In'
               : loginRole === 'ORGANIZER'
-              ? 'Register as Organizer'
-              : 'Create Attendee Account'}
+                ? 'Register as Organizer'
+                : 'Create Attendee Account'}
           </Button>
         </form>
 

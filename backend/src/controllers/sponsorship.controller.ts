@@ -84,15 +84,6 @@ export class SponsorshipController {
       }
 
       const { applicationId, status, package_name, pledged_amount, sponsor_notes } = req.body;
-      if (!applicationId || !status) {
-        sendError(res, 'Application ID and status are required.', 400);
-        return;
-      }
-
-      if (status !== 'INTERESTED' && status !== 'DECLINED') {
-        sendError(res, "Status must be either 'INTERESTED' or 'DECLINED'.", 400);
-        return;
-      }
 
       const deal = await SponsorshipService.expressInterestOrDecline(sponsorId, applicationId, status, {
         package_name,
@@ -142,11 +133,6 @@ export class SponsorshipController {
 
       const dealId = req.params.id as string;
       const { status, sponsor_notes } = req.body;
-
-      if (!status || (status !== 'INTERESTED' && status !== 'DECLINED')) {
-        sendError(res, "Status must be either 'INTERESTED' or 'DECLINED'.", 400);
-        return;
-      }
 
       const deal = await SponsorshipService.updateDealStatus(dealId, sponsorId, status, sponsor_notes);
       sendSuccess(res, deal, `Deal status updated to ${status}.`);
