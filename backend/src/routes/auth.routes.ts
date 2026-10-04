@@ -20,6 +20,7 @@ import {
   sponsorVerifyOtpSchema,
   sponsorResetPasswordOtpSchema,
 } from '../schemas/auth.schema';
+import { changePasswordSchema } from '../schemas/user.schema';
 
 const router = Router();
 
@@ -35,6 +36,7 @@ router.post('/reset-password', authLimiter, validateBody(resetPasswordSchema), A
 router.get('/me', authenticate, AuthController.getMe);
 router.post('/apply-organizer', authenticate, validateBody(applyOrganizerSchema), AuthController.applyForOrganizer);
 router.post('/switch-role', authenticate, validateBody(switchRoleSchema), AuthController.switchRole);
+router.post('/change-password', authenticate, validateBody(changePasswordSchema), AuthController.changePassword);
 router.post('/logout', authenticate, AuthController.logout);
 
 // Sponsor Auth Endpoints (Completely decoupled role & portal)

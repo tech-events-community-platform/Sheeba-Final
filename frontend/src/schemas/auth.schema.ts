@@ -118,6 +118,17 @@ export const resetPasswordStep3Schema = z
     path: ['confirmPassword'],
   });
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required.'),
+    newPassword: z.string().min(6, 'New password must be at least 6 characters long.'),
+    confirmPassword: z.string().min(1, 'Please confirm your new password.'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'New password and confirmation do not match.',
+    path: ['confirmPassword'],
+  });
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
@@ -132,3 +143,4 @@ export type SponsorForgotOtpStep2Input = z.infer<typeof sponsorForgotOtpStep2Sch
 export type SponsorResetPasswordStep3Input = z.infer<typeof sponsorResetPasswordStep3Schema>;
 export type ApplyOrganizerInput = z.infer<typeof applyOrganizerSchema>;
 export type SwitchRoleInput = z.infer<typeof switchRoleSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

@@ -409,6 +409,18 @@ export const api = {
       return res.data || { success: true, message: 'Password reset successfully.' };
     },
 
+    changePassword: async (data: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword?: string;
+    }): Promise<{ success: boolean; message: string }> => {
+      const res = await requestApi('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      return res.data || { success: true, message: res.message || 'Password changed successfully.' };
+    },
+
     sponsor: {
       register: async (data: {
         full_name: string;

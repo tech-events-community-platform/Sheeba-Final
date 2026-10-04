@@ -853,7 +853,7 @@ export class AuthService {
       }
 
       // Check user exists
-      const userRes = await query<IUser>('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+      const userRes = await query<IUser>('SELECT id, full_name, email FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
       if (!userRes.rowCount || userRes.rowCount === 0) {
         await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
         const err: any = new Error('No user account found with this email.');
@@ -861,9 +861,17 @@ export class AuthService {
         throw err;
       }
 
+      const user = userRes.rows[0];
       const passwordHash = await bcrypt.hash(newPassword, 10);
-      await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, userRes.rows[0].id]);
+      await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, user.id]);
       await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+
+      // Dispatch Brevo notification confirming password has been changed
+      try {
+        await EmailService.sendPasswordChangedNotificationEmail(cleanEmail, user.full_name);
+      } catch (emailErr) {
+        console.warn('[AuthService] ⚠️ Failed to send password changed confirmation email:', emailErr);
+      }
 
       return {
         success: true,
@@ -1398,9 +1406,75 @@ export class AuthService {
     // Clean up OTP record
     await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
 
+    const sponsorUserRes = await query<IUser>('SELECT id, full_name, email FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+    if (sponsorUserRes.rowCount && sponsorUserRes.rows[0]) {
+      try {
+        await EmailService.sendPasswordChangedNotificationEmail(cleanEmail, sponsorUserRes.rows[0].full_name);
+      } catch (emailErr) {
+        console.warn('[AuthService] ⚠️ Failed to send password changed confirmation email:', emailErr);
+      }
+    }
+
     return {
       success: true,
       message: 'Your password has been successfully reset. You may now log in with your new password.',
+    };
+  }
+
+  /**
+   * Change user password from settings with current password verification
+   */
+  static async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ success: boolean; message: string }> {
+    if (!newPassword || newPassword.length < 6) {
+      const err: any = new Error('New password must be at least 6 characters long.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const userRes = await query<{
+      id: string;
+      email: string;
+      full_name: string;
+      password_hash: string;
+    }>('SELECT id, email, full_name, password_hash FROM users WHERE id = $1', [userId]);
+
+    if (!userRes.rowCount || userRes.rowCount === 0) {
+      const err: any = new Error('User account not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const user = userRes.rows[0];
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isMatch) {
+      const err: any = new Error('Current password is incorrect.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [
+      passwordHash,
+      user.id,
+    ]);
+
+    // Dispatch Brevo notification confirming password has been changed
+    try {
+      await EmailService.sendPasswordChangedNotificationEmail(user.email, user.full_name);
+    } catch (emailErr) {
+      console.warn('[AuthService] ⚠️ Failed to dispatch password changed confirmation email:', emailErr);
+    }
+
+    return {
+      success: true,
+      message: 'Password changed successfully. A confirmation email has been sent.',
     };
   }
 }

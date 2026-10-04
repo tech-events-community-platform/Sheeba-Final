@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
@@ -22,6 +22,7 @@ import {
   Building2,
   Clock,
   X,
+  KeyRound,
 } from 'lucide-react';
 import type { ProfileVisibility } from '../../types/user';
 import {
@@ -35,6 +36,7 @@ import {
 export const AttendeeSettingsPage: React.FC = () => {
   const { user, logout, refreshUser, applyForOrganizer, switchRole } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [name, setName] = useState(user?.name || '');
   const [email] = useState(user?.email || '');
@@ -84,7 +86,12 @@ export const AttendeeSettingsPage: React.FC = () => {
       if (user.socials?.telegram) setTelegram(user.socials.telegram);
       if (user.socials?.x) setXHandle(user.socials.x);
     }
-  }, [user]);
+
+    if ((location.state as any)?.successMessage) {
+      setSaveMsg((location.state as any).successMessage);
+      window.history.replaceState({}, document.title);
+    }
+  }, [user, location.state]);
 
   const handleApplyOrganizer = async (e: React.FormEvent) => {
     const validation = validateForm(applyOrganizerSchema, {
@@ -791,6 +798,35 @@ export const AttendeeSettingsPage: React.FC = () => {
           >
             Export as CSV
           </Button>
+        </div>
+      </div>
+
+      {/* Password & Security */}
+      <div className="pt-6 border-t border-[#E8DDD7] space-y-4 max-w-2xl">
+        <div>
+          <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
+            <Lock className="w-4 h-4 text-[#63474D]" />
+            Password & Security
+          </h2>
+          <p className="text-xs text-[#756366] mt-0.5">
+            Manage your account credentials and login security.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7]">
+          <div className="space-y-0.5">
+            <span className="text-xs font-bold text-[#2D1F23] block">Account Password</span>
+            <span className="text-[11px] text-[#756366] block">
+              Change your password anytime to keep your Sheeba account secure.
+            </span>
+          </div>
+          <Link
+            to="/app/change-password"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#63474D] text-white rounded-xl text-xs font-bold hover:bg-[#52393F] transition-all cursor-pointer shadow-xs hover:shadow-sm shrink-0"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Change Password</span>
+          </Link>
         </div>
       </div>
 

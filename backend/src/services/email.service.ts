@@ -177,6 +177,51 @@ export class EmailService {
   }
 
   /**
+   * Password Changed Confirmation Email
+   * Subject: Your Sheeba password has been changed
+   */
+  static async sendPasswordChangedNotificationEmail(toEmail: string, fullName?: string): Promise<void> {
+    const subject = 'Your Sheeba password has been changed';
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization & Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Password Changed Successfully</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            Hello ${fullName || 'User'},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            This email confirms that the password for your Sheeba account has been successfully changed. You can now use your new password to log in.
+          </p>
+
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+              Sign In to Sheeba
+            </a>
+          </div>
+
+          <div style="background-color: #FFF8F6; border-left: 4px solid #FFA686; padding: 12px 16px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 12px; color: #63474D; line-height: 1.5;">
+              <strong>Security Notice:</strong> If you did not make this change, please contact Sheeba support immediately to secure your account.
+            </p>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 28px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
    * Welcome Email (Dispatched after attendee registration verification is complete)
    */
   static async sendWelcomeEmail(toEmail: string, fullName: string): Promise<void> {

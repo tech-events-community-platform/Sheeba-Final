@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
@@ -14,6 +14,7 @@ import {
   UserCheck,
   Lock,
   X,
+  KeyRound,
 } from 'lucide-react';
 import { TelegramIcon, XIcon, TikTokIcon, YouTubeIcon } from '../../components/ui/SocialIcons';
 import { OrganizerDefaultQuestionsSettings } from '../../components/organizer/OrganizerDefaultQuestionsSettings';
@@ -22,6 +23,13 @@ import { organizerProfileFormSchema, switchRoleSchema, validateForm } from '../.
 export const AccountSettingsPage: React.FC = () => {
   const { user, logout, switchRole } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const getChangePasswordPath = () => {
+    if (user?.role === 'SPONSOR') return '/sponsor/change-password';
+    if (user?.role === 'ADMIN') return '/admin/change-password';
+    return '/organizer/change-password';
+  };
 
   const [name, setName] = useState(user?.name || '');
   const [organization, setOrganization] = useState(user?.organization || '');
@@ -82,7 +90,12 @@ export const AccountSettingsPage: React.FC = () => {
         console.error(e);
       }
     }
-  }, [user]);
+
+    if ((location.state as any)?.successMessage) {
+      setSaveMsg((location.state as any).successMessage);
+      window.history.replaceState({}, document.title);
+    }
+  }, [user, location.state]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,6 +407,35 @@ export const AccountSettingsPage: React.FC = () => {
             <UserCheck className="w-3.5 h-3.5 text-[#FFA686]" />
             <span>Launch Attendee Workspace</span>
           </button>
+        </div>
+      </div>
+
+      {/* Password & Security Section */}
+      <div className="pt-6 border-t border-[#E8DDD7] space-y-4 max-w-3xl">
+        <div>
+          <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
+            <Lock className="w-4 h-4 text-[#63474D]" />
+            Password & Security
+          </h2>
+          <p className="text-xs text-[#756366] mt-0.5">
+            Manage your account credentials and login security.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7]">
+          <div className="space-y-0.5">
+            <span className="text-xs font-bold text-[#2D1F23] block">Account Password</span>
+            <span className="text-[11px] text-[#756366] block">
+              Change your password anytime to keep your Sheeba credentials secure.
+            </span>
+          </div>
+          <Link
+            to={getChangePasswordPath()}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#63474D] text-white rounded-xl text-xs font-bold hover:bg-[#52393F] transition-all cursor-pointer shadow-xs hover:shadow-sm shrink-0"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Change Password</span>
+          </Link>
         </div>
       </div>
 

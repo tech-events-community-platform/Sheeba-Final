@@ -65,7 +65,13 @@ export const LoginPage: React.FC = () => {
     if (roleParam?.toUpperCase() === 'ORGANIZER' || searchParams.get('portal') === 'organizer') {
       setLoginRole('ORGANIZER');
     }
-  }, [searchParams, location.pathname]);
+
+    if ((location.state as any)?.successMessage) {
+      setSuccessMsg((location.state as any).successMessage);
+      // Clean up history state so message isn't sticky on manual reload
+      window.history.replaceState({}, document.title);
+    }
+  }, [searchParams, location.pathname, location.state]);
 
   // 3-Step Forgot password modal state (Brevo OTP)
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -296,7 +302,11 @@ export const LoginPage: React.FC = () => {
         otp: forgotOtp.trim(),
         newPassword: forgotNewPassword,
       });
-      setForgotSuccess(res.message || 'Your password has been successfully reset! You may now sign in.');
+      setForgotSuccess(res.message || 'Your password has been changed successfully! Redirecting to sign in...');
+      setTimeout(() => {
+        resetForgotModal();
+        setSuccessMsg('Your password has been changed successfully. You may now sign in with your new password.');
+      }, 1500);
     } catch (err: any) {
       setForgotError(err.message || 'Failed to reset password.');
     } finally {
@@ -523,16 +533,13 @@ export const LoginPage: React.FC = () => {
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-semibold text-[#2D1F23]">Password</label>
               {authMode === 'login' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotEmail(email);
-                    setShowForgotModal(true);
-                  }}
+                <Link
+                  to="/forgot-password"
+                  state={{ email }}
                   className="text-xs font-semibold text-[#63474D] hover:underline cursor-pointer"
                 >
                   Forgot password?
-                </button>
+                </Link>
               )}
             </div>
             <div className="relative">
