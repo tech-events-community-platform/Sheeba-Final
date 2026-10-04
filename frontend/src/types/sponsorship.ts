@@ -7,6 +7,34 @@ export interface ISponsorshipPackage {
 
 export type SponsorshipApplicationStatus = 'OPEN' | 'UNDER_REVIEW' | 'FUNDED' | 'CLOSED';
 
+export interface IEventSpeaker {
+  name: string;
+  role?: string;
+  social?: string;
+}
+
+export interface IEventCoOrganizer {
+  name: string;
+  social?: string;
+}
+
+export interface IEventPastSponsor {
+  name: string;
+  website?: string;
+}
+
+export interface IEventPartner {
+  name: string;
+  social?: string;
+}
+
+export interface IApplicationAffiliations {
+  speakers?: IEventSpeaker[];
+  co_organizers?: IEventCoOrganizer[];
+  past_sponsors?: IEventPastSponsor[];
+  partners?: IEventPartner[];
+}
+
 export interface ISponsorshipApplication {
   id: string;
   organizer_id: string;
@@ -27,6 +55,7 @@ export interface ISponsorshipApplication {
   contact_telegram?: string;
   pitch_deck_url?: string;
   socials?: Record<string, string>;
+  affiliations?: IApplicationAffiliations;
   status: SponsorshipApplicationStatus;
   created_at: string;
   updated_at: string;

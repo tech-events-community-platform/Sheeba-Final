@@ -1,5 +1,5 @@
 import { query } from '../config/db';
-import { ISponsorshipApplication, ISponsorshipDeal, SponsorshipDealStatus } from '../types';
+import { ISponsorshipApplication, ISponsorshipDeal, SponsorshipDealStatus, IApplicationAffiliations } from '../types';
 
 export class SponsorshipService {
   /**
@@ -25,6 +25,7 @@ export class SponsorshipService {
       contact_telegram?: string;
       pitch_deck_url?: string;
       socials?: Record<string, string>;
+      affiliations?: IApplicationAffiliations;
     }
   ): Promise<ISponsorshipApplication> {
     if (!data.event_title || !data.expected_date || !data.location) {
@@ -41,6 +42,7 @@ export class SponsorshipService {
 
     const packagesJson = JSON.stringify(data.packages || []);
     const socialsJson = JSON.stringify(data.socials || {});
+    const affiliationsJson = JSON.stringify(data.affiliations || {});
 
     const res = await query<ISponsorshipApplication>(
       `INSERT INTO sponsorship_applications (
@@ -62,8 +64,9 @@ export class SponsorshipService {
         contact_telegram,
         pitch_deck_url,
         socials,
+        affiliations,
         status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'OPEN')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 'OPEN')
       RETURNING *`,
       [
         organizerId,
@@ -84,6 +87,7 @@ export class SponsorshipService {
         data.contact_telegram ? data.contact_telegram.trim() : null,
         data.pitch_deck_url ? data.pitch_deck_url.trim() : null,
         socialsJson,
+        affiliationsJson,
       ]
     );
 
@@ -284,6 +288,7 @@ export class SponsorshipService {
         sa.contact_telegram,
         sa.pitch_deck_url,
         sa.socials,
+        sa.affiliations,
         sa.status AS application_status,
         u.organization AS organizer_organization,
         u.full_name AS organizer_name,
@@ -333,6 +338,7 @@ export class SponsorshipService {
         contact_telegram: row.contact_telegram,
         pitch_deck_url: row.pitch_deck_url,
         socials: row.socials,
+        affiliations: row.affiliations,
         status: row.application_status,
         organizer_organization: row.organizer_organization,
         organizer_name: row.organizer_name,
