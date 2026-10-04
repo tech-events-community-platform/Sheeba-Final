@@ -131,6 +131,8 @@ CREATE TABLE IF NOT EXISTS otp_verifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_otp_verifications_email ON otp_verifications(email);
+ALTER TABLE otp_verifications ADD COLUMN IF NOT EXISTS purpose VARCHAR(50) DEFAULT 'password_reset';
+ALTER TABLE otp_verifications ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 
 -- Check-Ins Table (Section 4: Door Duty check-ins with soft-void Undo support)
 CREATE TABLE IF NOT EXISTS check_ins (

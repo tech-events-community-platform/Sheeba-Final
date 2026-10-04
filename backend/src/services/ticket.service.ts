@@ -103,7 +103,7 @@ export class TicketService {
       JOIN events e ON t.event_id = e.id
       JOIN users u ON t.user_id = u.id
       JOIN users org ON e.organizer_id = org.id
-      WHERE (t.event_id = $1 OR e.share_link_token = $1) AND t.user_id = $2
+      WHERE (t.event_id::text = $1 OR e.share_link_token = $1) AND t.user_id = $2
     `;
 
     const result = await query(sql, [eventId, userId]);
@@ -133,7 +133,7 @@ export class TicketService {
       FROM tickets t
       JOIN events e ON t.event_id = e.id
       JOIN users u ON t.user_id = u.id
-      WHERE t.id = $1 OR t.ticket_code = $1
+      WHERE t.id::text = $1 OR t.ticket_code = $1
     `;
 
     const result = await query(sql, [ticketId]);

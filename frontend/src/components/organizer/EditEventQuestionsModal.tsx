@@ -14,6 +14,8 @@ import {
   Layers,
 } from 'lucide-react';
 import { getOrganizerDefaultQuestions, type DefaultQuestion } from '../../utils/defaultQuestions';
+import { validateForm } from '../../utils/validation';
+import { eventQuestionDraftSchema } from '../../schemas/event.schema';
 
 interface EditEventQuestionsModalProps {
   event: Event | null;
@@ -155,16 +157,18 @@ export const EditEventQuestionsModal: React.FC<EditEventQuestionsModalProps> = (
     // Validate that questions with text exist and choice questions have options
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (!q.questionText.trim()) {
-        setErrorMsg(`Question ${i + 1} has an empty prompt. Please fill it in or remove it.`);
+      const validation = validateForm(eventQuestionDraftSchema, {
+        id: q.id || `q_${Date.now()}_${i}`,
+        questionText: q.questionText,
+        type: q.type || 'text',
+        options: q.options || [],
+        isRequired: Boolean(q.isRequired),
+        order: i + 1,
+      });
+
+      if (!validation.success) {
+        setErrorMsg(validation.error);
         return;
-      }
-      if ((q.type === 'choice' || q.type === 'multi_choice')) {
-        const validOptions = (q.options || []).filter((opt) => opt.trim().length > 0);
-        if (validOptions.length < 2) {
-          setErrorMsg(`Question ${i + 1} (${q.questionText}) requires at least 2 choice options.`);
-          return;
-        }
       }
     }
 

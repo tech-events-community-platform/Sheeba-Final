@@ -307,7 +307,7 @@ export const api = {
       organization?: string;
       phone?: string;
       bio?: string;
-    }): Promise<{ user: User; token?: string; isPendingApproval?: boolean; message?: string }> => {
+    }): Promise<{ user?: User; token?: string; isPendingApproval?: boolean; requireOtp?: boolean; email?: string; message?: string }> => {
       const res = await requestApi('/auth/register', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -317,12 +317,40 @@ export const api = {
         setAuthToken(res.data.token);
       }
 
+      const isAttendee = data.role !== 'ORGANIZER';
+      const requireOtp = res.data?.requireOtp ?? res.requireOtp ?? isAttendee;
+
+      return {
+        user: res.data?.user ?? res.user,
+        token: res.data?.token ?? res.token,
+        isPendingApproval: res.data?.isPendingApproval ?? res.isPendingApproval ?? false,
+        requireOtp,
+        email: res.data?.email ?? res.email ?? data.email,
+        message: res.data?.message ?? res.message,
+      };
+    },
+
+    verifyRegistrationOtp: async (data: { email: string; otp: string }): Promise<{ user: User; token: string; message: string }> => {
+      const res = await requestApi('/auth/verify-registration-otp', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      if (res.data?.token) {
+        setAuthToken(res.data.token);
+      }
       return {
         user: res.data.user,
         token: res.data.token,
-        isPendingApproval: res.data.isPendingApproval || false,
         message: res.data.message || res.message,
       };
+    },
+
+    resendRegistrationOtp: async (email: string): Promise<{ success: boolean; message: string }> => {
+      const res = await requestApi('/auth/resend-registration-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+      return res.data || { success: true, message: res.message || 'OTP resent successfully.' };
     },
 
     getMe: async (): Promise<User | null> => {
@@ -351,10 +379,26 @@ export const api = {
           method: 'POST',
           body: JSON.stringify({ email }),
         });
-        return res.data || { success: true, message: 'Password reset link sent.' };
+        return res.data || { success: true, message: res.message || 'Verification code sent.' };
       } catch (e: any) {
-        return { success: true, message: e.message || 'If an account exists, a reset link has been dispatched.' };
+        return { success: true, message: e.message || 'If an account exists, a verification code has been dispatched.' };
       }
+    },
+
+    verifyOtp: async (email: string, otp: string): Promise<{ success: boolean; message: string }> => {
+      const res = await requestApi('/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email, otp }),
+      });
+      return res.data || { success: true, message: res.message || 'Code verified successfully.' };
+    },
+
+    resetPasswordWithOtp: async (data: { email: string; otp: string; newPassword: string }): Promise<{ success: boolean; message: string }> => {
+      const res = await requestApi('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      return res.data || { success: true, message: res.message || 'Password reset successfully.' };
     },
 
     resetPassword: async (token: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
@@ -363,6 +407,18 @@ export const api = {
         body: JSON.stringify({ token, newPassword }),
       });
       return res.data || { success: true, message: 'Password reset successfully.' };
+    },
+
+    changePassword: async (data: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword?: string;
+    }): Promise<{ success: boolean; message: string }> => {
+      const res = await requestApi('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      return res.data || { success: true, message: res.message || 'Password changed successfully.' };
     },
 
     sponsor: {

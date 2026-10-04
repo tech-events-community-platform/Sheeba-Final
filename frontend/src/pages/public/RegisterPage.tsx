@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import type { UserRole } from '../../types/user';
+import { registerSchema, validateForm } from '../../schemas';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -55,10 +56,20 @@ export const RegisterPage: React.FC = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
+    const validation = validateForm(registerSchema, {
+      fullName,
+      full_name: fullName,
+      email,
+      password,
+      role: selectedRole,
+      organization: selectedRole === 'ORGANIZER' ? organization.trim() : undefined,
+      phone: phone.trim() || undefined,
+      bio: selectedRole === 'ORGANIZER' ? bio.trim() : undefined,
+    });
 
-    if (selectedRole === 'ORGANIZER' && !organization.trim()) {
-      setErrorMsg('Please specify your organization or community name.');
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors || {})[0] || 'Please complete all required fields.';
+      setErrorMsg(firstError);
       return;
     }
 
@@ -85,12 +96,17 @@ export const RegisterPage: React.FC = () => {
           },
         });
       } else {
-        // Attendee: context preserved across signup
+        // Attendee registration: ALWAYS navigate to OTP verification page
+        sessionStorage.setItem('sheeba_pending_otp_email', email.trim());
         if (redirectTarget) {
-          navigate(redirectTarget);
-        } else {
-          navigate('/app');
+          sessionStorage.setItem('sheeba_pending_otp_redirect', redirectTarget);
         }
+        navigate('/verify-otp', {
+          state: {
+            email: email.trim(),
+            redirect: redirectTarget,
+          },
+        });
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Registration failed. Please try again.');

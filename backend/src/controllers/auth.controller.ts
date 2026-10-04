@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/auth.service';
-import { sendSuccess, sendError } from '../utils/apiResponse';
+import { sendSuccess } from '../utils/apiResponse';
 import { AuthRequest } from '../types';
 
 export class AuthController {
@@ -17,7 +17,28 @@ export class AuthController {
         organization,
       });
 
-      return sendSuccess(res, result, 'User registered successfully.', 201);
+      const statusCode = result.requireOtp ? 200 : 201;
+      return sendSuccess(res, result, result.message || 'User registered successfully.', statusCode);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async verifyRegistrationOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, otp } = req.body;
+      const result = await AuthService.verifyRegistrationOtp({ email, otp });
+      sendSuccess(res, result, result.message, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async resendRegistrationOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email } = req.body;
+      const result = await AuthService.resendRegistrationOtp(email);
+      sendSuccess(res, result, result.message);
     } catch (error) {
       next(error);
     }
@@ -83,34 +104,50 @@ export class AuthController {
     );
   }
 
-  static async forgotPassword(req: Request, res: Response): Promise<void> {
-    const { email } = req.body;
-    if (!email) {
-      sendError(res, 'Email address is required.', 400);
-      return;
+  static async changePassword(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { currentPassword, newPassword } = req.body;
+      const result = await AuthService.changePassword(userId, currentPassword, newPassword);
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
     }
-    const result = await AuthService.forgotPassword(email);
-    sendSuccess(res, result, result.message);
   }
 
-  static async resetPassword(req: Request, res: Response): Promise<void> {
-    const { token, newPassword } = req.body;
-    if (!token || !newPassword) {
-      sendError(res, 'Token and newPassword are required.', 400);
-      return;
+  static async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email } = req.body;
+      const result = await AuthService.forgotPassword(email);
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
     }
-    const result = await AuthService.resetPassword(token, newPassword);
-    sendSuccess(res, result, result.message);
   }
 
+  static async verifyForgotPasswordOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, otp } = req.body;
+      const result = await AuthService.verifyForgotPasswordOtp(email, otp);
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token, email, otp, newPassword } = req.body;
+      const result = await AuthService.resetPassword({ token, email, otp, newPassword });
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
 
   static async googleLogin(req: Request, res: Response, next: NextFunction) {
     try {
       const { credential, role, mode } = req.body;
-      if (!credential) {
-        sendError(res, 'Google credential is required.', 400);
-        return;
-      }
       const result = await AuthService.loginWithGoogle(credential, role, mode || 'login');
       return sendSuccess(res, result, 'Google authentication successful.');
     } catch (error) {
@@ -152,10 +189,6 @@ export class AuthController {
   static async googleSponsorLogin(req: Request, res: Response, next: NextFunction) {
     try {
       const { credential, mode, company_name, industry_category, company_phone, company_website } = req.body;
-      if (!credential) {
-        sendError(res, 'Google credential is required.', 400);
-        return;
-      }
       const result = await AuthService.loginSponsorWithGoogle(credential, mode || 'login', {
         company_name,
         industry_category,
@@ -171,10 +204,6 @@ export class AuthController {
   static async sendSponsorOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { email } = req.body;
-      if (!email) {
-        sendError(res, 'Email address is required.', 400);
-        return;
-      }
       const result = await AuthService.sendPasswordResetOtp(email);
       sendSuccess(res, result, result.message);
     } catch (error) {
@@ -185,10 +214,6 @@ export class AuthController {
   static async verifySponsorOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { email, otp } = req.body;
-      if (!email || !otp) {
-        sendError(res, 'Email and 6-digit verification code are required.', 400);
-        return;
-      }
       const result = await AuthService.verifySponsorOtp(email, otp);
       sendSuccess(res, result, result.message);
     } catch (error) {
@@ -199,10 +224,6 @@ export class AuthController {
   static async resetSponsorPasswordWithOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { email, otp, newPassword } = req.body;
-      if (!email || !otp || !newPassword) {
-        sendError(res, 'Email, OTP, and new password are required.', 400);
-        return;
-      }
       const result = await AuthService.verifyOtpAndResetPassword(email, otp, newPassword);
       sendSuccess(res, result, result.message);
     } catch (error) {
@@ -210,4 +231,3 @@ export class AuthController {
     }
   }
 }
-

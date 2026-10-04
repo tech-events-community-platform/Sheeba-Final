@@ -1,71 +1,228 @@
-// @ts-ignore
-import nodemailer from 'nodemailer';
-
 /**
  * Email Service for Sheeba Platform
- * Supports:
- * - SMTP (Gmail, Brevo, AWS SES, etc.)
- * - Resend API (if RESEND_API_KEY provided)
- * - Development Console Logging fallback (so OTP is never lost during dev/testing)
+ * Powered by Brevo Transactional Email API (https://api.brevo.com/v3/smtp/email)
  */
 export class EmailService {
-  private static getTransporter() {
-    if (process.env.RESEND_API_KEY) {
-      return nodemailer.createTransport({
-        host: 'smtp.resend.com',
-        port: 465,
-        secure: true,
-        auth: {
-          user: 'resend',
-          pass: process.env.RESEND_API_KEY,
-        },
-      });
-    }
-
-    if (process.env.SMTP_HOST && process.env.SMTP_USER) {
-      return nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-    }
-
-    return null;
-  }
-
-  private static async dispatchEmail(to: string, subject: string, html: string): Promise<void> {
-    const fromAddress = process.env.EMAIL_FROM || 'Sheeba Platform <no-reply@sheeba.et>';
-    const transporter = this.getTransporter();
+  /**
+   * Core email dispatcher using Brevo REST API
+   */
+  private static async dispatchEmail(
+    to: string,
+    subject: string,
+    html: string,
+    recipientName?: string
+  ): Promise<void> {
+    const apiKey = process.env.BREVO_API_KEY;
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || 'hanannuru384@gmail.com';
+    const senderName = process.env.BREVO_SENDER_NAME || 'Sheeba';
 
     console.log(`\n======================================================`);
-    console.log(`[EmailService] 📧 Dispatched Email to: ${to}`);
+    console.log(`[EmailService] 📧 Dispatching Email to: ${to}`);
     console.log(`[EmailService] 📋 Subject: ${subject}`);
+    console.log(`[EmailService] 🚀 Provider: Brevo (Sender: ${senderName} <${senderEmail}>)`);
     console.log(`======================================================\n`);
 
-    if (!transporter) {
-      console.log(`[EmailService] (Local Dev Notice: No SMTP_HOST or RESEND_API_KEY set. Email content rendered in memory).`);
-      return;
+    if (!apiKey) {
+      const errorMsg = 'Email delivery failed: BREVO_API_KEY is not configured on the backend.';
+      console.warn(`[EmailService] ⚠️ ${errorMsg}`);
+      if (process.env.NODE_ENV === 'test') {
+        return; // Allow test mocks to complete without external network
+      }
+      throw new Error('Email service is temporarily unavailable. Please try again later.');
     }
 
     try {
-      await transporter.sendMail({
-        from: fromAddress,
-        to,
-        subject,
-        html,
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': apiKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: {
+            name: senderName,
+            email: senderEmail,
+          },
+          to: [
+            {
+              email: to,
+              name: recipientName || to,
+            },
+          ],
+          subject,
+          htmlContent: html,
+        }),
       });
-      console.log(`[EmailService] ✅ Email successfully delivered over SMTP/Resend to ${to}`);
-    } catch (error) {
-      console.warn(`[EmailService] ⚠️ Remote email delivery failed:`, (error as any)?.message || error);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.warn(
+          `[EmailService] ⚠️ Brevo API responded with error status ${response.status}:`,
+          (errorData as any)?.message || response.statusText
+        );
+        throw new Error('Failed to deliver email through Brevo service.');
+      }
+
+      const resJson: any = await response.json().catch(() => ({}));
+      console.log(`[EmailService] ✅ Email successfully delivered via Brevo (MessageId: ${resJson.messageId || 'OK'}) to ${to}`);
+    } catch (error: any) {
+      console.warn(`[EmailService] ⚠️ Brevo email dispatch error:`, error?.message || error);
+      throw error;
     }
   }
 
   /**
-   * Section 2: Triggered immediately when an attendee account is created.
+   * Attendee Registration OTP Email
+   * Subject: Verify your Sheeba account
+   * Expires in 3 minutes
+   */
+  static async sendAttendeeRegistrationOtpEmail(toEmail: string, otpCode: string, fullName?: string): Promise<void> {
+    const expirationMinutes = parseInt(process.env.OTP_EXPIRATION_MINUTES || '3', 10);
+    const subject = 'Verify your Sheeba account';
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization & Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Verify your email address</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            Hello ${fullName || 'Attendee'},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            Thank you for creating an account with Sheeba. Please use the 6-digit verification code below to complete your attendee registration:
+          </p>
+
+          <div style="background-color: #FAF7F5; border: 2px dashed #63474D; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+            <span style="font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 38px; font-weight: 800; letter-spacing: 10px; color: #63474D; display: inline-block;">
+              ${otpCode}
+            </span>
+            <p style="margin: 8px 0 0 0; font-size: 12px; color: #AA767C; font-weight: 600;">
+              ⏱️ This code will expire in ${expirationMinutes} minutes.
+            </p>
+          </div>
+
+          <div style="background-color: #FFF8F6; border-left: 4px solid #FFA686; padding: 12px 16px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 12px; color: #63474D; line-height: 1.5;">
+              <strong>Security Notice:</strong> For your security, never share this verification code with anyone. Sheeba team members will never ask for your code.
+            </p>
+          </div>
+
+          <p style="font-size: 13px; color: #756366; line-height: 1.5; margin: 20px 0 0 0;">
+            If you did not attempt to register on Sheeba, you can safely ignore this email.
+          </p>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 28px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Forgot Password OTP Email
+   * Subject: Reset your Sheeba password
+   * Expires in 3 minutes
+   */
+  static async sendForgotPasswordOtpEmail(toEmail: string, otpCode: string, fullName?: string): Promise<void> {
+    const expirationMinutes = parseInt(process.env.OTP_EXPIRATION_MINUTES || '3', 10);
+    const subject = 'Reset your Sheeba password';
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization & Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Reset your password</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            Hello ${fullName || 'User'},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            We received a request to reset the password for your Sheeba account. Use the 6-digit verification code below to verify your identity and choose a new password:
+          </p>
+
+          <div style="background-color: #FAF7F5; border: 2px dashed #63474D; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+            <span style="font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 38px; font-weight: 800; letter-spacing: 10px; color: #63474D; display: inline-block;">
+              ${otpCode}
+            </span>
+            <p style="margin: 8px 0 0 0; font-size: 12px; color: #AA767C; font-weight: 600;">
+              ⏱️ This code will expire in ${expirationMinutes} minutes.
+            </p>
+          </div>
+
+          <div style="background-color: #FFF8F6; border-left: 4px solid #FFA686; padding: 12px 16px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 12px; color: #63474D; line-height: 1.5;">
+              <strong>Security Notice:</strong> If you did not request a password reset, you can safely ignore this email. Never share your verification code with anyone.
+            </p>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 28px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Password Changed Confirmation Email
+   * Subject: Your Sheeba password has been changed
+   */
+  static async sendPasswordChangedNotificationEmail(toEmail: string, fullName?: string): Promise<void> {
+    const subject = 'Your Sheeba password has been changed';
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization & Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Password Changed Successfully</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            Hello ${fullName || 'User'},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            This email confirms that the password for your Sheeba account has been successfully changed. You can now use your new password to log in.
+          </p>
+
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/login" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+              Sign In to Sheeba
+            </a>
+          </div>
+
+          <div style="background-color: #FFF8F6; border-left: 4px solid #FFA686; padding: 12px 16px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 12px; color: #63474D; line-height: 1.5;">
+              <strong>Security Notice:</strong> If you did not make this change, please contact Sheeba support immediately to secure your account.
+            </p>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 28px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Welcome Email (Dispatched after attendee registration verification is complete)
    */
   static async sendWelcomeEmail(toEmail: string, fullName: string): Promise<void> {
     const subject = 'Welcome to Sheeba!';
@@ -73,7 +230,7 @@ export class EmailService {
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 16px;">
         <h1 style="color: #63474D; font-size: 24px; margin-bottom: 16px;">Welcome to Sheeba!</h1>
         <p>Hello ${fullName},</p>
-        <p>Your account has been created successfully.</p>
+        <p>Your attendee account has been verified and created successfully.</p>
         <p>Sheeba is an event platform for verifiable attendance credentials and community tech events in Ethiopia.</p>
         <div style="margin: 24px 0;">
           <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/app" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
@@ -84,11 +241,11 @@ export class EmailService {
       </div>
     `;
 
-    await this.dispatchEmail(toEmail, subject, htmlBody);
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
 
   /**
-   * Section 4: Triggered when registering for a specific event.
+   * Registration Confirmation Email for Events
    */
   static async sendRegistrationConfirmationEmail(
     toEmail: string,
@@ -126,11 +283,11 @@ export class EmailService {
       </div>
     `;
 
-    await this.dispatchEmail(toEmail, subject, htmlBody);
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
 
   /**
-   * Password reset request email (link-based)
+   * Password reset request email (link-based fallback)
    */
   static async sendPasswordResetEmail(toEmail: string, resetToken: string, fullName: string): Promise<void> {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
@@ -149,13 +306,14 @@ export class EmailService {
       </div>
     `;
 
-    await this.dispatchEmail(toEmail, subject, htmlBody);
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
 
   /**
    * Sponsor OTP Code Email (6-digit verification code)
    */
   static async sendSponsorOtpEmail(toEmail: string, otpCode: string, fullName: string): Promise<void> {
+    const expirationMinutes = parseInt(process.env.OTP_EXPIRATION_MINUTES || '3', 10);
     const subject = `Your Sheeba Password Reset Code: ${otpCode}`;
     const htmlBody = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
@@ -170,7 +328,7 @@ export class EmailService {
           <span style="font-family: monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #63474D;">
             ${otpCode}
           </span>
-          <p style="margin: 8px 0 0 0; font-size: 12px; color: #756366;">Valid for 15 minutes</p>
+          <p style="margin: 8px 0 0 0; font-size: 12px; color: #756366;">Valid for ${expirationMinutes} minutes</p>
         </div>
 
         <p style="font-size: 13px; color: #666; line-height: 1.5;">
@@ -183,11 +341,7 @@ export class EmailService {
       </div>
     `;
 
-    console.log(`\n======================================================`);
-    console.log(`[Sponsor OTP Generated] 🔑 EMAIL: ${toEmail} | CODE: ${otpCode}`);
-    console.log(`======================================================\n`);
-
-    await this.dispatchEmail(toEmail, subject, htmlBody);
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
 
   /**
@@ -211,7 +365,7 @@ export class EmailService {
       </div>
     `;
 
-    await this.dispatchEmail(toEmail, subject, htmlBody);
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
 
   /**
@@ -234,7 +388,7 @@ export class EmailService {
       </div>
     `;
 
-    await this.dispatchEmail(toEmail, subject, htmlBody);
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
 
   /**
@@ -252,6 +406,6 @@ export class EmailService {
       </div>
     `;
 
-    await this.dispatchEmail(toEmail, subject, htmlBody);
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
 }

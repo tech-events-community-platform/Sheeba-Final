@@ -57,8 +57,10 @@ export type EventStatus = 'open' | 'closed' | 'completed' | 'canceled' | 'postpo
 export interface RegistrationQuestion {
   id: string;
   questionText: string;
+  type?: string;
+  options?: string[];
   isRequired: boolean;
-  order: number;
+  order?: number;
 }
 
 export interface IEvent {

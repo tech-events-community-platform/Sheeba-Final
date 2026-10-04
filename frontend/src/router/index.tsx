@@ -17,6 +17,9 @@ import { EventRegistrationCheckoutPage } from '../pages/public/EventRegistration
 import { PublicProfilePage } from '../pages/public/PublicProfilePage';
 import { BadgeDetailPage } from '../pages/public/BadgeDetailPage';
 import { VerifyTicketPage } from '../pages/public/VerifyTicketPage';
+import { VerifyOtpPage } from '../pages/public/VerifyOtpPage';
+import { ForgotPasswordPage } from '../pages/public/ForgotPasswordPage';
+import { ChangePasswordPage } from '../pages/shared/ChangePasswordPage';
 
 // Sponsor Pages & Layout
 import { SponsorLayout } from '../layouts/SponsorLayout';
@@ -65,6 +68,9 @@ export const router = createBrowserRouter([
       { index: true, element: <LandingPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <LoginPage /> },
+      { path: 'verify-otp', element: <VerifyOtpPage /> },
+      { path: 'forgot-password', element: <ForgotPasswordPage /> },
+      { path: 'reset-password', element: <ForgotPasswordPage /> },
       { path: 'pending-approval', element: <PendingApprovalPage /> },
       { path: 'contact', element: <LoginPage /> },
       { path: 'search', element: <Navigate to="/" replace /> },
@@ -95,6 +101,7 @@ export const router = createBrowserRouter([
           { path: 'registrations', element: <MyEventsPage /> },
           { path: 'ticket/:eventId', element: <TicketPage /> },
           { path: 'settings', element: <AttendeeSettingsPage /> },
+          { path: 'change-password', element: <ChangePasswordPage /> },
           { path: 'profile', element: <ProfilePage /> },
           { path: 'profile/attendance', element: <AttendanceHistoryPage /> },
           { path: 'record', element: <RecordPage /> },
@@ -128,6 +135,7 @@ export const router = createBrowserRouter([
           { path: 'reports/:id', element: <ReportPage /> },
           { path: 'apply-sponsors', element: <ApplyToSponsorsPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
+          { path: 'change-password', element: <ChangePasswordPage /> },
         ],
       },
     ],
@@ -146,6 +154,8 @@ export const router = createBrowserRouter([
           { path: 'organizers', element: <AdminUsersPage /> },
           { path: 'reports', element: <AdminDashboardPage /> },
           { path: 'profile', element: <AccountSettingsPage /> },
+          { path: 'settings', element: <AccountSettingsPage /> },
+          { path: 'change-password', element: <ChangePasswordPage /> },
         ],
       },
     ],
@@ -165,6 +175,7 @@ export const router = createBrowserRouter([
           { path: 'deals', element: <SponsorDealsPage /> },
           { path: 'deliverables', element: <SponsorDeliverablesPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
+          { path: 'change-password', element: <ChangePasswordPage /> },
           { path: 'dashboard', element: <Navigate to="/sponsor" replace /> },
         ],
       },
