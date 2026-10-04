@@ -19,6 +19,10 @@ import {
   ArrowRight,
   TrendingUp,
   X,
+  Mic,
+  Handshake,
+  Trophy,
+  Globe,
 } from 'lucide-react';
 import {
   LinkedInIcon,
@@ -31,7 +35,15 @@ import {
 } from '../../components/ui/SocialIcons';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import type { ISponsorshipApplication, ISponsorshipPackage } from '../../types/sponsorship';
+import type {
+  ISponsorshipApplication,
+  ISponsorshipPackage,
+  IEventSpeaker,
+  IEventCoOrganizer,
+  IEventPastSponsor,
+  IEventPartner,
+  IApplicationAffiliations,
+} from '../../types/sponsorship';
 
 interface SocialPlatformDef {
   id: string;
@@ -119,6 +131,48 @@ const getSocialConfig = (platform: string): SocialPlatformDef => {
   if (p.includes('telegram')) return SOCIAL_PLATFORMS[6];
   return SOCIAL_PLATFORMS[0]; // Website
 };
+
+const getPackageBadgeClasses = (pkgName: string) => {
+  const name = (pkgName || '').toLowerCase();
+  if (name.includes('plat') || name.includes('pl')) {
+    // Very light platinum (clean subtle metallic slate/platinum tint)
+    return {
+      container: 'bg-[#F4F6F8] border border-[#E1E5EA]',
+      nameText: 'text-[#334155]',
+      amountText: 'text-[#0F172A]',
+    };
+  }
+  if (name.includes('gold')) {
+    // Very light gold (clean subtle pale champagne gold tint)
+    return {
+      container: 'bg-[#FEF9EE] border border-[#FBEAC4]',
+      nameText: 'text-[#7D5413]',
+      amountText: 'text-[#92400E]',
+    };
+  }
+  if (name.includes('silver')) {
+    // Very light silver (clean subtle silvery zinc tint)
+    return {
+      container: 'bg-[#F8F9FA] border border-[#E5E7EB]',
+      nameText: 'text-[#4B5563]',
+      amountText: 'text-[#1F2937]',
+    };
+  }
+  if (name.includes('bronz')) {
+    // Very light bronze (clean subtle warm bronze tint)
+    return {
+      container: 'bg-[#FAF5F0] border border-[#EEDBCA]',
+      nameText: 'text-[#7C4A27]',
+      amountText: 'text-[#5C3214]',
+    };
+  }
+  return {
+    container: 'bg-stone-50 border border-stone-200',
+    nameText: 'text-stone-700',
+    amountText: 'text-[#63474D]',
+  };
+};
+
 
 const CATEGORIES = [
   'Technology & AI',
@@ -239,6 +293,92 @@ export const ApplyToSponsorsPage: React.FC = () => {
     });
   };
 
+  // Helper to format social / website links
+  const formatLink = (url?: string) => {
+    if (!url) return '';
+    const trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    if (trimmed.startsWith('@')) return `https://t.me/${trimmed.substring(1)}`;
+    return `https://${trimmed}`;
+  };
+
+  // Affiliations (Lineup, Co-Organizers, Past Sponsors & Partners)
+  const [affiliationsTab, setAffiliationsTab] = useState<'past_sponsors' | 'partners' | 'co_organizers' | 'speakers'>('past_sponsors');
+  const [speakers, setSpeakers] = useState<IEventSpeaker[]>([]);
+  const [coOrganizers, setCoOrganizers] = useState<IEventCoOrganizer[]>([]);
+  const [pastSponsors, setPastSponsors] = useState<IEventPastSponsor[]>([]);
+  const [partners, setPartners] = useState<IEventPartner[]>([]);
+
+  const [speakerDraft, setSpeakerDraft] = useState({ name: '', role: '', social: '' });
+  const [coOrganizerDraft, setCoOrganizerDraft] = useState({ name: '', social: '' });
+  const [pastSponsorDraft, setPastSponsorDraft] = useState({ name: '', website: '' });
+  const [partnerDraft, setPartnerDraft] = useState({ name: '', social: '' });
+
+  const handleAddSpeaker = () => {
+    if (!speakerDraft.name.trim()) return;
+    setSpeakers((prev) => [
+      ...prev,
+      {
+        name: speakerDraft.name.trim(),
+        role: speakerDraft.role.trim() || undefined,
+        social: speakerDraft.social.trim() || undefined,
+      },
+    ]);
+    setSpeakerDraft({ name: '', role: '', social: '' });
+  };
+
+  const handleRemoveSpeaker = (idx: number) => {
+    setSpeakers((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddCoOrganizer = () => {
+    if (!coOrganizerDraft.name.trim()) return;
+    setCoOrganizers((prev) => [
+      ...prev,
+      {
+        name: coOrganizerDraft.name.trim(),
+        social: coOrganizerDraft.social.trim() || undefined,
+      },
+    ]);
+    setCoOrganizerDraft({ name: '', social: '' });
+  };
+
+  const handleRemoveCoOrganizer = (idx: number) => {
+    setCoOrganizers((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddPastSponsor = () => {
+    if (!pastSponsorDraft.name.trim()) return;
+    setPastSponsors((prev) => [
+      ...prev,
+      {
+        name: pastSponsorDraft.name.trim(),
+        website: pastSponsorDraft.website.trim() || undefined,
+      },
+    ]);
+    setPastSponsorDraft({ name: '', website: '' });
+  };
+
+  const handleRemovePastSponsor = (idx: number) => {
+    setPastSponsors((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddPartner = () => {
+    if (!partnerDraft.name.trim()) return;
+    setPartners((prev) => [
+      ...prev,
+      {
+        name: partnerDraft.name.trim(),
+        social: partnerDraft.social.trim() || undefined,
+      },
+    ]);
+    setPartnerDraft({ name: '', social: '' });
+  };
+
+  const handleRemovePartner = (idx: number) => {
+    setPartners((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const loadMyApplications = async () => {
     try {
       setFetchLoading(true);
@@ -308,12 +448,20 @@ export const ApplyToSponsorsPage: React.FC = () => {
       const validReportUrls = reportUrls.map((u) => u.trim()).filter(Boolean);
       const combinedReportUrl = validReportUrls.join(', ');
 
+      const affiliationsPayload: IApplicationAffiliations = {
+        speakers: speakers.filter((s) => s.name.trim()),
+        co_organizers: coOrganizers.filter((c) => c.name.trim()),
+        past_sponsors: pastSponsors.filter((p) => p.name.trim()),
+        partners: partners.filter((p) => p.name.trim()),
+      };
+
       const payload = {
         ...formData,
         event_type: finalEventType,
         pitch_deck_url: combinedReportUrl,
         packages,
         socials: socialsMap,
+        affiliations: affiliationsPayload,
       };
 
       await api.sponsorship.createApplication(payload);
@@ -347,6 +495,14 @@ export const ApplyToSponsorsPage: React.FC = () => {
         { platform: 'LinkedIn', url: '' },
         { platform: 'Website', url: '' },
       ]);
+      setSpeakers([]);
+      setCoOrganizers([]);
+      setPastSponsors([]);
+      setPartners([]);
+      setSpeakerDraft({ name: '', role: '', social: '' });
+      setCoOrganizerDraft({ name: '', social: '' });
+      setPastSponsorDraft({ name: '', website: '' });
+      setPartnerDraft({ name: '', social: '' });
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to submit application. Please try again.');
     } finally {
@@ -504,7 +660,7 @@ export const ApplyToSponsorsPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                  <img src="/calendar.webp" alt="Date" className="w-3.5 h-3.5 object-contain shrink-0" />
                   Expected Date or Month *
                 </label>
                 <input
@@ -519,7 +675,7 @@ export const ApplyToSponsorsPage: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                  <img src="/location.webp" alt="Location" className="w-3.5 h-3.5 object-contain shrink-0" />
                   Planned Location / City *
                 </label>
                 <input
@@ -629,6 +785,454 @@ export const ApplyToSponsorsPage: React.FC = () => {
                     You can only put maximum 2 reports for sponsorships
                   </p>
                 )}
+              </div>
+
+              {/* Past Sponsors, Partners, Co-Organizers, and Speakers on your previous events */}
+              <div className="md:col-span-2 pt-5 border-t border-gray-100 space-y-4">
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-gray-900">
+                    Past Sponsors, Partners, Co-Organizers, and Speakers on your previous events
+                  </label>
+                  <p className="text-[11px] sm:text-xs text-gray-500 mt-1">
+                    Sponsors want to know who they are associating with. Showcase previous sponsors, partners, co-organizers, and notable speakers to demonstrate your event track record and credibility.
+                  </p>
+                </div>
+
+                {/* Category Tabs: Clean Segmented Bar */}
+                <div className="bg-[#FAF8F5] p-2 rounded-2xl border border-stone-200 flex items-center gap-2 overflow-x-auto">
+                  {/* 1. Past Sponsors */}
+                  <button
+                    type="button"
+                    onClick={() => setAffiliationsTab('past_sponsors')}
+                    className={`flex-1 min-w-[170px] py-3 px-4 rounded-xl text-xs sm:text-[13px] font-bold transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+                      affiliationsTab === 'past_sponsors'
+                        ? 'bg-white text-[#63474D] shadow-xs border border-stone-200/90'
+                        : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
+                    }`}
+                  >
+                    <img src="/sponsor-icon.webp" alt="Past Sponsors" className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0" />
+                    <span>Past Sponsors</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                      affiliationsTab === 'past_sponsors' ? 'bg-[#63474D]/10 text-[#63474D]' : 'bg-stone-200/70 text-stone-600'
+                    }`}>
+                      {pastSponsors.length}
+                    </span>
+                  </button>
+
+                  {/* 2. Partners */}
+                  <button
+                    type="button"
+                    onClick={() => setAffiliationsTab('partners')}
+                    className={`flex-1 min-w-[170px] py-3 px-4 rounded-xl text-xs sm:text-[13px] font-bold transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+                      affiliationsTab === 'partners'
+                        ? 'bg-white text-[#63474D] shadow-xs border border-stone-200/90'
+                        : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
+                    }`}
+                  >
+                    <img src="/partner-icon.webp" alt="Partners" className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0" />
+                    <span>Partners</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                      affiliationsTab === 'partners' ? 'bg-[#63474D]/10 text-[#63474D]' : 'bg-stone-200/70 text-stone-600'
+                    }`}>
+                      {partners.length}
+                    </span>
+                  </button>
+
+                  {/* 3. Co-Organizers */}
+                  <button
+                    type="button"
+                    onClick={() => setAffiliationsTab('co_organizers')}
+                    className={`flex-1 min-w-[170px] py-3 px-4 rounded-xl text-xs sm:text-[13px] font-bold transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+                      affiliationsTab === 'co_organizers'
+                        ? 'bg-white text-[#63474D] shadow-xs border border-stone-200/90'
+                        : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
+                    }`}
+                  >
+                    <img src="/co-organizer-icon.webp" alt="Co-Organizers" className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0" />
+                    <span>Co-Organizers</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                      affiliationsTab === 'co_organizers' ? 'bg-[#63474D]/10 text-[#63474D]' : 'bg-stone-200/70 text-stone-600'
+                    }`}>
+                      {coOrganizers.length}
+                    </span>
+                  </button>
+
+                  {/* 4. Speakers */}
+                  <button
+                    type="button"
+                    onClick={() => setAffiliationsTab('speakers')}
+                    className={`flex-1 min-w-[170px] py-3 px-4 rounded-xl text-xs sm:text-[13px] font-bold transition-all flex items-center justify-center gap-2.5 cursor-pointer ${
+                      affiliationsTab === 'speakers'
+                        ? 'bg-white text-[#63474D] shadow-xs border border-stone-200/90'
+                        : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
+                    }`}
+                  >
+                    <img src="/speaker-icon.webp" alt="Speakers" className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0" />
+                    <span>Speakers</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                      affiliationsTab === 'speakers' ? 'bg-[#63474D]/10 text-[#63474D]' : 'bg-stone-200/70 text-stone-600'
+                    }`}>
+                      {speakers.length}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Active Tab Input Area */}
+                <div className="bg-stone-50/70 rounded-2xl p-4 border border-stone-200/80 space-y-3">
+                  {/* 1. PAST SPONSORS PANEL */}
+                  {affiliationsTab === 'past_sponsors' && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                        <div className="sm:col-span-6">
+                          <input
+                            type="text"
+                            placeholder="Past Sponsor Brand Name (e.g. Telebirr, Safaricom, Dashen Bank)"
+                            value={pastSponsorDraft.name}
+                            onChange={(e) => setPastSponsorDraft({ ...pastSponsorDraft, name: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddPastSponsor();
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-5">
+                          <input
+                            type="text"
+                            placeholder="Brand Website / Social URL (e.g. https://telebirr.et)"
+                            value={pastSponsorDraft.website}
+                            onChange={(e) => setPastSponsorDraft({ ...pastSponsorDraft, website: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddPastSponsor();
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-1">
+                          <button
+                            type="button"
+                            onClick={handleAddPastSponsor}
+                            disabled={!pastSponsorDraft.name.trim()}
+                            className="w-full h-full min-h-[38px] px-3 rounded-xl bg-[#63474D] text-white hover:bg-[#4E373C] disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-xs"
+                          >
+                            Add +
+                          </button>
+                        </div>
+                      </div>
+
+                      {pastSponsors.length === 0 ? (
+                        <p className="text-xs text-stone-500 italic pt-1">
+                          No past sponsors added yet. List companies who sponsored your previous events to prove corporate trust!
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {pastSponsors.map((ps, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-amber-50/70 border border-amber-200/80 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-2xs text-xs"
+                            >
+                              <img src="/sponsor-icon.webp" alt="Sponsor" className="w-4 h-4 object-contain shrink-0" />
+                              <span className="font-semibold text-gray-900">{ps.name}</span>
+                              {ps.website && (
+                                <a
+                                  href={formatLink(ps.website)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#63474D] hover:underline"
+                                  title={ps.website}
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePastSponsor(idx)}
+                                className="text-gray-400 hover:text-red-500 ml-1 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 2. PARTNERS PANEL */}
+                  {affiliationsTab === 'partners' && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                        <div className="sm:col-span-6">
+                          <input
+                            type="text"
+                            placeholder="Partner Organization Name (e.g. ALX Ethiopia, MInT)"
+                            value={partnerDraft.name}
+                            onChange={(e) => setPartnerDraft({ ...partnerDraft, name: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddPartner();
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-5">
+                          <input
+                            type="text"
+                            placeholder="Partner Website / Social Link"
+                            value={partnerDraft.social}
+                            onChange={(e) => setPartnerDraft({ ...partnerDraft, social: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddPartner();
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-1">
+                          <button
+                            type="button"
+                            onClick={handleAddPartner}
+                            disabled={!partnerDraft.name.trim()}
+                            className="w-full h-full min-h-[38px] px-3 rounded-xl bg-[#63474D] text-white hover:bg-[#4E373C] disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-xs"
+                          >
+                            Add +
+                          </button>
+                        </div>
+                      </div>
+
+                      {partners.length === 0 ? (
+                        <p className="text-xs text-stone-500 italic pt-1">
+                          No strategic partners added yet. Feature ecosystem partners or institutional collaborators.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {partners.map((pt, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-white border border-stone-200 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-2xs text-xs"
+                            >
+                              <img src="/partner-icon.webp" alt="Partner" className="w-4 h-4 object-contain shrink-0" />
+                              <span className="font-semibold text-gray-900">{pt.name}</span>
+                              {pt.social && (
+                                <a
+                                  href={formatLink(pt.social)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#63474D] hover:underline"
+                                  title={pt.social}
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePartner(idx)}
+                                className="text-gray-400 hover:text-red-500 ml-1 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 3. CO-ORGANIZERS PANEL */}
+                  {affiliationsTab === 'co_organizers' && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                        <div className="sm:col-span-6">
+                          <input
+                            type="text"
+                            placeholder="Co-Organizer Organization / Individual Name (e.g. GDG Addis)"
+                            value={coOrganizerDraft.name}
+                            onChange={(e) => setCoOrganizerDraft({ ...coOrganizerDraft, name: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddCoOrganizer();
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-5">
+                          <input
+                            type="text"
+                            placeholder="Social / Website / Telegram Link"
+                            value={coOrganizerDraft.social}
+                            onChange={(e) => setCoOrganizerDraft({ ...coOrganizerDraft, social: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddCoOrganizer();
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-1">
+                          <button
+                            type="button"
+                            onClick={handleAddCoOrganizer}
+                            disabled={!coOrganizerDraft.name.trim()}
+                            className="w-full h-full min-h-[38px] px-3 rounded-xl bg-[#63474D] text-white hover:bg-[#4E373C] disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-xs"
+                          >
+                            Add +
+                          </button>
+                        </div>
+                      </div>
+
+                      {coOrganizers.length === 0 ? (
+                        <p className="text-xs text-stone-500 italic pt-1">
+                          No co-organizers added yet. Let sponsors know if you are partnering with another entity or community to co-host.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {coOrganizers.map((co, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-white border border-stone-200 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-2xs text-xs"
+                            >
+                              <img src="/co-organizer-icon.webp" alt="Co-Organizer" className="w-4 h-4 object-contain shrink-0" />
+                              <span className="font-semibold text-gray-900">{co.name}</span>
+                              {co.social && (
+                                <a
+                                  href={formatLink(co.social)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#63474D] hover:underline"
+                                  title={co.social}
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCoOrganizer(idx)}
+                                className="text-gray-400 hover:text-red-500 ml-1 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 4. SPEAKERS PANEL */}
+                  {affiliationsTab === 'speakers' && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                        <div className="sm:col-span-4">
+                          <input
+                            type="text"
+                            placeholder="Speaker Full Name (e.g. Dr. Abebe)"
+                            value={speakerDraft.name}
+                            onChange={(e) => setSpeakerDraft({ ...speakerDraft, name: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddSpeaker();
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-4">
+                          <input
+                            type="text"
+                            placeholder="Role / Bio (e.g. Keynote, AI Lead)"
+                            value={speakerDraft.role}
+                            onChange={(e) => setSpeakerDraft({ ...speakerDraft, role: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddSpeaker();
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-3">
+                          <input
+                            type="text"
+                            placeholder="Social / Profile URL"
+                            value={speakerDraft.social}
+                            onChange={(e) => setSpeakerDraft({ ...speakerDraft, social: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddSpeaker();
+                              }
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm"
+                          />
+                        </div>
+                        <div className="sm:col-span-1">
+                          <button
+                            type="button"
+                            onClick={handleAddSpeaker}
+                            disabled={!speakerDraft.name.trim()}
+                            className="w-full h-full min-h-[38px] px-3 rounded-xl bg-[#63474D] text-white hover:bg-[#4E373C] disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition-all flex items-center justify-center cursor-pointer shadow-xs"
+                          >
+                            Add +
+                          </button>
+                        </div>
+                      </div>
+
+                      {speakers.length === 0 ? (
+                        <p className="text-xs text-stone-500 italic pt-1">
+                          No speakers added yet. Add keynote speakers, panelists, or presenters to highlight event caliber.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {speakers.map((spk, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-white border border-stone-200 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-2xs text-xs"
+                            >
+                              <img src="/speaker-icon.webp" alt="Speaker" className="w-4 h-4 object-contain shrink-0" />
+                              <div>
+                                <span className="font-semibold text-gray-900">{spk.name}</span>
+                                {spk.role && <span className="text-gray-500 text-[11px] ml-1.5">({spk.role})</span>}
+                              </div>
+                              {spk.social && (
+                                <a
+                                  href={formatLink(spk.social)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#63474D] hover:underline"
+                                  title={spk.social}
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSpeaker(idx)}
+                                className="text-gray-400 hover:text-red-500 ml-1 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -986,13 +1590,13 @@ export const ApplyToSponsorsPage: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-5">
+            <div className="divide-y-2 sm:divide-y-[3px] divide-gray-300">
               {myApplications.map((app) => (
                 <div
                   key={app.id}
-                  className="bg-white rounded-3xl p-6 border border-[#AA767C]/15 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden"
+                  className="py-8 first:pt-2 last:pb-2 space-y-4"
                 >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#FFA686]/20 text-[#63474D] border border-[#FFA686]/30">
@@ -1011,20 +1615,23 @@ export const ApplyToSponsorsPage: React.FC = () => {
                           {app.status}
                         </span>
                       </div>
-                      <h3 className="text-xl font-bold text-gray-900">{app.event_title}</h3>
+                      <h3 className="text-xl sm:text-2xl font-bold text-gray-900">{app.event_title}</h3>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-5 sm:gap-8 shrink-0">
                       <div className="text-right">
                         <p className="text-xs text-gray-500 font-medium">Funding Goal</p>
-                        <p className="text-lg font-serif font-bold text-[#63474D]">
+                        <p className="text-lg sm:text-xl font-serif font-bold text-[#63474D]">
                           {app.funding_goal.toLocaleString()} {app.currency}
                         </p>
                       </div>
 
-                      <div className="bg-[#FFA686]/15 border border-[#FFA686]/30 px-3 py-1.5 rounded-xl text-center">
-                        <p className="text-[10px] uppercase font-bold text-[#63474D]">Interested Sponsors</p>
-                        <p className="text-base font-bold text-[#63474D]">
+                      {/* Interested Sponsors: No red background box, text on its own */}
+                      <div className="text-center">
+                        <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                          Interested Sponsors
+                        </p>
+                        <p className="text-lg font-bold text-gray-900">
                           {app.interested_sponsors_count || 0}
                         </p>
                       </div>
@@ -1040,59 +1647,184 @@ export const ApplyToSponsorsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-4 text-xs text-gray-600">
+                  {/* Metadata with substituted webp icons */}
+                  <div className="flex flex-wrap items-center gap-6 my-2 text-xs sm:text-sm text-gray-600">
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-[#63474D]" />
-                      <span>{app.expected_date}</span>
+                      <img src="/calendar.webp" alt="Date" className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" />
+                      <span className="font-medium">{app.expected_date}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-[#63474D]" />
-                      <span>{app.location}</span>
+                      <img src="/location.webp" alt="Location" className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" />
+                      <span className="font-medium">{app.location}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-[#63474D]" />
-                      <span>{app.expected_attendees.toLocaleString()} Estimated Attendees</span>
+                      <Users className="w-4 h-4 text-gray-500 shrink-0" />
+                      <span className="font-medium">{app.expected_attendees.toLocaleString()} Estimated Attendees</span>
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-700 line-clamp-2 mb-4 bg-gray-50 p-3 rounded-xl">
-                    {app.description}
+                  {/* Description: text standing on its own, no card box */}
+                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed max-w-4xl">
+                    "{app.description}"
                   </p>
 
-                  {/* Packages chips */}
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-bold text-gray-500 uppercase">Configured Packages:</p>
+                  {/* Configured Packages: subtle light tier colors */}
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Configured Packages:</p>
                     <div className="flex flex-wrap gap-2">
-                      {app.packages?.map((p, i) => (
-                        <div
-                          key={i}
-                          className="px-3 py-1.5 rounded-xl bg-stone-100 border border-stone-200 text-xs flex items-center gap-2"
-                        >
-                          <span className="font-semibold text-gray-900">{p.name}:</span>
-                          <span className="font-bold text-[#63474D]">
-                            {p.amount.toLocaleString()} {app.currency}
-                          </span>
-                        </div>
-                      ))}
+                      {app.packages?.map((p, i) => {
+                        const badgeStyle = getPackageBadgeClasses(p.name);
+                        return (
+                          <div
+                            key={i}
+                            className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 ${badgeStyle.container}`}
+                          >
+                            <span className={`font-semibold ${badgeStyle.nameText}`}>{p.name}:</span>
+                            <span className={`font-bold ${badgeStyle.amountText}`}>
+                              {p.amount.toLocaleString()} {app.currency}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Direct Contact reminder banner */}
-                  <div className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
-                    <div className="flex items-center gap-3">
-                      <span>Direct Contact: <strong>{app.contact_name}</strong></span>
-                      <span>📞 {app.contact_phone}</span>
-                      <span>✉️ {app.contact_email}</span>
-                      {app.contact_telegram && <span>💬 {app.contact_telegram}</span>}
+                  {/* Two-Column Section: Track Record & Associations (Col 1) and Direct Contact (Col 2) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 pt-3">
+                    {/* Column 1: Track Record & Associations */}
+                    <div className="space-y-2.5">
+                      <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                        Track Record & Associations:
+                      </p>
+
+                      {app.affiliations && (
+                        (app.affiliations.past_sponsors && app.affiliations.past_sponsors.length > 0) ||
+                        (app.affiliations.partners && app.affiliations.partners.length > 0) ||
+                        (app.affiliations.co_organizers && app.affiliations.co_organizers.length > 0) ||
+                        (app.affiliations.speakers && app.affiliations.speakers.length > 0)
+                      ) ? (
+                        <div className="flex flex-col gap-2.5">
+                          {/* Past Sponsors */}
+                          {app.affiliations.past_sponsors?.map((p, idx) => (
+                            <div key={`ps-${idx}`} className="flex items-center gap-2.5 text-xs sm:text-sm text-gray-800">
+                              <img src="/sponsor-icon.webp" alt="Sponsor" className="w-7 h-7 object-contain shrink-0" />
+                              <span className="font-semibold text-gray-900">{p.name}</span>
+                              {p.website && (
+                                <a
+                                  href={formatLink(p.website)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#63474D] hover:underline"
+                                  title={p.website}
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Partners */}
+                          {app.affiliations.partners?.map((pt, idx) => (
+                            <div key={`pt-${idx}`} className="flex items-center gap-2.5 text-xs sm:text-sm text-gray-800">
+                              <img src="/partner-icon.webp" alt="Partner" className="w-7 h-7 object-contain shrink-0" />
+                              <span className="font-semibold text-gray-900">{pt.name}</span>
+                              {pt.social && (
+                                <a
+                                  href={formatLink(pt.social)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#63474D] hover:underline"
+                                  title={pt.social}
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Co-Organizers */}
+                          {app.affiliations.co_organizers?.map((c, idx) => (
+                            <div key={`co-${idx}`} className="flex items-center gap-2.5 text-xs sm:text-sm text-gray-800">
+                              <img src="/co-organizer-icon.webp" alt="Co-Organizer" className="w-7 h-7 object-contain shrink-0" />
+                              <span className="font-semibold text-gray-900">{c.name}</span>
+                              {c.social && (
+                                <a
+                                  href={formatLink(c.social)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#63474D] hover:underline"
+                                  title={c.social}
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Speakers */}
+                          {app.affiliations.speakers?.map((s, idx) => (
+                            <div key={`spk-${idx}`} className="flex items-center gap-2.5 text-xs sm:text-sm text-gray-800">
+                              <img src="/speaker-icon.webp" alt="Speaker" className="w-7 h-7 object-contain shrink-0" />
+                              <span className="font-semibold text-gray-900">{s.name}</span>
+                              {s.role && <span className="text-gray-500 text-xs">({s.role})</span>}
+                              {s.social && (
+                                <a
+                                  href={formatLink(s.social)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[#63474D] hover:underline"
+                                  title={s.social}
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">No affiliations listed</p>
+                      )}
                     </div>
 
-                    <Link
-                      to="/organizer/events/create"
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-[#63474D] hover:underline"
-                    >
-                      <span>Create Official Event Link</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
+                    {/* Column 2: Direct Contact */}
+                    <div className="space-y-2.5">
+                      <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                        Direct Contact:
+                      </p>
+                      <div className="flex flex-col gap-2.5 text-xs sm:text-sm text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900">{app.contact_name}</span>
+                        </div>
+                        {app.contact_phone && (
+                          <div className="flex items-center gap-2.5">
+                            <img src="/phone-icon.webp" alt="Phone" className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" />
+                            <a href={`tel:${app.contact_phone}`} className="hover:underline">{app.contact_phone}</a>
+                          </div>
+                        )}
+                        {app.contact_email && (
+                          <div className="flex items-center gap-2.5">
+                            <img src="/mail-icon.webp" alt="Email" className="w-4 h-4 sm:w-5 sm:h-5 object-contain shrink-0" />
+                            <a href={`mailto:${app.contact_email}`} className="hover:underline">{app.contact_email}</a>
+                          </div>
+                        )}
+                        {app.contact_telegram && (
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-base leading-none">💬</span>
+                            <span>{app.contact_telegram}</span>
+                          </div>
+                        )}
+
+                        <div className="pt-2">
+                          <Link
+                            to="/organizer/events/create"
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#63474D] hover:underline"
+                          >
+                            <span>Create Official Event Link</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
