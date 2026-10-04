@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
@@ -22,12 +22,21 @@ import {
   Building2,
   Clock,
   X,
+  KeyRound,
 } from 'lucide-react';
 import type { ProfileVisibility } from '../../types/user';
+import {
+  attendeeProfileFormSchema,
+  updateVisibilityFormSchema,
+  applyOrganizerSchema,
+  switchRoleSchema,
+  validateForm,
+} from '../../schemas';
 
 export const AttendeeSettingsPage: React.FC = () => {
   const { user, logout, refreshUser, applyForOrganizer, switchRole } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [name, setName] = useState(user?.name || '');
   const [email] = useState(user?.email || '');
@@ -77,16 +86,25 @@ export const AttendeeSettingsPage: React.FC = () => {
       if (user.socials?.telegram) setTelegram(user.socials.telegram);
       if (user.socials?.x) setXHandle(user.socials.x);
     }
-  }, [user]);
+
+    if ((location.state as any)?.successMessage) {
+      setSaveMsg((location.state as any).successMessage);
+      window.history.replaceState({}, document.title);
+    }
+  }, [user, location.state]);
 
   const handleApplyOrganizer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!orgName.trim()) {
-      setApplyError('Please provide an organization or community name.');
-      return;
-    }
-    if (!applyPassword) {
-      setApplyError('Please enter your account password to authorize your application.');
+    const validation = validateForm(applyOrganizerSchema, {
+      organization: orgName,
+      applyPassword,
+      bio: orgBio,
+      phone: orgPhone,
+      telegram,
+      xHandle,
+    });
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors || {})[0] || 'Please complete all required application fields.';
+      setApplyError(firstError);
       return;
     }
 
@@ -118,9 +136,9 @@ export const AttendeeSettingsPage: React.FC = () => {
   };
 
   const handleSwitchToOrganizer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!switchPassword) {
-      setSwitchError('Please enter your account password.');
+    const validation = validateForm(switchRoleSchema, { switchPassword });
+    if (!validation.success) {
+      setSwitchError(validation.errors.switchPassword || 'Please enter your account password.');
       return;
     }
 
@@ -141,15 +159,25 @@ export const AttendeeSettingsPage: React.FC = () => {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    const profileData = {
+      name: name.trim(),
+      phone: phone.trim(),
+      bio: bio.trim(),
+      visibility,
+    };
+
+    const validation = validateForm(attendeeProfileFormSchema, profileData);
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0] || 'Invalid profile data.';
+      alert(firstError);
+      return;
+    }
+
     setIsSavingProfile(true);
     setSaveMsg(null);
     try {
-      await api.userAccount.updateProfile(user.id, {
-        name: name.trim(),
-        phone: phone.trim(),
-        bio: bio.trim(),
-        visibility,
-      });
+      await api.userAccount.updateProfile(user.id, profileData);
 
       if (refreshUser) {
         await refreshUser();
@@ -165,6 +193,12 @@ export const AttendeeSettingsPage: React.FC = () => {
   };
 
   const handleVisibilityChange = async (newVisibility: ProfileVisibility) => {
+    const validation = validateForm(updateVisibilityFormSchema, { visibility: newVisibility });
+    if (!validation.success) {
+      console.warn('Invalid visibility:', validation.errors);
+      return;
+    }
+
     setVisibility(newVisibility);
     if (!user) return;
     try {
@@ -628,11 +662,10 @@ export const AttendeeSettingsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => handleVisibilityChange('public')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-              visibility === 'public'
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${visibility === 'public'
                 ? 'bg-[#FAF7F5] border-[#63474D] ring-2 ring-[#63474D]/20 shadow-xs'
                 : 'bg-white border-[#E8DDD7] hover:border-[#63474D]/50'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2 mb-1.5">
               <Globe className={`w-4 h-4 ${visibility === 'public' ? 'text-[#63474D]' : 'text-gray-400'}`} />
@@ -651,11 +684,10 @@ export const AttendeeSettingsPage: React.FC = () => {
           <button
             type="button"
             onClick={() => handleVisibilityChange('private')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-              visibility === 'private'
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${visibility === 'private'
                 ? 'bg-[#FAF7F5] border-[#63474D] ring-2 ring-[#63474D]/20 shadow-xs'
                 : 'bg-white border-[#E8DDD7] hover:border-[#63474D]/50'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2 mb-1.5">
               <Lock className={`w-4 h-4 ${visibility === 'private' ? 'text-[#63474D]' : 'text-gray-400'}`} />
@@ -769,6 +801,35 @@ export const AttendeeSettingsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Password & Security */}
+      <div className="pt-6 border-t border-[#E8DDD7] space-y-4 max-w-2xl">
+        <div>
+          <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
+            <Lock className="w-4 h-4 text-[#63474D]" />
+            Password & Security
+          </h2>
+          <p className="text-xs text-[#756366] mt-0.5">
+            Manage your account credentials and login security.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7]">
+          <div className="space-y-0.5">
+            <span className="text-xs font-bold text-[#2D1F23] block">Account Password</span>
+            <span className="text-[11px] text-[#756366] block">
+              Change your password anytime to keep your Sheeba account secure.
+            </span>
+          </div>
+          <Link
+            to="/app/change-password"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#63474D] text-white rounded-xl text-xs font-bold hover:bg-[#52393F] transition-all cursor-pointer shadow-xs hover:shadow-sm shrink-0"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Change Password</span>
+          </Link>
+        </div>
+      </div>
+
       {/* 5. Danger Zone */}
       <div className="pt-6 border-t border-red-200 space-y-4 max-w-2xl">
         <button
@@ -781,9 +842,8 @@ export const AttendeeSettingsPage: React.FC = () => {
             <span className="font-serif font-bold text-sm">Account Danger Zone</span>
           </div>
           <ChevronDown
-            className={`w-4 h-4 text-red-600 transition-transform duration-200 ${
-              isDangerZoneOpen ? 'rotate-180' : ''
-            }`}
+            className={`w-4 h-4 text-red-600 transition-transform duration-200 ${isDangerZoneOpen ? 'rotate-180' : ''
+              }`}
           />
         </button>
 

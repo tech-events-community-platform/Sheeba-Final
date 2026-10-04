@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
 import { sendError } from '../utils/apiResponse';
 
 export const errorHandler = (
@@ -8,6 +9,23 @@ export const errorHandler = (
   next: NextFunction
 ): void => {
   console.error('Unhandled Error:', err);
+
+  // Zod Validation Error handling
+  if (err instanceof ZodError || err.name === 'ZodError') {
+    const formatted = (err.issues || []).map((issue: any) => ({
+      field: issue.path.join('.') || 'body',
+      message: issue.message,
+    }));
+    const firstMessage = formatted[0]?.message || 'Validation failed.';
+
+    res.status(400).json({
+      success: false,
+      message: firstMessage,
+      error: 'VALIDATION_ERROR',
+      errors: formatted,
+    });
+    return;
+  }
 
   // PostgreSQL unique constraint error
   if (err.code === '23505') {

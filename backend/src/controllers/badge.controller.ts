@@ -54,13 +54,6 @@ export class BadgeController {
       const targetAttendeeId = attendeeId || attendee_id;
       const targetBadgeCode = (badgeCode || badge_type) as BadgeCode;
 
-      if (!targetEventId || !targetAttendeeId || !targetBadgeCode) {
-        return res.status(400).json({
-          success: false,
-          message: 'Missing required parameters: eventId, attendeeId, badgeCode (Participant, Winner, Speaker).',
-        });
-      }
-
       const badge = await BadgeService.awardBadge({
         eventId: targetEventId,
         attendeeId: targetAttendeeId,

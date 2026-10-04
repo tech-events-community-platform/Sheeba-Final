@@ -1,5 +1,5 @@
 import { query, getClient } from '../config/db';
-import { IEvent, EventType, EventStatus, UserRole, AttendeeRosterItem } from '../types';
+import { IEvent, EventType, EventStatus, UserRole, AttendeeRosterItem, RegistrationQuestion } from '../types';
 import { generateTicketToken, generateQrDataUrl, generateTicketCode, computeEventDayExpiration } from '../utils/qr.util';
 import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
@@ -439,6 +439,54 @@ export class EventService {
       const err: any = new Error('Event has reached maximum capacity.');
       err.statusCode = 400;
       throw err;
+    }
+
+    // Validate registration answers dynamically against event.customQuestions (Step 6)
+    const customQuestions: RegistrationQuestion[] = Array.isArray(event.customQuestions)
+      ? event.customQuestions
+      : [];
+
+    for (const q of customQuestions) {
+      const qVal = answers[q.id];
+      const isFilled =
+        typeof qVal === 'string'
+          ? qVal.trim().length > 0
+          : Array.isArray(qVal)
+          ? qVal.length > 0
+          : qVal !== undefined && qVal !== null && qVal !== '';
+
+      if (q.isRequired && !isFilled) {
+        const err: any = new Error(`Please answer required question: "${q.questionText}"`);
+        err.statusCode = 400;
+        err.code = 'VALIDATION_ERROR';
+        throw err;
+      }
+
+      // If answered and options are configured, validate option selection
+      if (isFilled && q.options && q.options.length > 0) {
+        const validOptionSet = new Set(q.options.map((opt: string) => opt.trim()));
+        if (['choice', 'select', 'radio'].includes(q.type || '')) {
+          if (typeof qVal === 'string' && !validOptionSet.has(qVal.trim())) {
+            const err: any = new Error(`Invalid selection for question: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'VALIDATION_ERROR';
+            throw err;
+          }
+        } else if (['multi_choice', 'checkbox'].includes(q.type || '')) {
+          const selectedList = Array.isArray(qVal)
+            ? qVal
+            : typeof qVal === 'string'
+            ? qVal.split(',').map((s: string) => s.trim())
+            : [];
+          const hasInvalid = selectedList.some((item: string) => !validOptionSet.has(item.trim()));
+          if (hasInvalid) {
+            const err: any = new Error(`Invalid options selected for question: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'VALIDATION_ERROR';
+            throw err;
+          }
+        }
+      }
     }
 
     // Reject duplicate registration server-side (Section 3)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import type { Event } from '../../types/event';
@@ -15,6 +15,9 @@ import {
   Lock,
 } from 'lucide-react';
 import { getCalendarTile, isEventPassed } from '../../utils/date';
+import { validateForm } from '../../utils/validation';
+import { eventRegistrationCheckoutSchema } from '../../schemas/event.schema';
+import { switchRoleSchema } from '../../schemas/auth.schema';
 
 export const SHEEBA_ROLES = [
   'Student',
@@ -38,6 +41,7 @@ export const SHEEBA_GOALS = [
 export const EventRegistrationCheckoutPage: React.FC = () => {
   const { token, id } = useParams<{ token?: string; id?: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, isAuthenticated, register, switchRole } = useAuth();
 
   const [event, setEvent] = useState<Event | null>(null);
@@ -109,8 +113,9 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
   }, [token, id, user]);
 
   const handleOrganizerSwitchToAttendee = async () => {
-    if (!organizerSwitchPassword) {
-      setSwitchError('Please enter your account password.');
+    const roleValidation = validateForm(switchRoleSchema, { switchPassword: organizerSwitchPassword });
+    if (!roleValidation.success) {
+      setSwitchError(roleValidation.error);
       return;
     }
 
@@ -159,27 +164,34 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
       }
       attendeeToRegister = user;
     } else {
-      if (!guestName.trim()) {
-        setErrorMsg('Please enter your full name.');
-        return;
-      }
-      if (!guestEmail.trim() || !guestEmail.includes('@')) {
-        setErrorMsg('Please enter a valid email address.');
-        return;
-      }
-      if (!guestPassword || guestPassword.length < 6) {
-        setErrorMsg('Please enter a password with at least 6 characters for your attendee account.');
+      const guestValidation = validateForm(eventRegistrationCheckoutSchema, {
+        isAuthenticated,
+        guestName,
+        guestEmail,
+        guestPassword,
+      });
+
+      if (!guestValidation.success) {
+        setErrorMsg(guestValidation.error);
         return;
       }
 
       try {
-        const regRes = await register({
+        await register({
           email: guestEmail.trim(),
           password: guestPassword,
           full_name: guestName.trim(),
           role: 'ATTENDEE',
         });
-        attendeeToRegister = regRes.user;
+        sessionStorage.setItem('sheeba_pending_otp_email', guestEmail.trim());
+        sessionStorage.setItem('sheeba_pending_otp_redirect', window.location.pathname);
+        navigate('/verify-otp', {
+          state: {
+            email: guestEmail.trim(),
+            redirect: window.location.pathname,
+          },
+        });
+        return;
       } catch (regErr: any) {
         if (regErr.message?.includes('already registered') || regErr.status === 409 || regErr.statusCode === 409) {
           setErrorMsg('An account with this email already exists. Please sign in to register for this event.');

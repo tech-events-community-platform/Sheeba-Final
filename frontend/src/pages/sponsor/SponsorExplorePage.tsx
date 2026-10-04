@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { ISponsorshipApplication } from '../../types/sponsorship';
+import { sponsorExploreFilterSchema, validateForm } from '../../schemas';
 
 const CATEGORIES = [
   'All Categories',
@@ -34,6 +35,12 @@ export const SponsorExplorePage: React.FC = () => {
       setLoading(true);
       const params: any = {};
       if (query.trim()) params.search = query.trim();
+
+      const validation = validateForm(sponsorExploreFilterSchema, params);
+      if (!validation.success) {
+        console.warn('Invalid explore filter params:', validation.errors);
+        return;
+      }
 
       const data = await api.sponsorship.exploreApplications(params);
       setAllApplications(data || []);

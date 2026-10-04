@@ -6,6 +6,7 @@ import type { Event } from '../../types/event';
 import type { SponsorReportData } from '../../types/attendance';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { reportNarrativeUpdateFormSchema, validateForm } from '../../schemas';
 import {
   BarChart3,
   FileSpreadsheet,
@@ -313,6 +314,14 @@ export const ReportPage: React.FC = () => {
 
   const handleSaveReport = async () => {
     if (!selectedEventId || !report) return;
+
+    const validation = validateForm(reportNarrativeUpdateFormSchema, editForm);
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0] || 'Please provide valid report values.';
+      alert(firstError);
+      return;
+    }
+
     setIsSavingReport(true);
     setSaveFeedback(null);
     try {

@@ -24,6 +24,7 @@ import {
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 import { EditEventModal } from '../../components/organizer/EditEventModal';
 import { getCalendarTile } from '../../utils/date';
+import { manualAttendeeFormSchema, awardBadgeFormSchema, validateForm } from '../../schemas';
 
 export const EventDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -87,8 +88,10 @@ export const EventDetailPage: React.FC = () => {
   const handleAddManualAttendee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!event) return;
-    if (!manualForm.name.trim() || !manualForm.email.trim()) {
-      setManualUserError('Please provide both full name and email address.');
+    const validation = validateForm(manualAttendeeFormSchema, manualForm);
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors || {})[0] || 'Please provide both full name and a valid email address.';
+      setManualUserError(firstError);
       return;
     }
     setIsSubmittingManualUser(true);
@@ -118,11 +121,19 @@ export const EventDetailPage: React.FC = () => {
   // Section 7: Shared badge-award action
   const handleAwardBadge = async () => {
     if (!event || !awardingAttendee) return;
+    const attendeeId = awardingAttendee.attendeeId || awardingAttendee.id;
+    const validation = validateForm(awardBadgeFormSchema, {
+      eventId: event.id,
+      attendeeId,
+      badgeCode: selectedBadgeCode,
+    });
+    if (!validation.success) return;
+
     setIsSubmittingAward(true);
     try {
       await api.badges.awardBadge({
         eventId: event.id,
-        attendeeId: awardingAttendee.attendeeId || awardingAttendee.id,
+        attendeeId,
         badgeCode: selectedBadgeCode,
       });
 

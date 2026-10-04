@@ -18,6 +18,9 @@ import {
   Calendar,
   MapPin,
 } from 'lucide-react';
+import { validateForm } from '../../utils/validation';
+import { manualAttendeeFormSchema, checkinNoteFormSchema } from '../../schemas/checkin.schema';
+
 
 export const CheckInPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -48,6 +51,7 @@ export const CheckInPage: React.FC = () => {
   // Note Modal State for Mark Attended
   const [noteModalAttendee, setNoteModalAttendee] = useState<AttendeeRosterItem | null>(null);
   const [organizerNoteInput, setOrganizerNoteInput] = useState('');
+  const [noteError, setNoteError] = useState<string | null>(null);
   const [isSubmittingNote, setIsSubmittingNote] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -202,10 +206,13 @@ export const CheckInPage: React.FC = () => {
   const handleAddManualAttendee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEventId) return;
-    if (!manualForm.name.trim() || !manualForm.email.trim()) {
-      setManualError('Please provide both full name and email address.');
+
+    const validation = validateForm(manualAttendeeFormSchema, manualForm);
+    if (!validation.success) {
+      setManualError(validation.error || 'Please check the attendee details.');
       return;
     }
+
     setIsSubmittingManual(true);
     setManualError(null);
     try {
@@ -647,6 +654,13 @@ export const CheckInPage: React.FC = () => {
             </div>
 
             <div className="space-y-3">
+              {noteError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                  <span>{noteError}</span>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1.5">
                   Organizer's Note <span className="text-gray-400 font-normal">(Optional)</span>
@@ -655,7 +669,10 @@ export const CheckInPage: React.FC = () => {
                   rows={3}
                   placeholder="e.g. Participated actively in the design sprint, contributed insightful ideas..."
                   value={organizerNoteInput}
-                  onChange={(e) => setOrganizerNoteInput(e.target.value)}
+                  onChange={(e) => {
+                    setOrganizerNoteInput(e.target.value);
+                    if (noteError) setNoteError(null);
+                  }}
                   className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#63474D] resize-none"
                 />
                 <p className="text-[11px] text-gray-500 mt-1">
@@ -668,7 +685,10 @@ export const CheckInPage: React.FC = () => {
               <button
                 type="button"
                 disabled={isSubmittingNote}
-                onClick={() => setNoteModalAttendee(null)}
+                onClick={() => {
+                  setNoteError(null);
+                  setNoteModalAttendee(null);
+                }}
                 className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 cursor-pointer"
               >
                 Cancel
@@ -677,9 +697,18 @@ export const CheckInPage: React.FC = () => {
                 type="button"
                 disabled={isSubmittingNote}
                 onClick={async () => {
+                  const validation = validateForm(checkinNoteFormSchema, {
+                    organizerNote: organizerNoteInput.trim() || undefined,
+                  });
+                  if (!validation.success) {
+                    setNoteError(validation.error || 'Invalid note.');
+                    return;
+                  }
+
                   setIsSubmittingNote(true);
                   try {
                     await handleMarkAttended(noteModalAttendee, organizerNoteInput.trim() || undefined);
+                    setNoteError(null);
                     setNoteModalAttendee(null);
                   } finally {
                     setIsSubmittingNote(false);

@@ -22,6 +22,8 @@ import {
   saveCloudinaryConfig,
 } from '../../utils/cloudinary';
 import { formatDateForInput, getCalendarTile } from '../../utils/date';
+import { validateForm } from '../../utils/validation';
+import { editEventSchema } from '../../schemas/event.schema';
 
 interface EditEventModalProps {
   event: Event | null;
@@ -130,16 +132,9 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    if (!formData.title.trim()) {
-      setErrorMsg('Event Title is required.');
-      return;
-    }
-    if (!formData.location.trim()) {
-      setErrorMsg('Event Place/Location is required.');
-      return;
-    }
-    if (!formData.date) {
-      setErrorMsg('Event Date is required.');
+    const validation = validateForm(editEventSchema, formData);
+    if (!validation.success) {
+      setErrorMsg(validation.error);
       return;
     }
 

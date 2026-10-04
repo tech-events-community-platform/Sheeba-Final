@@ -9,6 +9,7 @@ export const PublicLayout: React.FC = () => {
   const authRoutes = [
     '/login',
     '/register',
+    '/verify-otp',
     '/pending-approval',
     '/contact',
     '/sponsor/auth',

@@ -23,6 +23,7 @@ import {
 } from '../../components/ui/SocialIcons';
 import { api } from '../../services/api';
 import type { ISponsorshipApplication } from '../../types/sponsorship';
+import { sponsorExpressInterestSchema, validateForm } from '../../schemas';
 
 export const SponsorApplicationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -69,6 +70,24 @@ export const SponsorApplicationDetailPage: React.FC = () => {
 
   const handleExpressInterestOrDecline = async (status: 'INTERESTED' | 'DECLINED') => {
     if (!application) return;
+
+    const payload = {
+      applicationId: application.id,
+      status,
+      package_name: selectedPackage || undefined,
+      pledged_amount: pledgedAmount !== undefined ? pledgedAmount : undefined,
+    };
+
+    const validation = validateForm(sponsorExpressInterestSchema, payload);
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0] || 'Invalid deal parameters.';
+      setFeedbackMessage({
+        type: 'error',
+        text: firstError,
+      });
+      return;
+    }
+
     try {
       setActionLoading(true);
       setFeedbackMessage(null);

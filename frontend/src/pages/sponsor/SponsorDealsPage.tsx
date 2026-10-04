@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { ISponsorshipDeal } from '../../types/sponsorship';
+import { sponsorDealNotesSchema, validateForm } from '../../schemas';
 
 export const SponsorDealsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'INTERESTED' | 'DECLINED'>('INTERESTED');
@@ -56,6 +57,16 @@ export const SponsorDealsPage: React.FC = () => {
   };
 
   const handleSaveNotes = async (dealId: string) => {
+    const validation = validateForm(sponsorDealNotesSchema, {
+      status: activeTab,
+      sponsor_notes: notesDraft,
+    });
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0] || 'Invalid notes.';
+      alert(firstError);
+      return;
+    }
+
     try {
       setUpdatingId(dealId);
       await api.sponsorship.updateDeal(dealId, {

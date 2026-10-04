@@ -13,7 +13,9 @@ export class ReportController {
       const eventId = req.params.id as string;
       const userId = req.user!.userId;
       const userRole = req.user!.role;
-      const forceRefresh = req.query.refresh === 'true';
+      const forceRefresh =
+        req.query.refresh === 'true' ||
+        (req.query.refresh as unknown) === true;
 
       const report = await ReportService.getEventReport(
         eventId,

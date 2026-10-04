@@ -3,8 +3,10 @@ import type { User, UserRole } from '../types/user';
 import { api, getAuthToken } from '../services/api';
 
 export interface RegisterResult {
-  user: User;
+  user?: User;
   isPendingApproval?: boolean;
+  requireOtp?: boolean;
+  email?: string;
   message?: string;
 }
 
@@ -32,6 +34,7 @@ interface AuthContextType {
     phone?: string;
     bio?: string;
   }) => Promise<RegisterResult>;
+  verifyRegistrationOtp: (email: string, otp: string) => Promise<User>;
   loginSponsor: (email: string, password: string) => Promise<User>;
   registerSponsor: (data: {
     full_name: string;
@@ -153,15 +156,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const res = await api.auth.register(userData);
-      if (!res.isPendingApproval && res.user) {
+      if (!res.isPendingApproval && !res.requireOtp && res.user) {
         setUser(res.user);
         localStorage.setItem('sheba_auth_user', JSON.stringify(res.user));
       }
       return {
         user: res.user,
         isPendingApproval: res.isPendingApproval,
+        requireOtp: res.requireOtp ?? (userData.role !== 'ORGANIZER'),
+        email: res.email || userData.email,
         message: res.message,
       };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyRegistrationOtp = async (email: string, otp: string): Promise<User> => {
+    setIsLoading(true);
+    try {
+      const res = await api.auth.verifyRegistrationOtp({ email, otp });
+      setUser(res.user);
+      localStorage.setItem('sheba_auth_user', JSON.stringify(res.user));
+      return res.user;
     } finally {
       setIsLoading(false);
     }
@@ -244,6 +261,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         applyForOrganizer,
         switchRole,
         register,
+        verifyRegistrationOtp,
         logout,
         refreshUser,
       }}
