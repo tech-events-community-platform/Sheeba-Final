@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { ISponsorshipApplication } from '../../types/sponsorship';
+import { sponsorExploreFilterSchema, validateForm } from '../../schemas';
 
 const CATEGORIES = [
   'All Categories',
@@ -34,6 +35,12 @@ export const SponsorExplorePage: React.FC = () => {
       setLoading(true);
       const params: any = {};
       if (query.trim()) params.search = query.trim();
+
+      const validation = validateForm(sponsorExploreFilterSchema, params);
+      if (!validation.success) {
+        console.warn('Invalid explore filter params:', validation.errors);
+        return;
+      }
 
       const data = await api.sponsorship.exploreApplications(params);
       setAllApplications(data || []);
@@ -236,11 +243,23 @@ export const SponsorExplorePage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Middle: Category Pill + Description */}
-                <div className="flex items-center gap-2 min-w-0">
+                {/* Middle: Category Pill + Social Proof Badges + Description */}
+                <div className="flex items-center gap-1.5 min-w-0">
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-[#FFA686]/20 text-[#63474D] border border-[#FFA686]/30 shrink-0">
                     {app.category}
                   </span>
+                  {app.affiliations?.past_sponsors && app.affiliations.past_sponsors.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-900 border border-amber-200 shrink-0 flex items-center gap-1">
+                      <img src="/sponsor-icon.webp" alt="Sponsor" className="w-3 h-3 object-contain shrink-0" />
+                      <span>Proven Backers</span>
+                    </span>
+                  )}
+                  {app.affiliations?.speakers && app.affiliations.speakers.length > 0 && (
+                    <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-[#63474D]/10 text-[#63474D] border border-[#63474D]/20 shrink-0 items-center gap-1">
+                      <img src="/speaker-icon.webp" alt="Speaker" className="w-3 h-3 object-contain shrink-0" />
+                      <span>{app.affiliations.speakers.length} Speaker{app.affiliations.speakers.length > 1 ? 's' : ''}</span>
+                    </span>
+                  )}
                   <p className="text-xs text-[#523e43] truncate font-normal">
                     {app.description}
                   </p>

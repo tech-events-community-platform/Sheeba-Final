@@ -10,6 +10,11 @@ import {
   XCircle,
   AlertCircle,
   Globe,
+  Mic,
+  Handshake,
+  Trophy,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import {
   LinkedInIcon,
@@ -23,6 +28,7 @@ import {
 } from '../../components/ui/SocialIcons';
 import { api } from '../../services/api';
 import type { ISponsorshipApplication } from '../../types/sponsorship';
+import { sponsorExpressInterestSchema, validateForm } from '../../schemas';
 
 export const SponsorApplicationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -69,6 +75,24 @@ export const SponsorApplicationDetailPage: React.FC = () => {
 
   const handleExpressInterestOrDecline = async (status: 'INTERESTED' | 'DECLINED') => {
     if (!application) return;
+
+    const payload = {
+      applicationId: application.id,
+      status,
+      package_name: selectedPackage || undefined,
+      pledged_amount: pledgedAmount !== undefined ? pledgedAmount : undefined,
+    };
+
+    const validation = validateForm(sponsorExpressInterestSchema, payload);
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0] || 'Invalid deal parameters.';
+      setFeedbackMessage({
+        type: 'error',
+        text: firstError,
+      });
+      return;
+    }
+
     try {
       setActionLoading(true);
       setFeedbackMessage(null);
@@ -90,6 +114,14 @@ export const SponsorApplicationDetailPage: React.FC = () => {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const formatExternalLink = (url?: string) => {
+    if (!url) return '';
+    const trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    if (trimmed.startsWith('@')) return `https://t.me/${trimmed.substring(1)}`;
+    return `https://${trimmed}`;
   };
 
   const getSocialLogo = (platform: string) => {
@@ -299,6 +331,214 @@ export const SponsorApplicationDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ROW: Past Sponsors, Partners, Co-Organizers, and Speakers */}
+      {(() => {
+        const affiliations = application.affiliations;
+        const hasAffiliations = Boolean(
+          affiliations &&
+            ((affiliations.past_sponsors && affiliations.past_sponsors.length > 0) ||
+              (affiliations.partners && affiliations.partners.length > 0) ||
+              (affiliations.co_organizers && affiliations.co_organizers.length > 0) ||
+              (affiliations.speakers && affiliations.speakers.length > 0))
+        );
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-start py-5 border-b border-gray-200">
+            <div className="md:col-span-4 space-y-1">
+              <h2 className="font-serif text-lg sm:text-xl font-bold text-[#2D1F23]">
+                Past Sponsors, Partners, Co-Organizers, and Speakers
+              </h2>
+              <p className="text-xs text-gray-400">
+                Track record, previous sponsors, partners, co-organizers, and notable speakers
+              </p>
+              <div className="pt-1">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#63474D] bg-[#63474D]/10 px-2.5 py-0.5 rounded-full">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#63474D]" />
+                  Verified Associations
+                </span>
+              </div>
+            </div>
+
+            <div className="md:col-span-8 space-y-5">
+              {hasAffiliations ? (
+                <div className="space-y-6">
+                  {/* Row 1: Past Sponsors & Partners */}
+                  {((affiliations?.past_sponsors && affiliations.past_sponsors.length > 0) ||
+                    (affiliations?.partners && affiliations.partners.length > 0)) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 items-start">
+                      {/* 1. Previously Sponsored By */}
+                      {affiliations?.past_sponsors && affiliations.past_sponsors.length > 0 ? (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2">
+                            <img src="/sponsor-icon.webp" alt="Past Sponsors" className="w-5 h-5 object-contain shrink-0" />
+                            <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-gray-700">
+                              Previously Sponsored By ({affiliations.past_sponsors.length})
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {affiliations.past_sponsors.map((ps, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 bg-stone-50 border border-stone-200 rounded-xl flex items-center justify-between gap-2 shadow-2xs hover:border-[#63474D]/40 transition-colors"
+                              >
+                                <span className="font-bold text-xs sm:text-sm text-gray-900 truncate">{ps.name}</span>
+                                {ps.website && (
+                                  <a
+                                    href={formatExternalLink(ps.website)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1 text-stone-400 hover:text-[#63474D] rounded-lg hover:bg-stone-200/60 transition-colors shrink-0"
+                                    title="Sponsor Website"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : <div />}
+
+                      {/* 2. Partners & Collaborators */}
+                      {affiliations?.partners && affiliations.partners.length > 0 ? (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2">
+                            <img src="/partner-icon.webp" alt="Partners" className="w-5 h-5 object-contain shrink-0" />
+                            <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-gray-700">
+                              Partners & Collaborators ({affiliations.partners.length})
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {affiliations.partners.map((pt, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 bg-stone-50 border border-stone-200 rounded-xl flex items-center justify-between gap-2 shadow-2xs hover:border-[#63474D]/40 transition-colors"
+                              >
+                                <span className="font-bold text-xs sm:text-sm text-gray-900 truncate">{pt.name}</span>
+                                {pt.social && (
+                                  <a
+                                    href={formatExternalLink(pt.social)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1 text-stone-400 hover:text-[#63474D] rounded-lg hover:bg-stone-200/60 transition-colors shrink-0"
+                                    title="Partner Website / Profile"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : <div />}
+                    </div>
+                  )}
+
+                  {/* Divider line between Row 1 and Row 2 */}
+                  {((affiliations?.past_sponsors && affiliations.past_sponsors.length > 0) ||
+                    (affiliations?.partners && affiliations.partners.length > 0)) &&
+                   ((affiliations?.co_organizers && affiliations.co_organizers.length > 0) ||
+                    (affiliations?.speakers && affiliations.speakers.length > 0)) && (
+                    <div className="border-t border-gray-200/90" />
+                  )}
+
+                  {/* Row 2: Co-Organizers & Speakers */}
+                  {((affiliations?.co_organizers && affiliations.co_organizers.length > 0) ||
+                    (affiliations?.speakers && affiliations.speakers.length > 0)) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 items-start">
+                      {/* 3. Event Co-Organizers */}
+                      {affiliations?.co_organizers && affiliations.co_organizers.length > 0 ? (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2">
+                            <img src="/co-organizer-icon.webp" alt="Co-Organizers" className="w-5 h-5 object-contain shrink-0" />
+                            <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-gray-700">
+                              Event Co-Organizers ({affiliations.co_organizers.length})
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {affiliations.co_organizers.map((co, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 bg-stone-50 border border-stone-200 rounded-xl flex items-center justify-between gap-2 shadow-2xs hover:border-[#63474D]/40 transition-colors"
+                              >
+                                <span className="font-bold text-xs sm:text-sm text-gray-900 truncate">
+                                  {co.name}
+                                </span>
+                                {co.social && (
+                                  <a
+                                    href={formatExternalLink(co.social)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1 text-stone-400 hover:text-[#63474D] rounded-lg hover:bg-stone-200/60 transition-colors shrink-0"
+                                    title="View Co-Organizer Profile / Website"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : <div />}
+
+                      {/* 4. Featured & Potential Speakers */}
+                      {affiliations?.speakers && affiliations.speakers.length > 0 ? (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2">
+                            <img src="/speaker-icon.webp" alt="Speakers" className="w-5 h-5 object-contain shrink-0" />
+                            <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-gray-700">
+                              Featured & Potential Speakers ({affiliations.speakers.length})
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {affiliations.speakers.map((spk, idx) => (
+                              <div
+                                key={idx}
+                                className="p-3 bg-stone-50 border border-stone-200 rounded-xl flex items-start justify-between gap-2 shadow-2xs hover:border-[#63474D]/40 transition-colors"
+                              >
+                                <div className="min-w-0">
+                                  <span className="font-bold text-xs sm:text-sm text-gray-900 block truncate">
+                                    {spk.name}
+                                  </span>
+                                  {spk.role && (
+                                    <span className="text-[11px] text-gray-600 block line-clamp-1 mt-0.5">
+                                      {spk.role}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {spk.social && (
+                                  <a
+                                    href={formatExternalLink(spk.social)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1 text-stone-400 hover:text-[#63474D] rounded-lg hover:bg-stone-200/60 transition-colors shrink-0"
+                                    title="View Speaker Profile / Social"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : <div />}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 bg-stone-50/70 border border-stone-200/80 rounded-xl text-xs text-stone-600 flex items-center gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-stone-400 shrink-0" />
+                  <span>
+                    Organized independently by <strong>{application.organizer_organization || application.organizer_name}</strong>. No external co-organizers or past sponsors listed for this pitch.
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ROW 3: Direct Organizer Contact Card (Structured like the before two) */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-start py-4 border-b border-gray-200">

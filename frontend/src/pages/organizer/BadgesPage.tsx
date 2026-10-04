@@ -12,7 +12,11 @@ import {
   Search,
   X,
   Users,
+  AlertCircle,
 } from 'lucide-react';
+import { validateForm } from '../../utils/validation';
+import { awardBadgeFormSchema, bulkAwardBadgeFormSchema } from '../../schemas/badge.schema';
+
 
 export const BadgesPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -34,6 +38,7 @@ export const BadgesPage: React.FC = () => {
   const [targetAttendee, setTargetAttendee] = useState<AttendeeRosterItem | null>(null);
   const [selectedBadgeCode, setSelectedBadgeCode] = useState<BadgeCode>('participant');
   const [isSubmittingAward, setIsSubmittingAward] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
   // 1. Fetch Events & Sort (Ongoing → Upcoming → Past)
@@ -120,6 +125,7 @@ export const BadgesPage: React.FC = () => {
 
   // Open Award Modal for Single Attendee
   const openSingleAwardModal = (attendee: AttendeeRosterItem) => {
+    setModalError(null);
     setTargetAttendee(attendee);
     setModalMode('single');
     // Default to a badge they don't already have
@@ -134,6 +140,7 @@ export const BadgesPage: React.FC = () => {
   // Open Award Modal for Bulk Selection
   const openBulkAwardModal = () => {
     if (selectedIds.length === 0) return;
+    setModalError(null);
     setTargetAttendee(null);
     setModalMode('bulk');
     setSelectedBadgeCode('participant');
@@ -142,8 +149,30 @@ export const BadgesPage: React.FC = () => {
 
   // Shared Award Badge Submission (Section 7: calls shared endpoint)
   const handleConfirmAward = async () => {
-    if (!selectedEventId) return;
+    if (modalMode === 'single') {
+      const validation = validateForm(awardBadgeFormSchema, {
+        eventId: selectedEventId,
+        attendeeId: targetAttendee?.attendeeId || targetAttendee?.id || '',
+        selectedBadgeCode,
+      });
+      if (!validation.success) {
+        setModalError(validation.error || 'Please select an event, attendee, and badge type.');
+        return;
+      }
+    } else {
+      const validation = validateForm(bulkAwardBadgeFormSchema, {
+        eventId: selectedEventId,
+        selectedIds,
+        selectedBadgeCode,
+      });
+      if (!validation.success) {
+        setModalError(validation.error || 'Please select attendees and badge type.');
+        return;
+      }
+    }
+
     setIsSubmittingAward(true);
+    setModalError(null);
 
     try {
       if (modalMode === 'single' && targetAttendee) {
@@ -172,7 +201,7 @@ export const BadgesPage: React.FC = () => {
       await loadAttendedHolders(selectedEventId);
       setTimeout(() => setSuccessToast(null), 5000);
     } catch (err: any) {
-      alert(err.message || 'Failed to award badge.');
+      setModalError(err.message || 'Failed to award badge.');
     } finally {
       setIsSubmittingAward(false);
     }
@@ -433,6 +462,13 @@ export const BadgesPage: React.FC = () => {
             </div>
 
             <div className="space-y-3">
+              {modalError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
               <label className="text-xs font-bold text-[#2D1F23] block">
                 Choose Badge Type to Approve:
               </label>

@@ -3,6 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import {
+  sponsorForgotOtpStep1Schema,
+  sponsorForgotOtpStep2Schema,
+  sponsorResetPasswordStep3Schema,
+  validateForm,
+} from '../../schemas';
+import {
   KeyRound,
   Lock,
   ArrowLeft,
@@ -53,12 +59,13 @@ export const SponsorForgotPasswordPage: React.FC = () => {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const cleanEmail = email.trim();
-    if (!cleanEmail) {
-      setErrorMsg('Please enter your corporate work email.');
+    const validation = validateForm(sponsorForgotOtpStep1Schema, { email });
+    if (!validation.success) {
+      setErrorMsg(validation.errors.email || 'Please enter your corporate work email.');
       return;
     }
 
+    const cleanEmail = email.trim();
     setIsLoading(true);
     try {
       const res = await api.auth.sponsor.sendOtp(cleanEmail);
@@ -95,12 +102,13 @@ export const SponsorForgotPasswordPage: React.FC = () => {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const cleanOtp = otp.trim();
-    if (!cleanOtp || cleanOtp.length !== 6) {
-      setErrorMsg('Please enter the complete 6-digit verification code.');
+    const validation = validateForm(sponsorForgotOtpStep2Schema, { otp });
+    if (!validation.success) {
+      setErrorMsg(validation.errors.otp || 'Please enter the complete 6-digit verification code.');
       return;
     }
 
+    const cleanOtp = otp.trim();
     setIsLoading(true);
     try {
       const res = await api.auth.sponsor.verifyOtp(email.trim(), cleanOtp);
@@ -119,13 +127,9 @@ export const SponsorForgotPasswordPage: React.FC = () => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (newPassword.length < 6) {
-      setErrorMsg('Password must be at least 6 characters long.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setErrorMsg('Passwords do not match. Please re-enter.');
+    const validation = validateForm(sponsorResetPasswordStep3Schema, { newPassword, confirmPassword });
+    if (!validation.success) {
+      setErrorMsg(validation.errors.newPassword || validation.errors.confirmPassword || 'Invalid password.');
       return;
     }
 
@@ -168,9 +172,8 @@ export const SponsorForgotPasswordPage: React.FC = () => {
       <div className="flex items-center justify-center gap-2 max-w-xs mx-auto">
         <div className="flex items-center gap-1.5 text-xs font-bold">
           <span
-            className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-              step >= 1 ? 'bg-[#63474D] text-white' : 'bg-gray-200 text-gray-500'
-            }`}
+            className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${step >= 1 ? 'bg-[#63474D] text-white' : 'bg-gray-200 text-gray-500'
+              }`}
           >
             {step > 1 ? '✓' : '1'}
           </span>
@@ -181,9 +184,8 @@ export const SponsorForgotPasswordPage: React.FC = () => {
         <div className={`h-0.5 w-6 ${step >= 2 ? 'bg-[#63474D]' : 'bg-gray-200'}`} />
         <div className="flex items-center gap-1.5 text-xs font-bold">
           <span
-            className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-              step >= 2 ? 'bg-[#63474D] text-white' : 'bg-gray-200 text-gray-500'
-            }`}
+            className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${step >= 2 ? 'bg-[#63474D] text-white' : 'bg-gray-200 text-gray-500'
+              }`}
           >
             {step > 2 ? '✓' : '2'}
           </span>
@@ -194,9 +196,8 @@ export const SponsorForgotPasswordPage: React.FC = () => {
         <div className={`h-0.5 w-6 ${step >= 3 ? 'bg-[#63474D]' : 'bg-gray-200'}`} />
         <div className="flex items-center gap-1.5 text-xs font-bold">
           <span
-            className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-              step === 3 ? 'bg-[#63474D] text-white' : 'bg-gray-200 text-gray-500'
-            }`}
+            className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${step === 3 ? 'bg-[#63474D] text-white' : 'bg-gray-200 text-gray-500'
+              }`}
           >
             3
           </span>
@@ -258,9 +259,8 @@ export const SponsorForgotPasswordPage: React.FC = () => {
 
             {/* Local dev notice */}
             <div className="p-3 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl flex items-start gap-2 text-[11px] text-gray-600">
-              <Terminal className="w-3.5 h-3.5 text-[#63474D] flex-shrink-0 mt-0.5" />
               <p>
-                <strong>Local Dev Note:</strong> If live SMTP/Resend is not yet connected in <code className="font-mono bg-white px-1 py-0.5 rounded border border-gray-200">.env</code>, your 6-digit OTP is also logged in real-time to the backend terminal!
+                <strong>Notice:</strong> Your 6-digit verification code will be dispatched to your corporate email via Brevo.
               </p>
             </div>
           </form>
@@ -312,9 +312,8 @@ export const SponsorForgotPasswordPage: React.FC = () => {
                 type="button"
                 onClick={handleResendOtp}
                 disabled={resendCooldown > 0 || isLoading}
-                className={`inline-flex items-center gap-1.5 font-semibold ${
-                  resendCooldown > 0 ? 'text-gray-400 cursor-not-allowed' : 'text-[#63474D] hover:underline'
-                }`}
+                className={`inline-flex items-center gap-1.5 font-semibold ${resendCooldown > 0 ? 'text-gray-400 cursor-not-allowed' : 'text-[#63474D] hover:underline'
+                  }`}
               >
                 <RotateCw className={`w-3.5 h-3.5 ${resendCooldown > 0 ? '' : 'text-[#FFA686]'}`} />
                 <span>

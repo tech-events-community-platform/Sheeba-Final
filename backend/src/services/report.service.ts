@@ -700,7 +700,7 @@ export class ReportService {
     const cacheKey = `report:${eventId}`;
     CacheService.del(cacheKey);
 
-    return this.getEventReport(eventId, userId, userRole, true);
+    return this.getEventReport(eventId, userId, userRole, false);
   }
 
   // Reset report to fresh AI draft

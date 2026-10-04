@@ -20,6 +20,8 @@ import {
   saveCloudinaryConfig,
   uploadToCloudinary,
 } from '../../utils/cloudinary';
+import { validateForm } from '../../utils/validation';
+import { eventFormSchema } from '../../schemas/event.schema';
 
 interface QuestionDraft {
   id: string;
@@ -253,20 +255,19 @@ export const CreateEventPage: React.FC = () => {
   };
 
   const validate = () => {
-    const errs: Record<string, string> = {};
-    if (!formData.title.trim()) errs.title = 'Event title is required';
-    if (selectedTypeOption === 'other' && !customTypeInput.trim()) {
-      errs.customType = 'Please specify what type of event this is';
+    const result = validateForm(eventFormSchema, {
+      ...formData,
+      selectedTypeOption,
+      customTypeInput,
+    });
+
+    if (!result.success) {
+      setErrors(result.errors);
+      return false;
     }
-    if (!formData.date) errs.date = 'Event date is required';
-    if (!formData.location.trim()) errs.location = 'Venue or location is required';
-    if (!formData.description.trim()) errs.description = 'Description is required';
-    if (formData.capacity <= 0) errs.capacity = 'Capacity must be at least 1';
-    if (formData.isPaid && formData.ticketPrice <= 0) {
-      errs.ticketPrice = 'Paid tickets must specify a price in ETB (e.g. 150)';
-    }
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
+
+    setErrors({});
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

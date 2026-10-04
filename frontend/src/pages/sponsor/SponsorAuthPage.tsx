@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { GoogleLogin } from '@react-oauth/google';
+import { loginSchema, sponsorRegisterSchema, validateForm } from '../../schemas';
 import {
   Building2,
   Lock,
@@ -73,6 +74,14 @@ export const SponsorAuthPage: React.FC = () => {
 
     try {
       if (authMode === 'login') {
+        const validation = validateForm(loginSchema, { email, password, role: 'SPONSOR' });
+        if (!validation.success) {
+          const firstError = Object.values(validation.errors || {})[0] || 'Invalid credentials.';
+          setErrorMsg(firstError);
+          setIsLoading(false);
+          return;
+        }
+
         const loggedUser = await loginSponsor(email.trim(), password);
         if (loggedUser.role === 'SPONSOR') {
           navigate('/sponsor');
@@ -80,9 +89,19 @@ export const SponsorAuthPage: React.FC = () => {
           navigate('/app');
         }
       } else {
-        // Register Sponsor
-        if (!fullName.trim() || !companyName.trim() || !companyPhone.trim()) {
-          setErrorMsg('Please complete all required company and representative fields.');
+        const validation = validateForm(sponsorRegisterSchema, {
+          fullName,
+          email,
+          password,
+          companyName,
+          industryCategory,
+          companyPhone,
+          companyWebsite: companyWebsite.trim() || undefined,
+        });
+
+        if (!validation.success) {
+          const firstError = Object.values(validation.errors || {})[0] || 'Please complete all required company and representative fields.';
+          setErrorMsg(firstError);
           setIsLoading(false);
           return;
         }
@@ -145,11 +164,10 @@ export const SponsorAuthPage: React.FC = () => {
               setErrorMsg(null);
               setIsPendingReview(false);
             }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              authMode === 'login'
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${authMode === 'login'
                 ? 'bg-white text-[#2D1F23] shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
-            }`}
+              }`}
           >
             Sponsor Sign In
           </button>
@@ -160,11 +178,10 @@ export const SponsorAuthPage: React.FC = () => {
               setErrorMsg(null);
               setIsPendingReview(false);
             }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              authMode === 'signup'
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${authMode === 'signup'
                 ? 'bg-white text-[#2D1F23] shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
-            }`}
+              }`}
           >
             Apply to Sponsor
           </button>

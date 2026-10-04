@@ -131,6 +131,8 @@ CREATE TABLE IF NOT EXISTS otp_verifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_otp_verifications_email ON otp_verifications(email);
+ALTER TABLE otp_verifications ADD COLUMN IF NOT EXISTS purpose VARCHAR(50) DEFAULT 'password_reset';
+ALTER TABLE otp_verifications ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 
 -- Check-Ins Table (Section 4: Door Duty check-ins with soft-void Undo support)
 CREATE TABLE IF NOT EXISTS check_ins (
@@ -254,6 +256,8 @@ CREATE TABLE IF NOT EXISTS sponsorship_applications (
     contact_email VARCHAR(255) NOT NULL,
     contact_telegram VARCHAR(100),
     pitch_deck_url TEXT,
+    socials JSONB DEFAULT '{}'::jsonb,
+    affiliations JSONB DEFAULT '{}'::jsonb,
     status VARCHAR(50) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'UNDER_REVIEW', 'FUNDED', 'CLOSED')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -279,6 +283,9 @@ CREATE INDEX IF NOT EXISTS idx_sponsorship_applications_status ON sponsorship_ap
 CREATE INDEX IF NOT EXISTS idx_sponsorship_deals_application_id ON sponsorship_deals(application_id);
 CREATE INDEX IF NOT EXISTS idx_sponsorship_deals_sponsor_id ON sponsorship_deals(sponsor_id);
 CREATE INDEX IF NOT EXISTS idx_sponsorship_deals_status ON sponsorship_deals(status);
+
+ALTER TABLE sponsorship_applications ADD COLUMN IF NOT EXISTS socials JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE sponsorship_applications ADD COLUMN IF NOT EXISTS affiliations JSONB DEFAULT '{}'::jsonb;
 
 -- Event Reports Table (Persists organizer customizations & notes for event impact reports)
 CREATE TABLE IF NOT EXISTS event_reports (
