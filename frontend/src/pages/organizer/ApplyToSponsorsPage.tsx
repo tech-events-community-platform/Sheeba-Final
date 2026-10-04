@@ -18,11 +18,108 @@ import {
   Layers,
   ArrowRight,
   TrendingUp,
+  X,
 } from 'lucide-react';
+import {
+  LinkedInIcon,
+  XIcon,
+  TikTokIcon,
+  YouTubeIcon,
+  InstagramIcon,
+  TelegramIcon,
+  GlobeIcon,
+} from '../../components/ui/SocialIcons';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import type { ISponsorshipApplication, ISponsorshipPackage } from '../../types/sponsorship';
 import { applyToSponsorsFormSchema, validateForm } from '../../schemas';
+
+interface SocialPlatformDef {
+  id: string;
+  name: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  icon: (className?: string) => React.ReactNode;
+  placeholder: string;
+}
+
+const SOCIAL_PLATFORMS: SocialPlatformDef[] = [
+  {
+    id: 'Website',
+    name: 'Website',
+    color: '#2563EB',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    icon: (cls = 'w-5 h-5') => <GlobeIcon className={cls} />,
+    placeholder: 'https://yourwebsite.com',
+  },
+  {
+    id: 'LinkedIn',
+    name: 'LinkedIn',
+    color: '#0A66C2',
+    bgColor: 'bg-sky-50',
+    borderColor: 'border-[#0A66C2]/30',
+    icon: (cls = 'w-5 h-5') => <LinkedInIcon className={cls} />,
+    placeholder: 'https://linkedin.com/in/... or company page',
+  },
+  {
+    id: 'X',
+    name: 'X',
+    color: '#000000',
+    bgColor: 'bg-stone-100',
+    borderColor: 'border-stone-300',
+    icon: (cls = 'w-5 h-5') => <XIcon className={cls} />,
+    placeholder: 'https://x.com/... or @handle',
+  },
+  {
+    id: 'TikTok',
+    name: 'TikTok',
+    color: '#000000',
+    bgColor: 'bg-stone-100',
+    borderColor: 'border-stone-300',
+    icon: (cls = 'w-5 h-5') => <TikTokIcon className={cls} />,
+    placeholder: 'https://tiktok.com/@... or @handle',
+  },
+  {
+    id: 'YouTube',
+    name: 'YouTube',
+    color: '#FF0000',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
+    icon: (cls = 'w-5 h-5') => <YouTubeIcon className={cls} />,
+    placeholder: 'https://youtube.com/@channel',
+  },
+  {
+    id: 'Instagram',
+    name: 'Instagram',
+    color: '#E4405F',
+    bgColor: 'bg-rose-50',
+    borderColor: 'border-rose-200',
+    icon: (cls = 'w-5 h-5') => <InstagramIcon className={cls} />,
+    placeholder: 'https://instagram.com/... or @handle',
+  },
+  {
+    id: 'Telegram',
+    name: 'Telegram',
+    color: '#24A1DE',
+    bgColor: 'bg-sky-50',
+    borderColor: 'border-sky-200',
+    icon: (cls = 'w-5 h-5') => <TelegramIcon className={cls} />,
+    placeholder: 'https://t.me/... or @username',
+  },
+];
+
+const getSocialConfig = (platform: string): SocialPlatformDef => {
+  const p = (platform || '').toLowerCase();
+  if (p.includes('linkedin')) return SOCIAL_PLATFORMS[1];
+  if (p === 'x' || p.includes('twitter')) return SOCIAL_PLATFORMS[2];
+  if (p.includes('tiktok')) return SOCIAL_PLATFORMS[3];
+  if (p.includes('youtube')) return SOCIAL_PLATFORMS[4];
+  if (p.includes('instagram')) return SOCIAL_PLATFORMS[5];
+  if (p.includes('telegram')) return SOCIAL_PLATFORMS[6];
+  return SOCIAL_PLATFORMS[0]; // Website
+};
 
 const CATEGORIES = [
   'Technology & AI',
@@ -43,6 +140,7 @@ const EVENT_TYPES = [
   'Community Meetup',
   'Festival / Cultural',
   'Networking Gala',
+  'Other',
 ];
 
 export const ApplyToSponsorsPage: React.FC = () => {
@@ -55,9 +153,13 @@ export const ApplyToSponsorsPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Form state for pitch
+  const [selectedEventType, setSelectedEventType] = useState('Conference');
+  const [customEventType, setCustomEventType] = useState('');
+  const [reportUrls, setReportUrls] = useState<string[]>(['']);
+  const [showMaxReportsMsg, setShowMaxReportsMsg] = useState(false);
+
   const [formData, setFormData] = useState({
     event_title: '',
-    event_type: 'Conference',
     category: 'Technology & AI',
     expected_date: '',
     location: '',
@@ -70,8 +172,29 @@ export const ApplyToSponsorsPage: React.FC = () => {
     contact_phone: user?.phone || '',
     contact_email: user?.email || '',
     contact_telegram: '',
-    pitch_deck_url: '',
   });
+
+  const handleAddReportUrl = () => {
+    if (reportUrls.length < 2) {
+      setReportUrls((prev) => [...prev, '']);
+      setShowMaxReportsMsg(false);
+    } else {
+      setShowMaxReportsMsg(true);
+    }
+  };
+
+  const handleRemoveReportUrl = (index: number) => {
+    setReportUrls((prev) => prev.filter((_, i) => i !== index));
+    setShowMaxReportsMsg(false);
+  };
+
+  const handleReportUrlChange = (index: number, val: string) => {
+    setReportUrls((prev) => {
+      const updated = [...prev];
+      updated[index] = val;
+      return updated;
+    });
+  };
 
   // Dynamic sponsor packages
   const [packages, setPackages] = useState<ISponsorshipPackage[]>([
@@ -80,15 +203,29 @@ export const ApplyToSponsorsPage: React.FC = () => {
     { name: 'Community Supporter', amount: 5000, perks: 'Logo on digital backdrop, 2 passes, mention during opening remarks' },
   ]);
 
-  // Dynamic organizer socials
+  // Dynamic organizer socials (2 by default)
   const [socials, setSocials] = useState<{ platform: string; url: string }[]>([
     { platform: 'LinkedIn', url: '' },
-    { platform: 'X (Twitter)', url: '' },
     { platform: 'Website', url: '' },
   ]);
+  const [isAddSocialOpen, setIsAddSocialOpen] = useState(false);
 
   const handleAddSocial = () => {
-    setSocials((prev) => [...prev, { platform: '', url: '' }]);
+    setIsAddSocialOpen(true);
+  };
+
+  const handleSelectPlatformToAdd = (platformId: string) => {
+    setSocials((prev) => [...prev, { platform: platformId, url: '' }]);
+    setIsAddSocialOpen(false);
+  };
+
+  const isPlatformAdded = (platformId: string) => {
+    const target = platformId.toLowerCase();
+    return socials.some((s) => {
+      const p = s.platform.toLowerCase();
+      if (target === 'x') return p === 'x' || p.includes('twitter');
+      return p.includes(target);
+    });
   };
 
   const handleRemoveSocial = (index: number) => {
@@ -166,6 +303,31 @@ export const ApplyToSponsorsPage: React.FC = () => {
     }
 
     try {
+
+      const socialsMap: Record<string, string> = {};
+      socials.forEach((s) => {
+        if (s.platform.trim() && s.url.trim()) {
+          socialsMap[s.platform.trim()] = s.url.trim();
+        }
+      });
+
+      const finalEventType =
+        selectedEventType === 'Other'
+          ? customEventType.trim() || 'Other'
+          : selectedEventType;
+
+      const validReportUrls = reportUrls.map((u) => u.trim()).filter(Boolean);
+      const combinedReportUrl = validReportUrls.join(', ');
+
+      const payload = {
+        ...formData,
+        event_type: finalEventType,
+        pitch_deck_url: combinedReportUrl,
+        packages,
+        socials: socialsMap,
+      };
+
+     
       await api.sponsorship.createApplication(payload);
       setSuccessMessage('Your pitch has been published to the Sponsor Marketplace! Verified sponsors can now discover your event and reach out directly.');
       
@@ -176,7 +338,6 @@ export const ApplyToSponsorsPage: React.FC = () => {
       // Reset form
       setFormData({
         event_title: '',
-        event_type: 'Conference',
         category: 'Technology & AI',
         expected_date: '',
         location: '',
@@ -189,8 +350,15 @@ export const ApplyToSponsorsPage: React.FC = () => {
         contact_phone: user?.phone || '',
         contact_email: user?.email || '',
         contact_telegram: '',
-        pitch_deck_url: '',
       });
+      setSelectedEventType('Conference');
+      setCustomEventType('');
+      setReportUrls(['']);
+      setShowMaxReportsMsg(false);
+      setSocials([
+        { platform: 'LinkedIn', url: '' },
+        { platform: 'Website', url: '' },
+      ]);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to submit application. Please try again.');
     } finally {
@@ -214,10 +382,6 @@ export const ApplyToSponsorsPage: React.FC = () => {
       <div className="bg-gradient-to-r from-[#63474D] via-[#755259] to-[#8C6067] rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-6 w-64 h-64 bg-white/5 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-[#FFA686] text-xs font-semibold uppercase tracking-wider mb-3">
-            <Sparkles className="w-3.5 h-3.5" />
-            Organizer Funding Hub
-          </div>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-white tracking-tight">
             Apply to Sponsors & Get Funded
           </h1>
@@ -280,11 +444,11 @@ export const ApplyToSponsorsPage: React.FC = () => {
       {activeTab === 'create' && (
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Section 1: Event Identity & Vision */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#AA767C]/15 shadow-sm space-y-6">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#AA767C]/15 shadow-xl shadow-stone-900/10 space-y-6">
             <div className="border-b border-gray-100 pb-4">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[#63474D]" />
-                1. Upcoming Event Details
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-3">
+                <img src="/upcoming-details-icon.webp" alt="Upcoming Event Details" className="w-10 h-10 object-contain shrink-0" />
+                <span>1. Upcoming Event Details</span>
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 mt-1">
                 Tell sponsors what event you plan to host. You don't need to have created the event yet!
@@ -311,8 +475,8 @@ export const ApplyToSponsorsPage: React.FC = () => {
                   Event Format / Type *
                 </label>
                 <select
-                  value={formData.event_type}
-                  onChange={(e) => setFormData({ ...formData, event_type: e.target.value })}
+                  value={selectedEventType}
+                  onChange={(e) => setSelectedEventType(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-sm transition-all bg-white"
                 >
                   {EVENT_TYPES.map((t) => (
@@ -321,6 +485,16 @@ export const ApplyToSponsorsPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                {selectedEventType === 'Other' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Specify your event format / type"
+                    value={customEventType}
+                    onChange={(e) => setCustomEventType(e.target.value)}
+                    className="mt-2 w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-sm transition-all bg-white"
+                  />
+                )}
               </div>
 
               <div>
@@ -379,9 +553,13 @@ export const ApplyToSponsorsPage: React.FC = () => {
                   type="number"
                   min="1"
                   required
-                  value={formData.expected_attendees}
-                  onChange={(e) => setFormData({ ...formData, expected_attendees: Number(e.target.value) })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-sm transition-all"
+                  placeholder="e.g. 250"
+                  value={formData.expected_attendees || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData({ ...formData, expected_attendees: val === '' ? ('' as any) : Number(val) });
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-sm transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
 
@@ -400,12 +578,13 @@ export const ApplyToSponsorsPage: React.FC = () => {
                 />
               </div>
 
-              <div className="md:col-span-2">
+              {/* Pitch Overview (Left) */}
+              <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
                   Pitch & Concept Overview *
                 </label>
                 <textarea
-                  rows={4}
+                  rows={5}
                   required
                   placeholder="Describe your event objective, why sponsors should back it, and what value or exposure attendees and brands will gain..."
                   value={formData.description}
@@ -413,16 +592,66 @@ export const ApplyToSponsorsPage: React.FC = () => {
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-sm transition-all"
                 />
               </div>
+
+              {/* Past Sheeba Event Reports Space (Right) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                    Past Sheeba Event Report (PDF)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddReportUrl}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#63474D]/10 hover:bg-[#63474D]/20 text-[#63474D] text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    <span>Add +</span>
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Add your Sheeba report of a successful event. Paste the Google Drive URL of your verified PDF report:
+                </p>
+
+                <div className="space-y-2.5 pt-1">
+                  {reportUrls.map((url, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        placeholder={idx === 0 ? "Google Drive URL for Report #1" : "Google Drive URL for Report #2"}
+                        value={url}
+                        onChange={(e) => handleReportUrlChange(idx, e.target.value)}
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm transition-all"
+                      />
+                      {reportUrls.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveReportUrl(idx)}
+                          className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors cursor-pointer shrink-0"
+                          title="Remove report URL"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {showMaxReportsMsg && (
+                  <p className="text-xs font-semibold text-red-600 mt-1">
+                    You can only put maximum 2 reports for sponsorships
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Section 2: Sponsorship Packages & Financials */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#AA767C]/15 shadow-sm space-y-6">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#AA767C]/15 shadow-xl shadow-stone-900/10 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
               <div>
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-[#63474D]" />
-                  2. Sponsorship Packages & Tiers
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-3">
+                  <img src="/packages-icon.webp" alt="Sponsorship Packages" className="w-10 h-10 object-contain shrink-0" />
+                  <span>2. Sponsorship Packages & Tiers</span>
                 </h2>
                 <p className="text-xs sm:text-sm text-gray-500 mt-1">
                   Define tiered contribution options so sponsors know what deliverables they will receive.
@@ -528,11 +757,11 @@ export const ApplyToSponsorsPage: React.FC = () => {
           </div>
 
           {/* Section 3: Direct Organizer Contacts */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#AA767C]/15 shadow-sm space-y-6">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#AA767C]/15 shadow-xl shadow-stone-900/10 space-y-6">
             <div className="border-b border-gray-100 pb-4">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <img src="/phone-icon.webp" alt="Phone" className="w-5 h-5 object-contain" />
-                3. Direct Organizer Contact Channels
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-3">
+                <img src="/phone-icon.webp" alt="Phone" className="w-10 h-10 object-contain shrink-0" />
+                <span>3. Direct Organizer Contact Channels</span>
               </h2>
               <p className="text-xs sm:text-sm text-gray-500 mt-1">
                 Sponsors will communicate with you directly off-platform via phone, email, and telegram once interested!
@@ -598,88 +827,146 @@ export const ApplyToSponsorsPage: React.FC = () => {
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5 flex items-center gap-1.5">
-                  <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
-                  Pitch Deck / PDF Link (Google Drive, Dropbox, Notion - Optional)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://drive.google.com/your-pitch-deck.pdf"
-                  value={formData.pitch_deck_url}
-                  onChange={(e) => setFormData({ ...formData, pitch_deck_url: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-sm transition-all"
-                />
-              </div>
-
-              {/* Organizer Socials for Sponsors */}
-              <div className="md:col-span-2 pt-4 border-t border-gray-100 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">
-                      Organizer Social Media Links (Displayed to Sponsors)
-                    </h3>
-                    <p className="text-[11px] text-gray-500">
-                      Add any social platforms you want displayed on your proposal card for sponsors (LinkedIn, X, TikTok, Website, etc.).
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddSocial}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#63474D]/10 hover:bg-[#63474D]/20 text-[#63474D] text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    <PlusCircle className="w-3.5 h-3.5" />
-                    <span>Add Social</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2.5">
-                  {socials.map((soc, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Platform (e.g. LinkedIn, X, TikTok)"
-                        value={soc.platform}
-                        onChange={(e) => handleSocialChange(idx, 'platform', e.target.value)}
-                        className="w-1/3 px-3 py-2 rounded-xl border border-gray-200 focus:border-[#63474D] outline-none text-xs font-semibold"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Link or Handle (e.g. https://linkedin.com/in/... or @handle)"
-                        value={soc.url}
-                        onChange={(e) => handleSocialChange(idx, 'url', e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:border-[#63474D] outline-none text-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSocial(idx)}
-                        className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-                        title="Remove link"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+              {/* Organizer Socials for Sponsors (Left-aligned, comfortable width) */}
+              <div className="md:col-span-2 pt-6 border-t border-gray-100">
+                <div className="w-full max-w-xl space-y-3.5">
+                  <div className="flex items-center justify-between pb-1">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">
+                        Organizer Social Media Links (Displayed to Sponsors)
+                      </h3>
+                      <p className="text-[11px] text-gray-500">
+                        Add any social platforms you want displayed on your proposal card
+                      </p>
                     </div>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={handleAddSocial}
+                      disabled={socials.length >= SOCIAL_PLATFORMS.length}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#63474D]/10 hover:bg-[#63474D]/20 text-[#63474D] text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>Add Social</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {socials.map((soc, idx) => {
+                      const config = getSocialConfig(soc.platform);
+                      return (
+                        <div key={idx} className="flex items-center gap-2.5">
+                          {/* Communicating only through icon */}
+                          <div
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border ${config.borderColor} ${config.bgColor} shadow-2xs transition-transform hover:scale-105`}
+                            style={{ color: config.color }}
+                            title={config.name}
+                          >
+                            {config.icon('w-5 h-5')}
+                          </div>
+                          <input
+                            type="text"
+                            placeholder={config.placeholder}
+                            value={soc.url}
+                            onChange={(e) => handleSocialChange(idx, 'url', e.target.value)}
+                            className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-xs sm:text-sm transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSocial(idx)}
+                            className="p-2.5 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 transition-colors cursor-pointer shrink-0"
+                            title={`Remove ${config.name} link`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Submit Action */}
-          <div className="flex items-center justify-between bg-stone-100 p-5 rounded-2xl border border-stone-200">
-            <div className="flex items-center gap-2 text-xs text-gray-600">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Visible instantly on verified sponsors' Explore feed.</span>
-            </div>
+          {/* Modal / Popup for Adding Social Media */}
+          {isAddSocialOpen && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in"
+              onClick={() => setIsAddSocialOpen(false)}
+            >
+              <div
+                className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-gray-200 space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">
+                      Add Social Media
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Select a platform to add to your pitch
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSocialOpen(false)}
+                    className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
 
+                <div className="grid grid-cols-2 gap-2.5">
+                  {SOCIAL_PLATFORMS.map((plat) => {
+                    const isAdded = isPlatformAdded(plat.id);
+                    return (
+                      <button
+                        key={plat.id}
+                        type="button"
+                        disabled={isAdded}
+                        onClick={() => handleSelectPlatformToAdd(plat.id)}
+                        className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all ${
+                          isAdded
+                            ? 'opacity-40 bg-gray-50 border-gray-200 cursor-not-allowed'
+                            : 'bg-white hover:bg-stone-50 border-gray-200 hover:border-[#63474D] hover:shadow-xs cursor-pointer group'
+                        }`}
+                      >
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${plat.bgColor} transition-transform ${isAdded ? '' : 'group-hover:scale-110'}`}
+                          style={{ color: plat.color }}
+                        >
+                          {plat.icon('w-5 h-5')}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="block text-xs font-bold text-gray-900 truncate">
+                            {plat.name}
+                          </span>
+                          <span className={`block text-[10px] ${isAdded ? 'text-gray-400 font-medium' : 'text-[#63474D] font-semibold'}`}>
+                            {isAdded ? 'Added' : 'Select'}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Submit Action: Centered, Green, Text Below, No Background Card */}
+          <div className="flex flex-col items-center justify-center text-center pt-4 pb-2 space-y-2.5">
             <button
               type="submit"
               disabled={loading}
-              className="px-8 py-3.5 rounded-xl bg-[#63474D] hover:bg-[#4E373C] text-white font-bold text-sm shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-9 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg hover:shadow-emerald-600/25 transition-all flex items-center gap-2.5 cursor-pointer disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
             >
               <Send className="w-4 h-4" />
-              {loading ? 'Publishing Pitch...' : 'Publish Pitch to Sponsors'}
+              <span>{loading ? 'Publishing Pitch...' : 'Publish Pitch to Sponsors'}</span>
             </button>
+
+            <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 font-medium">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Visible instantly on verified sponsors' Explore feed.</span>
+            </div>
           </div>
         </form>
       )}
