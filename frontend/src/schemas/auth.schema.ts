@@ -91,9 +91,41 @@ export const switchRoleSchema = z.object({
   switchPassword: z.string().min(1, 'Please enter your account password.'),
 });
 
+export const verifyRegistrationOtpSchema = z.object({
+  email: z.string().trim().email('Please enter a valid email address.'),
+  otp: z.string().trim().regex(/^\d{6}$/, 'Please enter the complete 6-digit verification code.'),
+});
+
+export const resendRegistrationOtpSchema = z.object({
+  email: z.string().trim().email('Please enter a valid email address.'),
+});
+
+export const forgotOtpStep1Schema = z.object({
+  email: z.string().trim().email('Please enter a valid email address.'),
+});
+
+export const forgotOtpStep2Schema = z.object({
+  otp: z.string().trim().regex(/^\d{6}$/, 'Please enter the complete 6-digit verification code.'),
+});
+
+export const resetPasswordStep3Schema = z
+  .object({
+    newPassword: z.string().min(6, 'Password must be at least 6 characters long.'),
+    confirmPassword: z.string().min(1, 'Please confirm your new password.'),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match. Please re-enter.',
+    path: ['confirmPassword'],
+  });
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type VerifyRegistrationOtpInput = z.infer<typeof verifyRegistrationOtpSchema>;
+export type ResendRegistrationOtpInput = z.infer<typeof resendRegistrationOtpSchema>;
+export type ForgotOtpStep1Input = z.infer<typeof forgotOtpStep1Schema>;
+export type ForgotOtpStep2Input = z.infer<typeof forgotOtpStep2Schema>;
+export type ResetPasswordStep3Input = z.infer<typeof resetPasswordStep3Schema>;
 export type SponsorRegisterInput = z.infer<typeof sponsorRegisterSchema>;
 export type SponsorForgotOtpStep1Input = z.infer<typeof sponsorForgotOtpStep1Schema>;
 export type SponsorForgotOtpStep2Input = z.infer<typeof sponsorForgotOtpStep2Schema>;

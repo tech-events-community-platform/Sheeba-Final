@@ -81,7 +81,7 @@ export class AuthService {
     phone?: string;
     bio?: string;
     organization?: string;
-  }): Promise<{ user: any; token: string; isPendingApproval?: boolean; message?: string }> {
+  }): Promise<{ user: any; token: string; isPendingApproval?: boolean; requireOtp?: boolean; email?: string; message?: string }> {
     const {
       email,
       password,
@@ -132,35 +132,34 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, salt);
     const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(full_name)}&background=63474D&color=fff`;
 
-    const result = await query<IUser>(
-      `INSERT INTO users (
-        email, password_hash, full_name, role, phone, bio, organization,
-        avatar_url, visibility, member_since, is_active, approval_status,
-        is_organizer, organizer_approval_status, organizer_bio
-       )
-       VALUES (LOWER($1), $2, $3, $4, $5, $6, $7, $8, 'public', 'August 2026', $9, $10, $11, $12, $13)
-       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, created_at, updated_at`,
-      [
-        email,
-        passwordHash,
-        full_name,
-        normalizedRole,
-        phone,
-        bio,
-        organization,
-        avatarUrl,
-        initialIsActive,
-        initialApprovalStatus,
-        isOrganizer,
-        isOrganizer ? 'pending' : 'none',
-        isOrganizer ? bio : null,
-      ]
-    );
-
-    const rawUser = result.rows[0];
-
-    // If organizer: registration goes to pending approval queue
+    // If organizer: preserve existing registration and review workflow
     if (isOrganizer) {
+      const result = await query<IUser>(
+        `INSERT INTO users (
+          email, password_hash, full_name, role, phone, bio, organization,
+          avatar_url, visibility, member_since, is_active, approval_status,
+          is_organizer, organizer_approval_status, organizer_bio
+         )
+         VALUES (LOWER($1), $2, $3, $4, $5, $6, $7, $8, 'public', 'August 2026', $9, $10, $11, $12, $13)
+         RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, created_at, updated_at`,
+        [
+          email,
+          passwordHash,
+          full_name,
+          normalizedRole,
+          phone,
+          bio,
+          organization,
+          avatarUrl,
+          initialIsActive,
+          initialApprovalStatus,
+          isOrganizer,
+          'pending',
+          bio,
+        ]
+      );
+
+      const rawUser = result.rows[0];
       const user = this.formatUserResponse(rawUser);
       return {
         user,
@@ -170,7 +169,134 @@ export class AuthService {
       };
     }
 
-    // Attendee: immediate active login token
+    // Attendee: Generate 6-digit OTP with 3-minute expiration and dispatch via Brevo
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const expiryMinutes = parseInt(process.env.OTP_EXPIRATION_MINUTES || '3', 10);
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    // Delete older unverified registration OTPs for this email
+    await query('DELETE FROM otp_verifications WHERE LOWER(email) = LOWER($1) AND purpose = $2', [email.trim(), 'registration']);
+
+    // Store OTP securely with metadata
+    await query(
+      `INSERT INTO otp_verifications (email, otp_code, expires_at, attempts, purpose, metadata)
+       VALUES (LOWER($1), $2, $3, 0, 'registration', $4)`,
+      [
+        email.trim(),
+        otpCode,
+        expiresAt,
+        JSON.stringify({
+          full_name: full_name.trim(),
+          password_hash: passwordHash,
+          phone: phone ? phone.trim() : null,
+          bio: bio ? bio.trim() : null,
+          organization: organization ? organization.trim() : null,
+        }),
+      ]
+    );
+
+    // Dispatch Brevo OTP email
+    await EmailService.sendAttendeeRegistrationOtpEmail(email.trim(), otpCode, full_name.trim());
+
+    return {
+      user: null,
+      token: '',
+      requireOtp: true,
+      email: email.toLowerCase().trim(),
+      message: `A 6-digit verification code has been dispatched to your email. It will expire in ${expiryMinutes} minutes.`,
+    };
+  }
+
+  /**
+   * Verify 6-digit OTP code for Attendee registration and create user account
+   */
+  static async verifyRegistrationOtp(data: {
+    email: string;
+    otp: string;
+  }): Promise<{ user: any; token: string; message: string }> {
+    const cleanEmail = data.email.toLowerCase().trim();
+    const cleanOtp = data.otp.trim();
+
+    const otpRes = await query(
+      `SELECT id, otp_code, expires_at, attempts, metadata
+       FROM otp_verifications
+       WHERE LOWER(email) = LOWER($1) AND purpose = 'registration'
+       ORDER BY created_at DESC LIMIT 1`,
+      [cleanEmail]
+    );
+
+    if (!otpRes.rowCount || otpRes.rowCount === 0) {
+      const err: any = new Error('No pending registration found for this email. Please register again.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const record = otpRes.rows[0];
+
+    // Limit failed attempts
+    if (record.attempts >= 5) {
+      await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+      const err: any = new Error('Too many failed attempts. Please register again.');
+      err.statusCode = 429;
+      throw err;
+    }
+
+    // Backend enforcement of 3-minute expiration
+    if (new Date() > new Date(record.expires_at)) {
+      await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+      const err: any = new Error('Verification code has expired (3-minute limit). Please register again or request a new code.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Match verification code
+    if (record.otp_code !== cleanOtp) {
+      await query('UPDATE otp_verifications SET attempts = attempts + 1 WHERE id = $1', [record.id]);
+      const remaining = 5 - (record.attempts + 1);
+      const err: any = new Error(`Invalid verification code. You have ${remaining} attempt(s) remaining.`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Parse registration metadata
+    const meta = typeof record.metadata === 'string' ? JSON.parse(record.metadata) : (record.metadata || {});
+
+    // Ensure account wasn't registered in the interim
+    const existing = await query<IUser>('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+    if (existing.rowCount && existing.rowCount > 0) {
+      await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+      const err: any = new Error('An account with this email already exists. Please sign in.');
+      err.statusCode = 409;
+      throw err;
+    }
+
+    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(meta.full_name || 'Attendee')}&background=63474D&color=fff`;
+
+    const result = await query<IUser>(
+      `INSERT INTO users (
+        email, password_hash, full_name, role, phone, bio, organization,
+        avatar_url, visibility, member_since, is_active, approval_status,
+        is_organizer, organizer_approval_status
+       )
+       VALUES (LOWER($1), $2, $3, 'attendee', $4, $5, $6, $7, 'public', 'August 2026', TRUE, 'approved', FALSE, 'none')
+       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, created_at, updated_at`,
+      [
+        cleanEmail,
+        meta.password_hash,
+        meta.full_name,
+        meta.phone || null,
+        meta.bio || null,
+        meta.organization || null,
+        avatarUrl,
+      ]
+    );
+
+    const rawUser = result.rows[0];
+
+    // Clean up OTP record
+    await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+
+    // Generate authenticated attendee session token
     const token = signAuthToken({
       userId: rawUser.id,
       email: rawUser.email,
@@ -180,14 +306,64 @@ export class AuthService {
 
     const user = this.formatUserResponse(rawUser);
 
-    // Trigger separate "Welcome to Sheeba" email after account creation (Section 2)
+    // Dispatch welcome email asynchronously
     try {
       await EmailService.sendWelcomeEmail(rawUser.email, rawUser.full_name || 'Attendee');
     } catch (emailErr) {
       console.warn('Welcome email dispatch failed:', emailErr);
     }
 
-    return { user, token, isPendingApproval: false };
+    return {
+      user,
+      token,
+      message: 'Account verified and registered successfully! Welcome to Sheeba.',
+    };
+  }
+
+  /**
+   * Resend 6-digit OTP for pending Attendee registration
+   */
+  static async resendRegistrationOtp(email: string): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = email.toLowerCase().trim();
+
+    const existingUser = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+    if (existingUser.rowCount && existingUser.rowCount > 0) {
+      const err: any = new Error('An account with this email is already registered and verified. Please sign in.');
+      err.statusCode = 409;
+      throw err;
+    }
+
+    const otpRes = await query(
+      `SELECT id, metadata FROM otp_verifications
+       WHERE LOWER(email) = LOWER($1) AND purpose = 'registration'
+       ORDER BY created_at DESC LIMIT 1`,
+      [cleanEmail]
+    );
+
+    if (!otpRes.rowCount || otpRes.rowCount === 0) {
+      const err: any = new Error('No pending registration found for this email. Please submit your registration first.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const record = otpRes.rows[0];
+    const meta = typeof record.metadata === 'string' ? JSON.parse(record.metadata) : (record.metadata || {});
+
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const expiryMinutes = parseInt(process.env.OTP_EXPIRATION_MINUTES || '3', 10);
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+    await query(
+      'UPDATE otp_verifications SET otp_code = $1, expires_at = $2, attempts = 0, created_at = NOW() WHERE id = $3',
+      [otpCode, expiresAt, record.id]
+    );
+
+    await EmailService.sendAttendeeRegistrationOtpEmail(cleanEmail, otpCode, meta.full_name || 'Attendee');
+
+    return {
+      success: true,
+      message: `A fresh 6-digit verification code has been dispatched to your email. It will expire in ${expiryMinutes} minutes.`,
+    };
   }
 
   static async loginUser(data: {
@@ -512,61 +688,222 @@ export class AuthService {
   }
 
   static async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = email.toLowerCase().trim();
     const result = await query<IUser>(
       'SELECT id, email, full_name FROM users WHERE LOWER(email) = LOWER($1)',
-      [email.trim()]
+      [cleanEmail]
     );
 
     if (result.rowCount && result.rowCount > 0) {
       const user = result.rows[0];
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
+      const otpCode = crypto.randomInt(100000, 1000000).toString();
+      const expiryMinutes = parseInt(process.env.OTP_EXPIRATION_MINUTES || '3', 10);
+      const expiresAt = new Date(Date.now() + expiryMinutes * 60 * 1000);
 
+      // Clean up previous unverified password reset OTPs for this email
+      await query('DELETE FROM otp_verifications WHERE LOWER(email) = LOWER($1) AND purpose = $2', [cleanEmail, 'password_reset']);
+
+      // Store OTP in database with 3-minute expiration
       await query(
-        'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-        [user.id, resetToken, expiresAt]
+        `INSERT INTO otp_verifications (email, otp_code, expires_at, attempts, purpose)
+         VALUES (LOWER($1), $2, $3, 0, 'password_reset')`,
+        [cleanEmail, otpCode, expiresAt]
       );
 
+      // Dispatch Brevo OTP email
       try {
-        await EmailService.sendPasswordResetEmail(user.email, resetToken, user.full_name || 'Attendee');
+        await EmailService.sendForgotPasswordOtpEmail(user.email, otpCode, user.full_name || 'User');
       } catch (e) {
-        console.warn('Password reset email dispatch error:', e);
+        console.warn('Password reset OTP email dispatch error:', e);
       }
     }
 
     return {
       success: true,
-      message: 'If an account exists with that email, a password reset link has been dispatched.',
+      message: 'If an account exists with that email, a 6-digit verification code has been dispatched. It will expire in 3 minutes.',
     };
   }
 
-  static async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
-    const tokenRes = await query(
-      'SELECT user_id, expires_at FROM password_reset_tokens WHERE token = $1',
-      [token]
+  /**
+   * Verify 6-digit OTP code for Forgot Password before resetting
+   */
+  static async verifyForgotPasswordOtp(email: string, otp: string): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = email.toLowerCase().trim();
+    const cleanOtp = otp.trim();
+
+    const otpRes = await query(
+      `SELECT id, otp_code, expires_at, attempts
+       FROM otp_verifications
+       WHERE LOWER(email) = LOWER($1) AND purpose = 'password_reset'
+       ORDER BY created_at DESC LIMIT 1`,
+      [cleanEmail]
     );
 
-    if (!tokenRes.rowCount || tokenRes.rowCount === 0) {
-      const err: any = new Error('Invalid or expired password reset token.');
+    if (!otpRes.rowCount || otpRes.rowCount === 0) {
+      const err: any = new Error('No active verification code found for this email. Please request a new code.');
       err.statusCode = 400;
       throw err;
     }
 
-    const { user_id, expires_at } = tokenRes.rows[0];
-    if (new Date() > new Date(expires_at)) {
-      const err: any = new Error('Password reset token has expired.');
+    const record = otpRes.rows[0];
+
+    // Limit failed attempts
+    if (record.attempts >= 5) {
+      await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+      const err: any = new Error('Too many failed attempts. Please request a new verification code.');
+      err.statusCode = 429;
+      throw err;
+    }
+
+    // Backend enforcement of 3-minute expiration
+    if (new Date() > new Date(record.expires_at)) {
+      await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+      const err: any = new Error('The verification code has expired (3-minute limit). Please request a fresh one.');
       err.statusCode = 400;
       throw err;
     }
 
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, user_id]);
-    await query('DELETE FROM password_reset_tokens WHERE token = $1', [token]);
+    // Match verification code
+    if (record.otp_code !== cleanOtp) {
+      await query('UPDATE otp_verifications SET attempts = attempts + 1 WHERE id = $1', [record.id]);
+      const remaining = 5 - (record.attempts + 1);
+      const err: any = new Error(`Invalid verification code. You have ${remaining} attempt(s) remaining.`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Mark verified
+    await query('UPDATE otp_verifications SET is_verified = TRUE WHERE id = $1', [record.id]);
 
     return {
       success: true,
-      message: 'Password has been reset successfully. You may now log in.',
-    };    
+      message: 'Code verified successfully! Please enter your new password below.',
+    };
+  }
+
+  /**
+   * Reset account password using verified OTP or legacy token
+   */
+  static async resetPassword(
+    tokenOrData: { token?: string; email?: string; otp?: string; newPassword?: string } | string,
+    maybePassword?: string
+  ): Promise<{ success: boolean; message: string }> {
+    let token: string | undefined;
+    let email: string | undefined;
+    let otp: string | undefined;
+    let newPassword: string;
+
+    if (typeof tokenOrData === 'string') {
+      token = tokenOrData;
+      newPassword = maybePassword || '';
+    } else {
+      token = tokenOrData.token;
+      email = tokenOrData.email;
+      otp = tokenOrData.otp;
+      newPassword = tokenOrData.newPassword || '';
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      const err: any = new Error('New password must be at least 6 characters long.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // 1. OTP-based reset
+    if (email && otp) {
+      const cleanEmail = email.toLowerCase().trim();
+      const cleanOtp = otp.trim();
+
+      const otpRes = await query(
+        `SELECT id, otp_code, expires_at, attempts, is_verified
+         FROM otp_verifications
+         WHERE LOWER(email) = LOWER($1) AND purpose = 'password_reset'
+         ORDER BY created_at DESC LIMIT 1`,
+        [cleanEmail]
+      );
+
+      if (!otpRes.rowCount || otpRes.rowCount === 0) {
+        const err: any = new Error('No active verification code found for this email. Please request a new one.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const record = otpRes.rows[0];
+
+      if (record.attempts >= 5) {
+        await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+        const err: any = new Error('Too many failed attempts. Please request a new verification code.');
+        err.statusCode = 429;
+        throw err;
+      }
+
+      if (new Date() > new Date(record.expires_at)) {
+        await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+        const err: any = new Error('The verification code has expired (3-minute limit). Please request a new one.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      if (!record.is_verified && record.otp_code !== cleanOtp) {
+        await query('UPDATE otp_verifications SET attempts = attempts + 1 WHERE id = $1', [record.id]);
+        const remaining = 5 - (record.attempts + 1);
+        const err: any = new Error(`Invalid verification code. You have ${remaining} attempt(s) remaining.`);
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // Check user exists
+      const userRes = await query<IUser>('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+      if (!userRes.rowCount || userRes.rowCount === 0) {
+        await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+        const err: any = new Error('No user account found with this email.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, userRes.rows[0].id]);
+      await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
+
+      return {
+        success: true,
+        message: 'Your password has been reset successfully. You may now log in.',
+      };
+    }
+
+    // 2. Legacy Token-based reset
+    if (token) {
+      const tokenRes = await query(
+        'SELECT user_id, expires_at FROM password_reset_tokens WHERE token = $1',
+        [token]
+      );
+
+      if (!tokenRes.rowCount || tokenRes.rowCount === 0) {
+        const err: any = new Error('Invalid or expired password reset token.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const { user_id, expires_at } = tokenRes.rows[0];
+      if (new Date() > new Date(expires_at)) {
+        const err: any = new Error('Password reset token has expired.');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, user_id]);
+      await query('DELETE FROM password_reset_tokens WHERE token = $1', [token]);
+
+      return {
+        success: true,
+        message: 'Password has been reset successfully. You may now log in.',
+      };
+    }
+
+    const err: any = new Error('Reset token or email with OTP verification code is required.');
+    err.statusCode = 400;
+    throw err;
   }
 
   
@@ -920,10 +1257,6 @@ export class AuthService {
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-    console.log(`\n======================================================`);
-    console.log(`[Sponsor OTP Generated] 🔑 EMAIL: ${cleanEmail} | CODE: ${otpCode}`);
-    console.log(`======================================================\n`);
 
     // Delete older unverified OTPs for this email
     await query('DELETE FROM otp_verifications WHERE LOWER(email) = LOWER($1)', [cleanEmail]);

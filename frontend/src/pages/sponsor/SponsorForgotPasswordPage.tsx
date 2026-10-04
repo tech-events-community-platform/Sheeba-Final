@@ -259,9 +259,8 @@ export const SponsorForgotPasswordPage: React.FC = () => {
 
             {/* Local dev notice */}
             <div className="p-3 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl flex items-start gap-2 text-[11px] text-gray-600">
-              <Terminal className="w-3.5 h-3.5 text-[#63474D] flex-shrink-0 mt-0.5" />
               <p>
-                <strong>Local Dev Note:</strong> If live SMTP/Resend is not yet connected in <code className="font-mono bg-white px-1 py-0.5 rounded border border-gray-200">.env</code>, your 6-digit OTP is also logged in real-time to the backend terminal!
+                <strong>Notice:</strong> Your 6-digit verification code will be dispatched to your corporate email via Brevo.
               </p>
             </div>
           </form>

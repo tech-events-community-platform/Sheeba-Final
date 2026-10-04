@@ -96,12 +96,17 @@ export const RegisterPage: React.FC = () => {
           },
         });
       } else {
-        // Attendee: context preserved across signup
+        // Attendee registration: ALWAYS navigate to OTP verification page
+        sessionStorage.setItem('sheeba_pending_otp_email', email.trim());
         if (redirectTarget) {
-          navigate(redirectTarget);
-        } else {
-          navigate('/app');
+          sessionStorage.setItem('sheeba_pending_otp_redirect', redirectTarget);
         }
+        navigate('/verify-otp', {
+          state: {
+            email: email.trim(),
+            redirect: redirectTarget,
+          },
+        });
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Registration failed. Please try again.');

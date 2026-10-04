@@ -57,10 +57,38 @@ export const forgotPasswordSchema = z.object({
   email: z.string().trim().email('Please provide a valid email address.'),
 });
 
-export const resetPasswordSchema = z.object({
-  token: z.string().trim().min(1, 'Reset token is required.'),
-  newPassword: z.string().min(6, 'Password must be at least 6 characters long.'),
+export const verifyRegistrationOtpSchema = z.object({
+  email: z.string().trim().email('Please provide a valid email address.'),
+  otp: z.string().trim().regex(/^\d{6}$/, 'Please provide a valid 6-digit verification code.'),
 });
+
+export const resendRegistrationOtpSchema = z.object({
+  email: z.string().trim().email('Please provide a valid email address.'),
+});
+
+export const verifyForgotPasswordOtpSchema = z.object({
+  email: z.string().trim().email('Please provide a valid email address.'),
+  otp: z.string().trim().regex(/^\d{6}$/, 'Please provide a valid 6-digit verification code.'),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().trim().optional(),
+    email: z.string().trim().email('Please provide a valid email address.').optional(),
+    otp: z.string().trim().regex(/^\d{6}$/, 'Please provide a valid 6-digit verification code.').optional(),
+    newPassword: z.string().min(6, 'Password must be at least 6 characters long.'),
+  })
+  .superRefine((data, ctx) => {
+    const hasToken = Boolean(data.token && data.token.length > 0);
+    const hasOtp = Boolean(data.email && data.otp && data.otp.length > 0);
+    if (!hasToken && !hasOtp) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Either reset token or email with OTP verification code is required.',
+        path: ['token'],
+      });
+    }
+  });
 
 export const googleAuthSchema = z.object({
   credential: z.string().trim().min(1, 'Google credential token is required.'),

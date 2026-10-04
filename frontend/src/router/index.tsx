@@ -17,6 +17,7 @@ import { EventRegistrationCheckoutPage } from '../pages/public/EventRegistration
 import { PublicProfilePage } from '../pages/public/PublicProfilePage';
 import { BadgeDetailPage } from '../pages/public/BadgeDetailPage';
 import { VerifyTicketPage } from '../pages/public/VerifyTicketPage';
+import { VerifyOtpPage } from '../pages/public/VerifyOtpPage';
 
 // Sponsor Pages & Layout
 import { SponsorLayout } from '../layouts/SponsorLayout';
@@ -65,6 +66,7 @@ export const router = createBrowserRouter([
       { index: true, element: <LandingPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <LoginPage /> },
+      { path: 'verify-otp', element: <VerifyOtpPage /> },
       { path: 'pending-approval', element: <PendingApprovalPage /> },
       { path: 'contact', element: <LoginPage /> },
       { path: 'search', element: <Navigate to="/" replace /> },

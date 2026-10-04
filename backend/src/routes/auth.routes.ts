@@ -8,6 +8,9 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  verifyRegistrationOtpSchema,
+  resendRegistrationOtpSchema,
+  verifyForgotPasswordOtpSchema,
   googleAuthSchema,
   applyOrganizerSchema,
   switchRoleSchema,
@@ -21,8 +24,12 @@ import {
 const router = Router();
 
 router.post('/register', authLimiter, validateBody(registerSchema), AuthController.register);
+router.post('/verify-registration-otp', authLimiter, validateBody(verifyRegistrationOtpSchema), AuthController.verifyRegistrationOtp);
+router.post('/resend-registration-otp', authLimiter, validateBody(resendRegistrationOtpSchema), AuthController.resendRegistrationOtp);
 router.post('/login', authLimiter, validateBody(loginSchema), AuthController.login);
 router.post('/forgot-password', authLimiter, validateBody(forgotPasswordSchema), AuthController.forgotPassword);
+router.post('/verify-otp', authLimiter, validateBody(verifyForgotPasswordOtpSchema), AuthController.verifyForgotPasswordOtp);
+router.post('/resend-forgot-password-otp', authLimiter, validateBody(forgotPasswordSchema), AuthController.forgotPassword);
 router.post('/google', authLimiter, validateBody(googleAuthSchema), AuthController.googleLogin);
 router.post('/reset-password', authLimiter, validateBody(resetPasswordSchema), AuthController.resetPassword);
 router.get('/me', authenticate, AuthController.getMe);

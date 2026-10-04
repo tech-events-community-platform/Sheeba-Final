@@ -26,7 +26,7 @@ export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
-  const isAuthPage = ['/login', '/register', '/pending-approval', '/sponsor/auth', '/sponsor/forgot-password'].includes(location.pathname);
+  const isAuthPage = ['/login', '/register', '/verify-otp', '/pending-approval', '/sponsor/auth', '/sponsor/forgot-password'].includes(location.pathname);
   const isExternalRegistration =
     location.pathname.startsWith('/e/') ||
     (location.pathname.startsWith('/events/') && location.pathname.includes('/register'));

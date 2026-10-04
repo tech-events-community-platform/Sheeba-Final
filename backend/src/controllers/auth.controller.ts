@@ -17,7 +17,28 @@ export class AuthController {
         organization,
       });
 
-      return sendSuccess(res, result, 'User registered successfully.', 201);
+      const statusCode = result.requireOtp ? 200 : 201;
+      return sendSuccess(res, result, result.message || 'User registered successfully.', statusCode);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async verifyRegistrationOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, otp } = req.body;
+      const result = await AuthService.verifyRegistrationOtp({ email, otp });
+      sendSuccess(res, result, result.message, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async resendRegistrationOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email } = req.body;
+      const result = await AuthService.resendRegistrationOtp(email);
+      sendSuccess(res, result, result.message);
     } catch (error) {
       next(error);
     }
@@ -93,10 +114,20 @@ export class AuthController {
     }
   }
 
+  static async verifyForgotPasswordOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, otp } = req.body;
+      const result = await AuthService.verifyForgotPasswordOtp(email, otp);
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { token, newPassword } = req.body;
-      const result = await AuthService.resetPassword(token, newPassword);
+      const { token, email, otp, newPassword } = req.body;
+      const result = await AuthService.resetPassword({ token, email, otp, newPassword });
       sendSuccess(res, result, result.message);
     } catch (error) {
       next(error);

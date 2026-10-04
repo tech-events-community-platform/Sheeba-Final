@@ -36,7 +36,7 @@ const runTests = async () => {
     assert(!(await bcrypt.compare('WrongPassword', hash)), 'Bcrypt rejects incorrect passwords');
 
     // QR Token Cryptography
-    const qrToken = generateTicketToken('ticket-123', 'event-456', '2026-09-20');
+    const qrToken = generateTicketToken('ticket-123', 'event-456', '2026-12-31');
     const decodedQr = verifyTicketToken(qrToken);
     assert(decodedQr.ticketId === 'ticket-123' && decodedQr.eventId === 'event-456', 'Dynamic QR pass token signed & verified');
     assert(typeof decodedQr.exp === 'number' && decodedQr.exp > 0, 'Token includes end-of-event-day exp timestamp');
@@ -105,8 +105,8 @@ const runTests = async () => {
     assert(adminLoginRes.status === 200 && adminLoginRes.body.data?.token, 'Admin logs in successfully with seeded credentials');
     const adminToken = adminLoginRes.body.data?.token;
 
-    // 3. Attendee Registration Flow
-    console.log('\n📦 4. Testing Attendee Direct Registration & Login...');
+    // 3. Attendee Registration Flow (Brevo OTP verification)
+    console.log('\n📦 4. Testing Attendee Registration with Brevo OTP Verification...');
     const testAttendeeEmail = `attendee_${Date.now()}@example.et`;
     const attendeeRegRes = await fetchHttp('/api/auth/register', {
       method: 'POST',
@@ -119,10 +119,24 @@ const runTests = async () => {
       },
     });
     assert(
-      attendeeRegRes.status === 201 &&
-      attendeeRegRes.body.data?.token &&
-      attendeeRegRes.body.data?.user?.approvalStatus === 'approved',
-      'Attendee registers and receives instant login token without approval block'
+      attendeeRegRes.status === 200 &&
+      attendeeRegRes.body.data?.requireOtp === true,
+      'Attendee registration dispatches Brevo OTP and returns requireOtp: true'
+    );
+
+    const otpDb = await query('SELECT otp_code FROM otp_verifications WHERE LOWER(email) = LOWER($1) AND purpose = $2', [testAttendeeEmail, 'registration']);
+    const attendeeVerifyRes = await fetchHttp('/api/auth/verify-registration-otp', {
+      method: 'POST',
+      body: {
+        email: testAttendeeEmail,
+        otp: otpDb.rows[0].otp_code,
+      },
+    });
+    assert(
+      attendeeVerifyRes.status === 201 &&
+      attendeeVerifyRes.body.data?.token &&
+      attendeeVerifyRes.body.data?.user?.approvalStatus === 'approved',
+      'Attendee verifies OTP and receives instant login token with approved status'
     );
 
     // 4. Organizer Registration & Approval Flow
@@ -204,7 +218,7 @@ const runTests = async () => {
     console.log('\n📦 6. Testing Single Account Upgrade, Admin Approval & Formal Credential-Gated Role Switching...');
     const upgradeEmail = `upgrade_${Date.now()}@example.et`;
     
-    // Step 1: Register as Attendee
+    // Step 1: Register as Attendee & Verify OTP
     const regAttendeeRes = await fetchHttp('/api/auth/register', {
       method: 'POST',
       body: {
@@ -214,9 +228,17 @@ const runTests = async () => {
         role: 'attendee',
       },
     });
-    assert(regAttendeeRes.status === 201 && regAttendeeRes.body.data?.token, 'Attendee registered successfully');
-    const attendeeToken = regAttendeeRes.body.data?.token;
-    const attendeeId = regAttendeeRes.body.data?.user?.id;
+    const otpUpgradeDb = await query('SELECT otp_code FROM otp_verifications WHERE LOWER(email) = LOWER($1) AND purpose = $2', [upgradeEmail, 'registration']);
+    const upgradeVerifyRes = await fetchHttp('/api/auth/verify-registration-otp', {
+      method: 'POST',
+      body: {
+        email: upgradeEmail,
+        otp: otpUpgradeDb.rows[0].otp_code,
+      },
+    });
+    assert(upgradeVerifyRes.status === 201 && upgradeVerifyRes.body.data?.token, 'Attendee registered successfully');
+    const attendeeToken = upgradeVerifyRes.body.data?.token;
+    const attendeeId = upgradeVerifyRes.body.data?.user?.id;
 
     // Step 2: Attempt duplicate registration (should return 409 conflict, NOT overwrite account)
     const duplicateRegRes = await fetchHttp('/api/auth/register', {
