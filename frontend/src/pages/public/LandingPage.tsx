@@ -5,6 +5,7 @@ import { RoleSpotlightSection } from '../../components/sections/RoleSpotlightSec
 import { HowItWorksSection } from '../../components/sections/HowItWorksSection';
 import { LiveTicketSimulatorSection } from '../../components/sections/LiveTicketSimulatorSection';
 import { StrideMilestoneCard } from '../../components/sections/StrideMilestoneCard';
+import { ContactUsSection } from '../../components/sections/ContactUsSection';
 import FadeIn from '../../components/FadeIn';
 import { ArrowRight } from 'lucide-react';
 
@@ -30,8 +31,12 @@ export const LandingPage: React.FC = () => {
       {/* 4. LIVE TICKET & BADGE DASHBOARD SIMULATOR */}
       <LiveTicketSimulatorSection />
 
-      {/* 5. MINIMALISTIC CLOSING CTA */}
+      {/* 5. CONTACT US SECTION (BREVO-POWERED INBOX DISPATCH) */}
+      <ContactUsSection id="contact" />
+
+      {/* 6. MINIMALISTIC CLOSING CTA */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6">
+
         <FadeIn direction="up">
           <div className="bg-gradient-to-r from-[#2D1F23] via-[#4A3238] to-[#63474D] text-white rounded-3xl p-8 sm:p-14 text-center space-y-6 shadow-2xl relative overflow-hidden">
             <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-[#FFA686]/10 rounded-full blur-3xl pointer-events-none" />

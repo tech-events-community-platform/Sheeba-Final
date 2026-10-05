@@ -1716,6 +1716,33 @@ export const api = {
       }
     },
   },
+
+  contact: {
+    sendMessage: async (payload: {
+      name: string;
+      email: string;
+      subject: string;
+      category?: string;
+      message: string;
+    }) => {
+      return requestApi<{ success: boolean; message: string; data?: any }>('/contact', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+  },
 };
+
+export interface ContactMessagePayload {
+  name: string;
+  email: string;
+  subject: string;
+  category?: string;
+  message: string;
+}
+
+export async function submitContactMessage(payload: ContactMessagePayload) {
+  return api.contact.sendMessage(payload);
+}
 
 

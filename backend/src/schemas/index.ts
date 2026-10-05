@@ -8,3 +8,5 @@ export * from './sponsorship.schema';
 export * from './user.schema';
 export * from './search.schema';
 export * from './ticket.schema';
+export * from './contact.schema';
+
