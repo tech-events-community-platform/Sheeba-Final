@@ -11,7 +11,6 @@ export const PublicLayout: React.FC = () => {
     '/register',
     '/verify-otp',
     '/pending-approval',
-    '/contact',
     '/sponsor/auth',
     '/sponsor/forgot-password',
   ];
@@ -65,7 +64,7 @@ export const PublicLayout: React.FC = () => {
       >
         <Outlet />
       </main>
-      {isHome && <Footer />}
+      {(isHome || location.pathname === '/contact') && <Footer />}
     </div>
   );
 };

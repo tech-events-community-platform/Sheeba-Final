@@ -10,16 +10,20 @@ export class EmailService {
     to: string,
     subject: string,
     html: string,
-    recipientName?: string
+    recipientName?: string,
+    replyTo?: { email: string; name?: string }
   ): Promise<void> {
     const apiKey = process.env.BREVO_API_KEY;
-    const senderEmail = process.env.BREVO_SENDER_EMAIL || 'hanannuru384@gmail.com';
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || 'sheebanet.events@gmail.com';
     const senderName = process.env.BREVO_SENDER_NAME || 'Sheeba';
 
     console.log(`\n======================================================`);
     console.log(`[EmailService] 📧 Dispatching Email to: ${to}`);
     console.log(`[EmailService] 📋 Subject: ${subject}`);
     console.log(`[EmailService] 🚀 Provider: Brevo (Sender: ${senderName} <${senderEmail}>)`);
+    if (replyTo) {
+      console.log(`[EmailService] ↩️ Reply-To: ${replyTo.name || replyTo.email} <${replyTo.email}>`);
+    }
     console.log(`======================================================\n`);
 
     if (!apiKey) {
@@ -32,6 +36,28 @@ export class EmailService {
     }
 
     try {
+      const payload: any = {
+        sender: {
+          name: senderName,
+          email: senderEmail,
+        },
+        to: [
+          {
+            email: to,
+            name: recipientName || to,
+          },
+        ],
+        subject,
+        htmlContent: html,
+      };
+
+      if (replyTo && replyTo.email) {
+        payload.replyTo = {
+          email: replyTo.email,
+          name: replyTo.name || replyTo.email,
+        };
+      }
+
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: {
@@ -39,20 +65,7 @@ export class EmailService {
           'api-key': apiKey,
           'content-type': 'application/json',
         },
-        body: JSON.stringify({
-          sender: {
-            name: senderName,
-            email: senderEmail,
-          },
-          to: [
-            {
-              email: to,
-              name: recipientName || to,
-            },
-          ],
-          subject,
-          htmlContent: html,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -61,7 +74,7 @@ export class EmailService {
           `[EmailService] ⚠️ Brevo API responded with error status ${response.status}:`,
           (errorData as any)?.message || response.statusText
         );
-        throw new Error('Failed to deliver email through Brevo service.');
+        throw new Error((errorData as any)?.message || 'Failed to deliver email through Brevo service.');
       }
 
       const resJson: any = await response.json().catch(() => ({}));
@@ -407,5 +420,131 @@ export class EmailService {
     `;
 
     await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Contact Us Notification Email to Sheeba Team
+   * Dispatched to the organization email (BREVO_SENDER_EMAIL) when a visitor submits the contact form.
+   */
+  static async sendContactUsNotification(data: {
+    name: string;
+    email: string;
+    subject: string;
+    category?: string;
+    message: string;
+  }): Promise<void> {
+    const teamEmail = process.env.BREVO_SENDER_EMAIL || 'sheebanet.events@gmail.com';
+    const emailSubject = `📬 [Contact Us] ${data.category ? `[${data.category}] ` : ''}${data.subject} - from ${data.name}`;
+    const formattedDate = new Date().toLocaleString('en-US', {
+      timeZone: 'Africa/Addis_Ababa',
+      dateStyle: 'full',
+      timeStyle: 'short',
+    });
+
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 32px 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">New Contact Form Submission</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 4px 12px rgba(99, 71, 77, 0.04);">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #F0E8E4; padding-bottom: 16px; margin-bottom: 20px;">
+            <span style="display: inline-block; background-color: #F3EAE6; color: #63474D; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 4px 12px; border-radius: 9999px;">
+              ${data.category || 'General Inquiry'}
+            </span>
+            <span style="font-size: 12px; color: #99878B;">
+              ${formattedDate} EAT
+            </span>
+          </div>
+
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 16px; line-height: 1.3;">
+            ${data.subject}
+          </h2>
+
+          <div style="background-color: #FAF7F5; border-left: 4px solid #63474D; border-radius: 8px; padding: 14px 18px; margin-bottom: 22px;">
+            <p style="margin: 0 0 6px 0; font-size: 13px; color: #756366;">
+              <strong style="color: #2D1F23;">From:</strong> ${data.name} &lt;<a href="mailto:${data.email}" style="color: #63474D; text-decoration: underline;">${data.email}</a>&gt;
+            </p>
+            <p style="margin: 0; font-size: 13px; color: #756366;">
+              <strong style="color: #2D1F23;">Topic:</strong> ${data.category || 'General Inquiry'}
+            </p>
+          </div>
+
+          <div style="margin-bottom: 24px;">
+            <p style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #AA767C; margin-bottom: 8px;">
+              Message Content:
+            </p>
+            <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #333; background-color: #FAF7F5; border: 1px solid #E8DDD7; border-radius: 12px; padding: 18px;">${data.message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+          </div>
+
+          <div style="text-align: center; margin-top: 24px;">
+            <a href="mailto:${data.email}?subject=Re: ${encodeURIComponent(data.subject)}" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px; display: inline-block;">
+              Reply Directly to ${data.name}
+            </a>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 24px; line-height: 1.4;">
+          This message was sent from the Sheeba Contact Us portal.<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(
+      teamEmail,
+      emailSubject,
+      htmlBody,
+      'Sheeba Team',
+      { email: data.email, name: data.name }
+    );
+  }
+
+  /**
+   * Confirmation / Auto-response receipt to the visitor
+   */
+  static async sendContactAcknowledgmentEmail(toEmail: string, fullName: string, subject: string): Promise<void> {
+    const emailSubject = `We received your message: "${subject}"`;
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization & Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Thank you for contacting Sheeba!</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Hello ${fullName},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            We have received your message regarding <strong>"${subject}"</strong>. Our team reviews every inquiry and will get back to you promptly, typically within 24 hours.
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            In the meantime, feel free to explore upcoming community tech events, hackathons, and verifiable credentials on the Sheeba platform.
+          </p>
+
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; display: inline-block;">
+              Visit Sheeba Platform
+            </a>
+          </div>
+
+          <div style="background-color: #FFF8F6; border-left: 4px solid #FFA686; padding: 12px 16px; border-radius: 4px; margin-top: 24px;">
+            <p style="margin: 0; font-size: 12px; color: #63474D; line-height: 1.5;">
+              <strong>Note:</strong> If you did not submit this message or need urgent assistance, reach out directly to <a href="mailto:sheebanet.events@gmail.com" style="color: #63474D; font-weight: 600;">sheebanet.events@gmail.com</a>.
+            </p>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 24px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, emailSubject, htmlBody, fullName);
   }
 }
