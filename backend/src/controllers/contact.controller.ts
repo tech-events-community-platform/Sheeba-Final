@@ -12,6 +12,8 @@ export class ContactController {
     try {
       const { name, email, subject, category, message } = req.body;
       const ipAddress = (req.ip || req.socket.remoteAddress || '').slice(0, 100);
+      const resolvedCategory = category || 'General Inquiry';
+      const resolvedSubject = (subject && subject.trim()) || `${resolvedCategory} from ${name}`;
 
       // 1. Persist the message in the database for reliability and audit trail
       let messageRecordId: string | null = null;
@@ -20,7 +22,7 @@ export class ContactController {
           `INSERT INTO contact_messages (name, email, subject, category, message, ip_address, status)
            VALUES ($1, $2, $3, $4, $5, $6, 'unread')
            RETURNING id, created_at`,
-          [name, email, subject, category || 'General Inquiry', message, ipAddress]
+          [name, email, resolvedSubject, resolvedCategory, message, ipAddress]
         );
         messageRecordId = insertRes.rows[0]?.id || null;
       } catch (dbErr) {
@@ -31,13 +33,13 @@ export class ContactController {
       await EmailService.sendContactUsNotification({
         name,
         email,
-        subject,
-        category: category || 'General Inquiry',
+        subject: resolvedSubject,
+        category: resolvedCategory,
         message,
       });
 
       // 3. Dispatch automated confirmation receipt to the visitor (non-blocking)
-      EmailService.sendContactAcknowledgmentEmail(email, name, subject).catch((ackErr) => {
+      EmailService.sendContactAcknowledgmentEmail(email, name, resolvedSubject).catch((ackErr) => {
         console.warn('[ContactController] ⚠️ Acknowledgment email to visitor could not be sent:', ackErr?.message || ackErr);
       });
 

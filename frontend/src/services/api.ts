@@ -1721,7 +1721,7 @@ export const api = {
     sendMessage: async (payload: {
       name: string;
       email: string;
-      subject: string;
+      subject?: string;
       category?: string;
       message: string;
     }) => {
@@ -1736,7 +1736,7 @@ export const api = {
 export interface ContactMessagePayload {
   name: string;
   email: string;
-  subject: string;
+  subject?: string;
   category?: string;
   message: string;
 }
