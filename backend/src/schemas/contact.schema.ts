@@ -11,8 +11,9 @@ export const contactMessageSchema = z.object({
   subject: z
     .string()
     .trim()
-    .min(3, 'Subject must be at least 3 characters.')
-    .max(200, 'Subject must be at most 200 characters.'),
+    .max(200)
+    .optional()
+    .default('General Inquiry'),
   category: z
     .string()
     .trim()

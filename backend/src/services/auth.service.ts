@@ -380,7 +380,7 @@ export class AuthService {
     );
 
     if (!result.rowCount || result.rowCount === 0) {
-      const err: any = new Error('Invalid email or password.');
+      const err: any = new Error('Incorrect email or password.');
       err.statusCode = 401;
       throw err;
     }
@@ -403,7 +403,7 @@ export class AuthService {
         err.statusCode = 401;
         throw err;
       }
-      const err: any = new Error('Invalid email or password.');
+      const err: any = new Error('Incorrect email or password.');
       err.statusCode = 401;
       throw err;
     }
@@ -411,7 +411,7 @@ export class AuthService {
     const isMatch = await bcrypt.compare(password, rawUser.password_hash);
 
     if (!isMatch) {
-      const err: any = new Error('Invalid email or password.');
+      const err: any = new Error('Incorrect email or password.');
       err.statusCode = 401;
       throw err;
     }
@@ -429,8 +429,8 @@ export class AuthService {
     // If logging into sponsor portal, verify that account has sponsor role
     if (requestedRole === 'sponsor') {
       if (!isSponsorAccount) {
-        const err: any = new Error('This account is not registered as a Sponsor. Please use the Attendee or Organizer login.');
-        err.statusCode = 403;
+        const err: any = new Error('Incorrect email or password.');
+        err.statusCode = 401;
         throw err;
       }
       if (rawUser.approval_status !== 'approved') {
@@ -449,7 +449,10 @@ export class AuthService {
     }
 
     const isAdmin = rawUser.role?.toLowerCase() === 'admin';
-    const isOrganizerAccount = Boolean(rawUser.is_organizer || rawUser.role?.toLowerCase() === 'organizer');
+    const isOrganizerAccount = Boolean(
+      rawUser.role?.toLowerCase() === 'organizer' ||
+      (rawUser.is_organizer && rawUser.organizer_approval_status && rawUser.organizer_approval_status !== 'none')
+    );
     const organizerStatus = (rawUser.organizer_approval_status && rawUser.organizer_approval_status !== 'none')
       ? rawUser.organizer_approval_status
       : (rawUser.approval_status || 'pending');
@@ -461,12 +464,12 @@ export class AuthService {
     } else if (requestedRole === 'sponsor') {
       sessionRole = 'sponsor';
     } else if (requestedRole === 'organizer') {
-      if (!isOrganizerAccount) {
-        const err: any = new Error('This account does not have an organizer profile. Please sign in as an Attendee and apply in your Settings.');
-        err.statusCode = 403;
+      if (!isOrganizerAccount && !isAdmin) {
+        const err: any = new Error('Incorrect email or password.');
+        err.statusCode = 401;
         throw err;
       }
-      if (organizerStatus !== 'approved') {
+      if (organizerStatus !== 'approved' && !isAdmin) {
         const err: any = new Error('Your organizer application is under review by Sheeba Administration. It is typically reviewed within 1 hour.');
         err.statusCode = 403;
         err.isPendingApproval = true;
@@ -1009,7 +1012,10 @@ export class AuthService {
     }
 
     // Determine session role
-    const isOrganizerAccount = Boolean(user.is_organizer || user.role?.toLowerCase() === 'organizer');
+    const isOrganizerAccount = Boolean(
+      user.role?.toLowerCase() === 'organizer' ||
+      (user.is_organizer && user.organizer_approval_status && user.organizer_approval_status !== 'none')
+    );
     const effOrganizerStatus = user.organizer_approval_status && user.organizer_approval_status !== 'none'
       ? user.organizer_approval_status
       : (user.approval_status || 'pending');
@@ -1018,12 +1024,12 @@ export class AuthService {
     if (user.role?.toLowerCase() === 'admin') {
       sessionRole = 'admin';
     } else if (requestedRole === 'organizer') {
-      if (!isOrganizerAccount) {
-        const err: any = new Error('This account does not have an organizer profile. Please sign in as an Attendee and apply in your Settings.');
-        err.statusCode = 403;
+      if (!isOrganizerAccount && user.role?.toLowerCase() !== 'admin') {
+        const err: any = new Error('Incorrect email or password.');
+        err.statusCode = 401;
         throw err;
       }
-      if (effOrganizerStatus !== 'approved') {
+      if (effOrganizerStatus !== 'approved' && user.role?.toLowerCase() !== 'admin') {
         const err: any = new Error('Your organizer application is under review by Sheeba Administration. It is typically reviewed within 1 hour.');
         err.statusCode = 403;
         err.isPendingApproval = true;

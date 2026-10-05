@@ -15,6 +15,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   HelpCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 const INDUSTRY_OPTIONS = [
@@ -42,6 +44,7 @@ export const SponsorAuthPage: React.FC = () => {
   // Form fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [industryCategory, setIndustryCategory] = useState(INDUSTRY_OPTIONS[0]);
@@ -432,16 +435,29 @@ export const SponsorAuthPage: React.FC = () => {
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+                  <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     minLength={6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl focus:outline-none focus:border-[#63474D] focus:bg-white text-[#2D1F23]"
+                    className="w-full pl-9 pr-10 py-2.5 text-xs bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl focus:outline-none focus:border-[#63474D] focus:bg-white text-[#2D1F23]"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1 focus:outline-none cursor-pointer"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
               </div>
 

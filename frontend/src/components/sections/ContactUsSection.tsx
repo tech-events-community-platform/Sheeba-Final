@@ -37,7 +37,6 @@ export const ContactUsSection: React.FC<ContactUsSectionProps> = ({
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    subject: '',
     category: 'General Inquiry',
     message: '',
   });
@@ -67,10 +66,6 @@ export const ContactUsSection: React.FC<ContactUsSectionProps> = ({
       setErrorMessage('Please provide a valid email address.');
       return;
     }
-    if (!formData.subject.trim()) {
-      setErrorMessage('Please provide a subject for your message.');
-      return;
-    }
     if (!formData.message.trim() || formData.message.trim().length < 10) {
       setErrorMessage('Please write a message with at least 10 characters.');
       return;
@@ -81,7 +76,6 @@ export const ContactUsSection: React.FC<ContactUsSectionProps> = ({
       await submitContactMessage({
         name: formData.name.trim(),
         email: formData.email.trim(),
-        subject: formData.subject.trim(),
         category: formData.category,
         message: formData.message.trim(),
       });
@@ -102,7 +96,6 @@ export const ContactUsSection: React.FC<ContactUsSectionProps> = ({
     setFormData({
       name: '',
       email: '',
-      subject: '',
       category: 'General Inquiry',
       message: '',
     });
@@ -356,25 +349,6 @@ export const ContactUsSection: React.FC<ContactUsSectionProps> = ({
                         className="w-full px-4 py-3 rounded-xl border border-[#E8DDD7] bg-[#FAF7F5]/50 text-sm text-[#2D1F23] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
                       />
                     </div>
-                  </div>
-
-                  {/* Subject */}
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="contact-subject"
-                      className="block text-xs font-bold text-gray-700"
-                    >
-                      Subject <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="contact-subject"
-                      type="text"
-                      required
-                      value={formData.subject}
-                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                      placeholder="e.g. Inquiring about organizing our upcoming AI hackathon"
-                      className="w-full px-4 py-3 rounded-xl border border-[#E8DDD7] bg-[#FAF7F5]/50 text-sm text-[#2D1F23] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
-                    />
                   </div>
 
                   {/* Message Area */}

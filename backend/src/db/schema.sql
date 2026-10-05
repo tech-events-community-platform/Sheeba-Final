@@ -301,12 +301,11 @@ CREATE TABLE IF NOT EXISTS event_reports (
 
 CREATE INDEX IF NOT EXISTS idx_event_reports_event_id ON event_reports(event_id);
 
--- Contact Messages Table (Visitor inquiries submitted via Contact Us)
 CREATE TABLE IF NOT EXISTS contact_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
-    subject VARCHAR(255) NOT NULL,
+    subject VARCHAR(255) DEFAULT 'General Inquiry',
     category VARCHAR(100) DEFAULT 'General',
     message TEXT NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'unread' CHECK (status IN ('unread', 'read', 'replied', 'archived')),
@@ -314,8 +313,12 @@ CREATE TABLE IF NOT EXISTS contact_messages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE contact_messages ALTER COLUMN subject DROP NOT NULL;
+ALTER TABLE contact_messages ALTER COLUMN subject SET DEFAULT 'General Inquiry';
+
 CREATE INDEX IF NOT EXISTS idx_contact_messages_email ON contact_messages(email);
 CREATE INDEX IF NOT EXISTS idx_contact_messages_created_at ON contact_messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_contact_messages_status ON contact_messages(status);
+
 
 
