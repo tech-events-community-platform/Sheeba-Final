@@ -122,7 +122,7 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
       });
     } catch (netErr: any) {
       console.error(`[API Network Error] Failed to reach ${API_BASE_URL}${endpoint}:`, netErr);
-      throw new Error('Unable to connect to Sheeba services. Please check your internet connection and try again.');
+      throw new Error('Please check your internet connection and try again.');
     }
 
     const contentType = response.headers.get('content-type');
@@ -188,7 +188,7 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
       });
     } catch (netErr: any) {
       console.error(`[API Network Error] Failed to reach ${API_BASE_URL}${endpoint}:`, netErr);
-      throw new Error('Unable to connect to Sheeba services. Please check your internet connection and try again.');
+      throw new Error('Please check your internet connection and try again.');
     }
 
     const contentType = response.headers.get('content-type');
@@ -1251,7 +1251,7 @@ export const api = {
     getSponsorReport: async (eventId: string): Promise<SponsorReportData> => {
       const event = await api.events.getById(eventId);
       const roster = await api.roster.getByEventId(eventId);
-      
+
       const isDemo = eventId === 'demo-impact-event-2026';
       if (!event && !isDemo) {
         throw new Error('Event report not found or unauthorized.');
@@ -1529,12 +1529,12 @@ export const api = {
       const allEvents = await api.events.getAll();
       const matchedEvents = q
         ? allEvents.filter(
-            (e) =>
-              e.title.toLowerCase().includes(q) ||
-              e.description.toLowerCase().includes(q) ||
-              e.location.toLowerCase().includes(q) ||
-              (e.organizerName && e.organizerName.toLowerCase().includes(q))
-          )
+          (e) =>
+            e.title.toLowerCase().includes(q) ||
+            e.description.toLowerCase().includes(q) ||
+            e.location.toLowerCase().includes(q) ||
+            (e.organizerName && e.organizerName.toLowerCase().includes(q))
+        )
         : allEvents;
 
       return {
