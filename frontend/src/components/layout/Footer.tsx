@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { LinkedInIcon, XIcon, TikTokIcon } from '../ui/SocialIcons';
 
 export const Footer: React.FC = () => {
@@ -21,14 +21,32 @@ export const Footer: React.FC = () => {
             © 2026 Sheeba.
           </p>
 
-          {/* Middle: Rights & Location */}
-          <p
-            className={`font-medium tracking-wide text-center ${
+          {/* Middle: Rights, Location & Contact */}
+          <div
+            className={`flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-medium tracking-wide text-center ${
               isExternalRegistration ? 'text-white/80' : 'text-[#756366]'
             }`}
           >
-            All rights reserved. Addis Ababa, Ethiopia.
-          </p>
+            <span>All rights reserved. Addis Ababa, Ethiopia.</span>
+            <span>•</span>
+            <Link
+              to="/contact"
+              className={`font-semibold transition-colors hover:underline ${
+                isExternalRegistration ? 'text-white hover:text-white/90' : 'text-[#63474D] hover:text-[#2D1F23]'
+              }`}
+            >
+              Contact Us
+            </Link>
+            <span>•</span>
+            <a
+              href="mailto:sheebanet.events@gmail.com"
+              className={`transition-colors hover:underline ${
+                isExternalRegistration ? 'text-white/90' : 'text-[#756366] hover:text-[#63474D]'
+              }`}
+            >
+              sheebanet.events@gmail.com
+            </a>
+          </div>
 
           {/* Right: Social media icons (LinkedIn, X, TikTok) */}
           <div className="flex items-center justify-center sm:justify-end gap-5 shrink-0">

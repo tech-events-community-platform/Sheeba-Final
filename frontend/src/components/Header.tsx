@@ -85,9 +85,11 @@ export default function Header() {
         { name: 'Features', href: '#features', isInternal: true },
         { name: 'How It Works', href: '#how-it-works', isInternal: true },
         { name: 'Live Simulator', href: '#simulator', isInternal: true },
+        { name: 'Contact Us', href: '#contact', isInternal: true },
       ]
     : [
         { name: 'Home', href: '/', isInternal: false },
+        { name: 'Contact Us', href: '/contact', isInternal: false },
       ];
 
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';

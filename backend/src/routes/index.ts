@@ -9,6 +9,7 @@ import reportRoutes from './report.routes';
 import adminRoutes from './admin.routes';
 import searchRoutes from './search.routes';
 import sponsorshipRoutes from './sponsorship.routes';
+import contactRoutes from './contact.routes';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/reports', reportRoutes);
 router.use('/admin', adminRoutes);
 router.use('/search', searchRoutes);
 router.use('/sponsorships', sponsorshipRoutes);
+router.use('/contact', contactRoutes);
 
 export default router;

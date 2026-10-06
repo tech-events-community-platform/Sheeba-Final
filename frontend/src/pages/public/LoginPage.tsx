@@ -45,6 +45,7 @@ export const LoginPage: React.FC = () => {
   const [loginRole, setLoginRole] = useState<'ATTENDEE' | 'ORGANIZER'>(initialRole);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [organization, setOrganization] = useState('');
 
@@ -205,12 +206,12 @@ export const LoginPage: React.FC = () => {
 
       if (
         err.isPendingApproval ||
-        message.toLowerCase().includes('1 hour') ||
-        message.toLowerCase().includes('pending')
+        (message.toLowerCase().includes('1 hour') && !message.toLowerCase().includes('password') && !message.toLowerCase().includes('incorrect'))
       ) {
         setIsPendingNotice(true);
         setErrorMsg('Your organizer registration is pending admin approval.');
       } else {
+        setIsPendingNotice(false);
         setErrorMsg(message);
       }
     } finally {
@@ -451,20 +452,6 @@ export const LoginPage: React.FC = () => {
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <span>{errorMsg}</span>
-              {loginRole === 'ORGANIZER' && errorMsg.includes('Settings') && (
-                <div className="mt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginRole('ATTENDEE');
-                      setErrorMsg(null);
-                    }}
-                    className="text-xs font-bold text-[#63474D] underline hover:text-[#2D1F23]"
-                  >
-                    Switch to Attendee Portal
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -480,10 +467,14 @@ export const LoginPage: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-3">
           {authMode === 'signup' && (
             <div>
-              <label className="block text-xs font-semibold text-[#2D1F23] mb-1">Full Name</label>
+              <label htmlFor="login-fullname" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+                Full Name
+              </label>
               <div className="relative">
-                <UserIcon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366]" />
+                <UserIcon className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none" />
                 <input
+                  id="login-fullname"
+                  name="fullName"
                   type="text"
                   required
                   placeholder="Abebe Bikila"
@@ -497,12 +488,14 @@ export const LoginPage: React.FC = () => {
 
           {authMode === 'signup' && loginRole === 'ORGANIZER' && (
             <div>
-              <label className="block text-xs font-semibold text-[#2D1F23] mb-1">
+              <label htmlFor="login-organization" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
                 Organization / Community Name
               </label>
               <div className="relative">
-                <Briefcase className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366]" />
+                <Briefcase className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none" />
                 <input
+                  id="login-organization"
+                  name="organization"
                   type="text"
                   placeholder="e.g. GDG Addis, ALX Tech Community"
                   value={organization}
@@ -514,12 +507,21 @@ export const LoginPage: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-[#2D1F23] mb-1">Email Address</label>
+            <label htmlFor="login-email" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+              Email Address
+            </label>
             <div className="relative">
-              <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain absolute left-3 top-1/2 -translate-y-1/2" />
+              <img
+                src="/mail-icon.webp"
+                alt="Email"
+                className="w-3.5 h-3.5 object-contain absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none select-none"
+              />
               <input
+                id="login-email"
+                name="email"
                 type="email"
                 required
+                tabIndex={1}
                 autoComplete={authMode === 'signup' ? 'off' : 'email'}
                 placeholder="name@example.com"
                 value={email}
@@ -531,11 +533,14 @@ export const LoginPage: React.FC = () => {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-[#2D1F23]">Password</label>
+              <label htmlFor="login-password" className="block text-xs font-semibold text-[#2D1F23] cursor-pointer">
+                Password
+              </label>
               {authMode === 'login' && (
                 <Link
                   to="/forgot-password"
                   state={{ email }}
+                  tabIndex={3}
                   className="text-xs font-semibold text-[#63474D] hover:underline cursor-pointer"
                 >
                   Forgot password?
@@ -543,16 +548,33 @@ export const LoginPage: React.FC = () => {
               )}
             </div>
             <div className="relative">
-              <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366]" />
+              <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
               <input
-                type="password"
+                id="login-password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
                 required
+                tabIndex={2}
                 autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
+                className="w-full pl-9 pr-10 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
               />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#756366] hover:text-[#2D1F23] transition-colors p-1 focus:outline-none cursor-pointer"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
 

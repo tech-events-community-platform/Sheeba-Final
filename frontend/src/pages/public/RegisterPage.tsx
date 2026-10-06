@@ -11,6 +11,8 @@ import {
   Users,
   Briefcase,
   ArrowLeft,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import type { UserRole } from '../../types/user';
@@ -31,6 +33,7 @@ export const RegisterPage: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
 
   // Organizer-specific fields
@@ -189,12 +192,17 @@ export const RegisterPage: React.FC = () => {
 
         <form onSubmit={handleRegister} className="space-y-2.5">
           <div>
-            <label className="block text-xs font-semibold text-[#2D1F23] mb-1">Full Name</label>
+            <label htmlFor="reg-fullname" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+              Full Name
+            </label>
             <div className="relative">
-              <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366]" />
+              <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
               <input
+                id="reg-fullname"
+                name="fullName"
                 type="text"
                 required
+                tabIndex={1}
                 placeholder="e.g. Abebe Kebede"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -205,14 +213,17 @@ export const RegisterPage: React.FC = () => {
 
           {selectedRole === 'ORGANIZER' && (
             <div>
-              <label className="block text-xs font-semibold text-[#2D1F23] mb-1">
+              <label htmlFor="reg-organization" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
                 Community or Organization Name <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Building className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366]" />
+                <Building className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
                 <input
+                  id="reg-organization"
+                  name="organization"
                   type="text"
                   required
+                  tabIndex={2}
                   placeholder="e.g. GDG Addis, ALX Tech Community"
                   value={organization}
                   onChange={(e) => setOrganization(e.target.value)}
@@ -223,12 +234,21 @@ export const RegisterPage: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-[#2D1F23] mb-1">Email Address</label>
+            <label htmlFor="reg-email" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+              Email Address
+            </label>
             <div className="relative">
-              <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain absolute left-3 top-1/2 -translate-y-1/2" />
+              <img
+                src="/mail-icon.webp"
+                alt="Email"
+                className="w-3.5 h-3.5 object-contain absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none select-none"
+              />
               <input
+                id="reg-email"
+                name="email"
                 type="email"
                 required
+                tabIndex={3}
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -238,27 +258,55 @@ export const RegisterPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#2D1F23] mb-1">Password</label>
+            <label htmlFor="reg-password" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+              Password
+            </label>
             <div className="relative">
-              <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366]" />
+              <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
               <input
-                type="password"
+                id="reg-password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
                 required
+                tabIndex={4}
                 minLength={6}
                 placeholder="Minimum 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
+                className="w-full pl-9 pr-10 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
               />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#756366] hover:text-[#2D1F23] transition-colors p-1 focus:outline-none cursor-pointer"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#2D1F23] mb-1">Phone Number (Optional)</label>
+            <label htmlFor="reg-phone" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+              Phone Number (Optional)
+            </label>
             <div className="relative">
-              <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain absolute left-3 top-1/2 -translate-y-1/2" />
+              <img
+                src="/phone-icon.webp"
+                alt="Phone"
+                className="w-3.5 h-3.5 object-contain absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none select-none"
+              />
               <input
+                id="reg-phone"
+                name="phone"
                 type="tel"
+                tabIndex={5}
                 placeholder="+2519..."
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -269,11 +317,16 @@ export const RegisterPage: React.FC = () => {
 
           {selectedRole === 'ORGANIZER' && (
             <div>
-              <label className="block text-xs font-semibold text-[#2D1F23] mb-1">Organizer Bio (Optional)</label>
+              <label htmlFor="reg-bio" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+                Organizer Bio (Optional)
+              </label>
               <div className="relative">
-                <FileText className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#756366]" />
+                <FileText className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#756366] pointer-events-none select-none" />
                 <textarea
+                  id="reg-bio"
+                  name="bio"
                   rows={2}
+                  tabIndex={6}
                   placeholder="Tell attendees about your tech community..."
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
