@@ -121,7 +121,8 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
         headers,
       });
     } catch (netErr: any) {
-      throw new Error(`Unable to reach Sheeba server at ${API_BASE_URL}. Please check that the backend is running and reachable.`);
+      console.error(`[API Network Error] Failed to reach ${API_BASE_URL}${endpoint}:`, netErr);
+      throw new Error('Unable to connect to Sheeba services. Please check your internet connection and try again.');
     }
 
     const contentType = response.headers.get('content-type');
@@ -186,7 +187,8 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
         headers,
       });
     } catch (netErr: any) {
-      throw new Error(`Unable to reach Sheeba server at ${API_BASE_URL}. Please check that the backend is running and reachable.`);
+      console.error(`[API Network Error] Failed to reach ${API_BASE_URL}${endpoint}:`, netErr);
+      throw new Error('Unable to connect to Sheeba services. Please check your internet connection and try again.');
     }
 
     const contentType = response.headers.get('content-type');
