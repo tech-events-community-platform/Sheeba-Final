@@ -142,15 +142,11 @@ export const PublicRegisterPage: React.FC = () => {
           {/* LEFT COLUMN: Title, Date/Time, Location, Registration Area, Description */}
           <div className="lg:col-span-7 space-y-6 order-2 lg:order-1">
 
-            {/* Event Category & Price Row (Yellow lines) */}
+            {/* Event Category Row */}
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="primary" className="uppercase font-mono text-xs sm:text-sm py-1.5 px-4 rounded-xl shadow-xs font-bold">
                 {event.type}
               </Badge>
-              <span className="text-gray-400 font-bold">•</span>
-              <span className="font-extrabold text-base sm:text-lg text-[#1B6B4A] tracking-wide">
-                {event.isPaid ? `${event.ticketPrice} ETB` : 'FREE ADMISSION'}
-              </span>
             </div>
 
             {/* Event Title (Orange line - wraps down to middle if long) */}
