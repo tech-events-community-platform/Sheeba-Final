@@ -146,10 +146,10 @@ export const updateEventSchema = z
     currency: z.string().trim().optional(),
     customQuestions: z.array(registrationQuestionSchema).optional(),
     custom_questions: z.array(registrationQuestionSchema).optional(),
-    bannerUrl: z.string().trim().url('Invalid banner URL.').or(z.literal('')).optional(),
-    banner_url: z.string().trim().url('Invalid banner URL.').or(z.literal('')).optional(),
-    posterImageUrl: z.string().trim().url('Invalid poster image URL.').or(z.literal('')).optional(),
-    poster_image_url: z.string().trim().url('Invalid poster image URL.').or(z.literal('')).optional(),
+    bannerUrl: z.string().trim().optional(),
+    banner_url: z.string().trim().optional(),
+    posterImageUrl: z.string().trim().optional(),
+    poster_image_url: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
     const targetDate = data.date || data.event_date;

@@ -91,12 +91,6 @@ export const CreateEventPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const config = getCloudinaryConfig();
-    if (!config.cloudName || !config.uploadPreset) {
-      setShowCloudinaryConfigModal(true);
-      return;
-    }
-
     setIsUploadingBanner(true);
     setBannerUploadError(null);
 
@@ -104,11 +98,7 @@ export const CreateEventPage: React.FC = () => {
       const url = await uploadToCloudinary(file);
       setFormData((prev) => ({ ...prev, posterImageUrl: url }));
     } catch (err: any) {
-      if (err.message?.includes('MISSING_CLOUDINARY_CONFIG')) {
-        setShowCloudinaryConfigModal(true);
-      } else {
-        setBannerUploadError(err.message || 'Failed to upload image. Please try again.');
-      }
+      setBannerUploadError(err.message || 'Failed to upload image. Please try again.');
     } finally {
       setIsUploadingBanner(false);
       if (fileInputRef.current) {

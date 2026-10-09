@@ -75,6 +75,8 @@ export const editEventSchema = z
     venueName: z.string().trim().optional(),
     startTime: z.string().trim().optional(),
     endTime: z.string().trim().optional(),
+    posterImageUrl: z.string().trim().optional(),
+    bannerUrl: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.isPaid && data.ticketPrice <= 0) {
