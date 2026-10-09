@@ -110,7 +110,7 @@ export const EventDetailPage: React.FC = () => {
       });
 
       setAwardSuccessMsg(
-        `Successfully added "${manualForm.name}" as an attended participant with verified badge!`
+        `Successfully registered "${manualForm.name}"! Ticket and QR pass emailed to ${manualForm.email}.`
       );
       setTimeout(() => setAwardSuccessMsg(null), 5000);
       setIsAddUserModalOpen(false);
@@ -771,13 +771,13 @@ export const EventDetailPage: React.FC = () => {
             <div className="flex items-start justify-between pb-3 border-b border-gray-100">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
-                  Walk-in Check-in
+                  Manual Registration
                 </span>
                 <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
-                  Add User Manually
+                  Register Attendee Manually
                 </h3>
                 <p className="text-xs text-gray-500">
-                  {event.title} • Automatically registered & marked as Attended
+                  {event.title} • Registers attendee, issues QR ticket & emails account link
                 </p>
               </div>
             </div>
@@ -837,7 +837,7 @@ export const EventDetailPage: React.FC = () => {
               <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-[11px] text-emerald-900 flex items-start gap-2">
                 <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0 mt-0.5" />
                 <span>
-                  Adding this attendee will instantly create their registration, record their door check-in, and award them the official <strong>Attended</strong> badge.
+                  Registering this attendee will generate their official ticket and email them a QR pass with an account link. They will appear under your <strong>Registered List</strong> until checked in at the door.
                 </span>
               </div>
 
@@ -857,7 +857,7 @@ export const EventDetailPage: React.FC = () => {
                   size="sm"
                   icon={<UserPlus className="w-4 h-4" />}
                 >
-                  Add & Mark Attended
+                  Register Attendee
                 </Button>
               </div>
             </form>
