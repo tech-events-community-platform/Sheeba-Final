@@ -101,4 +101,18 @@ router.get(
   EventController.lookupAttendee
 );
 
+router.delete(
+  '/:id/attendees/:attendeeId',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  EventController.removeAttendee
+);
+
+router.delete(
+  '/:id/registrations/:registrationId',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  EventController.removeAttendee
+);
+
 export default router;

@@ -184,4 +184,19 @@ export class EventController {
       next(error);
     }
   }
+
+  static async removeAttendee(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const eventId = req.params.id as string;
+      const targetId = (req.params.attendeeId || req.params.registrationId || req.params.targetId) as string;
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+
+      await EventService.removeAttendeeFromEvent(eventId, targetId, userId, userRole);
+
+      return sendSuccess(res, null, 'Attendee removed from event successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
