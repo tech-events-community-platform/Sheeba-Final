@@ -1031,7 +1031,7 @@ export const api = {
         if (res.data) {
           return {
             success: true,
-            message: res.message || 'Attendee added and marked attended.',
+            message: res.message || 'Attendee registered successfully and QR pass emailed.',
             rosterItem: res.data.rosterItem,
           };
         }

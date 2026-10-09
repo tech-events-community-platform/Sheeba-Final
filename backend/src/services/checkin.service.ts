@@ -1,9 +1,16 @@
 import { getClient, query } from '../config/db';
-import { verifyTicketToken, computeEventDayExpiration } from '../utils/qr.util';
+import {
+  generateTicketToken,
+  generateQrDataUrl,
+  generateTicketCode,
+  verifyTicketToken,
+  computeEventDayExpiration,
+} from '../utils/qr.util';
 import { UserRole } from '../types';
 import { BadgeService } from './badge.service';
 import { EventService } from './event.service';
 import { CacheService } from './cache.service';
+import { EmailService } from './email.service';
 
 function extractCleanTokenOrCode(input: string): string {
   const raw = (input || '').trim();
@@ -828,6 +835,10 @@ export class CheckinService {
     }
 
     const client = await getClient();
+    let isExistingUser = false;
+    let issuedTicketCode = '';
+    let issuedQrDataUrl = '';
+
     try {
       await client.query('BEGIN');
 
@@ -835,11 +846,13 @@ export class CheckinService {
       let userId: string;
       const userLookup = await client.query('SELECT id, full_name, phone FROM users WHERE email = $1', [cleanEmail]);
       if (userLookup.rowCount && userLookup.rowCount > 0) {
+        isExistingUser = true;
         userId = userLookup.rows[0].id;
         if (cleanPhone && !userLookup.rows[0].phone) {
           await client.query('UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2', [cleanPhone, userId]);
         }
       } else {
+        isExistingUser = false;
         const dummyHash = '$2b$10$wT0o3q6/11fI0vL9fD9f1.xJ4Vb2c9P5lQ6kZ3eX4kL9wR4y7zT6e';
         const userInsert = await client.query(
           `INSERT INTO users (email, password_hash, full_name, role, phone, visibility, approval_status)
@@ -867,58 +880,70 @@ export class CheckinService {
           `INSERT INTO registrations (event_id, user_id, status, answers)
            VALUES ($1, $2, 'registered', $3)
            RETURNING id`,
-          [realEventId, userId, JSON.stringify({ Phone: cleanPhone || 'N/A' })]
+          [realEventId, userId, JSON.stringify({ Phone: cleanPhone || 'N/A', AddedBy: 'Organizer Manual Registration' })]
         );
         registrationId = regInsert.rows[0].id;
       }
 
-      const now = new Date();
+      // 3. Find or create ISSUED ticket (Do NOT mark as CHECKED_IN, do NOT create check_in or badge)
+      const eventDate = event.rawDate || event.date;
+      const ticketCode = generateTicketCode(eventDate);
+      const expiresAt = computeEventDayExpiration(eventDate);
 
-      // 3. Insert or update CheckIn row
-      const checkInLookup = await client.query(
-        `SELECT id FROM check_ins WHERE registration_id = $1`,
-        [registrationId]
-      );
-      if (checkInLookup.rowCount && checkInLookup.rowCount > 0) {
-        await client.query(
-          `UPDATE check_ins SET voided_at = NULL, approved_by = $1, approved_at = $2, updated_at = $2 WHERE id = $3`,
-          [organizerId, now, checkInLookup.rows[0].id]
-        );
-      } else {
-        await client.query(
-          `INSERT INTO check_ins (registration_id, event_id, user_id, approved_by, approved_at)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [registrationId, realEventId, userId, organizerId, now]
-        );
-      }
-
-      // 4. Atomically award "Attended" badge
-      await client.query(
-        `INSERT INTO badge_awards (badge_code, badge_label, event_id, user_id, awarded_by, awarded_at)
-         VALUES ('attended', 'Attended', $1, $2, $3, $4)
-         ON CONFLICT (event_id, user_id, badge_code)
-         DO UPDATE SET revoked_at = NULL, awarded_at = $4, revocation_reason = NULL`,
-        [realEventId, userId, organizerId, now]
-      );
-
-      // 5. Create or update ticket
       const ticketLookup = await client.query(
-        `SELECT id FROM tickets WHERE event_id = $1 AND user_id = $2`,
+        `SELECT id, ticket_code, qr_token, qr_code_data_url, status FROM tickets WHERE event_id = $1 AND user_id = $2`,
         [realEventId, userId]
       );
+
       if (ticketLookup.rowCount && ticketLookup.rowCount > 0) {
+        const existingTicket = ticketLookup.rows[0];
+        issuedTicketCode = existingTicket.ticket_code || ticketCode;
+
+        let qrDataUrl = existingTicket.qr_code_data_url;
+        if (!qrDataUrl) {
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const verifyUrl = `${frontendUrl}/verify-ticket?token=${encodeURIComponent(existingTicket.qr_token)}&code=${encodeURIComponent(issuedTicketCode)}`;
+          const qrPayload = [
+            `SHEEBA VERIFIED PASS`,
+            `Attendee: ${cleanName}`,
+            `Email: ${cleanEmail}`,
+            `Event: ${event.title}`,
+            `Code: ${issuedTicketCode}`,
+            `Status: Valid`,
+            `Verify: ${verifyUrl}`,
+          ].join('\n');
+          qrDataUrl = await generateQrDataUrl(qrPayload);
+        }
+        issuedQrDataUrl = qrDataUrl;
+
         await client.query(
-          `UPDATE tickets SET status = 'CHECKED_IN', checked_in_at = $1, checked_in_by = $2, updated_at = $1 WHERE id = $3`,
-          [now, organizerId, ticketLookup.rows[0].id]
+          `UPDATE tickets SET status = 'ISSUED', checked_in_at = NULL, checked_in_by = NULL, updated_at = NOW() WHERE id = $1`,
+          [existingTicket.id]
         );
       } else {
-        const ticketCode = `SHB-${Math.floor(1000 + Math.random() * 9000)}-2026`;
+        const ticketId = (await client.query('SELECT gen_random_uuid() AS id')).rows[0].id;
+        const qrToken = generateTicketToken(ticketId, realEventId, eventDate);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const verifyUrl = `${frontendUrl}/verify-ticket?token=${encodeURIComponent(qrToken)}&code=${encodeURIComponent(ticketCode)}`;
+        const qrPayload = [
+          `SHEEBA VERIFIED PASS`,
+          `Attendee: ${cleanName}`,
+          `Email: ${cleanEmail}`,
+          `Event: ${event.title}`,
+          `Code: ${ticketCode}`,
+          `Status: Valid`,
+          `Verify: ${verifyUrl}`,
+        ].join('\n');
+
+        issuedQrDataUrl = await generateQrDataUrl(qrPayload);
+        issuedTicketCode = ticketCode;
+
         await client.query(
           `INSERT INTO tickets (
-            ticket_code, registration_id, event_id, user_id, qr_token, qr_code_data_url,
-            status, checked_in_at, checked_in_by, is_paid, ticket_price, currency
-          ) VALUES ($1, $2, $3, $4, $5, $6, 'CHECKED_IN', $7, $8, FALSE, 0, 'ETB')`,
-          [ticketCode, registrationId, realEventId, userId, `shb_walkin_${Date.now()}`, '', now, organizerId]
+            id, ticket_code, registration_id, event_id, user_id, qr_token, qr_code_data_url,
+            status, is_paid, ticket_price, currency, expires_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ISSUED', $8, $9, 'ETB', $10)`,
+          [ticketId, ticketCode, registrationId, realEventId, userId, qrToken, issuedQrDataUrl, event.isPaid, event.ticketPrice, expiresAt]
         );
       }
 
@@ -929,11 +954,28 @@ export class CheckinService {
       CacheService.del(`report:${realEventId}`);
       CacheService.delPrefix('events:list');
 
+      // 4. Dispatch Email with QR code and link
+      try {
+        await EmailService.sendManualRegistrationTicketEmail({
+          toEmail: cleanEmail,
+          fullName: cleanName,
+          eventTitle: event.title,
+          date: event.date,
+          time: event.time,
+          location: event.location,
+          ticketCode: issuedTicketCode,
+          qrDataUrl: issuedQrDataUrl,
+          isExistingUser,
+        });
+      } catch (emailErr) {
+        console.warn('Manual registration ticket email dispatch warning:', emailErr);
+      }
+
       const updatedAttendee = await this.lookupAttendee(realEventId, userId);
 
       return {
         success: true,
-        message: `Successfully added ${cleanName} as an attended participant!`,
+        message: `Successfully registered ${cleanName}! Ticket and QR pass emailed to ${cleanEmail}.`,
         rosterItem: updatedAttendee,
       };
     } catch (err) {
