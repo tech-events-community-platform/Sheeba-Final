@@ -281,12 +281,17 @@ export class EventService {
     userRole: UserRole,
     data: any
   ): Promise<any> {
-    const existing = await query('SELECT organizer_id, start_time, end_time FROM events WHERE id = $1', [eventId]);
+    const existing = await query(
+      'SELECT id, organizer_id, start_time, end_time FROM events WHERE id::text = $1 OR share_link_token = $1',
+      [eventId]
+    );
     if (!existing.rowCount || existing.rowCount === 0) {
       const err: any = new Error('Event not found.');
       err.statusCode = 404;
       throw err;
     }
+
+    const realId = (existing.rows[0] as any).id;
 
     if (existing.rows[0].organizer_id !== userId && userRole !== 'admin') {
       const err: any = new Error('You are not authorized to update this event.');
@@ -364,11 +369,11 @@ export class EventService {
     }
 
     if (fields.length === 0) {
-      return this.getEventById(eventId);
+      return this.getEventById(realId);
     }
 
     fields.push('updated_at = NOW()');
-    values.push(eventId);
+    values.push(realId);
 
     const queryText = `
       UPDATE events
@@ -379,18 +384,25 @@ export class EventService {
 
     await query(queryText, values);
     CacheService.delPrefix('events:list');
+    CacheService.delPrefix(`event:${realId}`);
     CacheService.delPrefix(`event:${eventId}`);
+    CacheService.del(`report:${realId}`);
     CacheService.del(`report:${eventId}`);
-    return this.getEventById(eventId);
+    return this.getEventById(realId);
   }
 
   static async deleteEvent(eventId: string, userId: string, userRole: UserRole): Promise<boolean> {
-    const existing = await query('SELECT organizer_id FROM events WHERE id = $1', [eventId]);
+    const existing = await query(
+      'SELECT id, organizer_id FROM events WHERE id::text = $1 OR share_link_token = $1',
+      [eventId]
+    );
     if (!existing.rowCount || existing.rowCount === 0) {
       const err: any = new Error('Event not found.');
       err.statusCode = 404;
       throw err;
     }
+
+    const realId = (existing.rows[0] as any).id;
 
     if (existing.rows[0].organizer_id !== userId && userRole !== 'admin') {
       const err: any = new Error('Unauthorized to delete this event.');
@@ -398,9 +410,11 @@ export class EventService {
       throw err;
     }
 
-    await query('DELETE FROM events WHERE id = $1', [eventId]);
+    await query('DELETE FROM events WHERE id = $1', [realId]);
     CacheService.delPrefix('events:list');
+    CacheService.delPrefix(`event:${realId}`);
     CacheService.delPrefix(`event:${eventId}`);
+    CacheService.del(`report:${realId}`);
     CacheService.del(`report:${eventId}`);
     return true;
   }
@@ -695,5 +709,55 @@ export class EventService {
 
     CacheService.set(cacheKey, roster, 20);
     return roster;
+  }
+
+  static async removeAttendeeFromEvent(
+    eventId: string,
+    targetId: string,
+    userId: string,
+    userRole: UserRole
+  ): Promise<boolean> {
+    const existing = await query(
+      'SELECT id, organizer_id FROM events WHERE id::text = $1 OR share_link_token = $1',
+      [eventId]
+    );
+    if (!existing.rowCount || existing.rowCount === 0) {
+      const err: any = new Error('Event not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const realEventId = (existing.rows[0] as any).id;
+
+    if (existing.rows[0].organizer_id !== userId && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. You are not the organizer of this event.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // Delete registration for this event (matching registration id OR user_id)
+    await query(
+      `DELETE FROM registrations 
+       WHERE event_id = $1 AND (id::text = $2 OR user_id::text = $2 OR user_id IN (SELECT id FROM users WHERE email = $2))`,
+      [realEventId, targetId]
+    );
+
+    // Also delete associated tickets and check-ins if any
+    await query(
+      `DELETE FROM tickets WHERE event_id = $1 AND (registration_id::text = $2 OR user_id::text = $2)`,
+      [realEventId, targetId]
+    );
+    await query(`DELETE FROM check_ins WHERE registration_id::text = $2`, [targetId]);
+
+    // Invalidate caches
+    CacheService.delPrefix('events:list');
+    CacheService.delPrefix(`event:${realEventId}`);
+    CacheService.delPrefix(`event:${eventId}`);
+    CacheService.del(`event:${realEventId}:roster`);
+    CacheService.del(`event:${eventId}:roster`);
+    CacheService.del(`report:${realEventId}`);
+    CacheService.del(`report:${eventId}`);
+
+    return true;
   }
 }

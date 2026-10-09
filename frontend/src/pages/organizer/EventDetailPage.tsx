@@ -20,6 +20,7 @@ import {
   X,
   HelpCircle,
   Edit,
+  Trash2,
 } from 'lucide-react';
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 import { EditEventModal } from '../../components/organizer/EditEventModal';
@@ -36,6 +37,10 @@ export const EventDetailPage: React.FC = () => {
   // Search queries for both independent lists (Section 3)
   const [registeredSearch, setRegisteredSearch] = useState('');
   const [attendedSearch, setAttendedSearch] = useState('');
+
+  // Delete attendee confirmation toast state
+  const [deleteConfirmToast, setDeleteConfirmToast] = useState<AttendeeRosterItem | null>(null);
+  const [isDeletingAttendee, setIsDeletingAttendee] = useState(false);
 
   // Badge award modal / action state
   const [awardingAttendee, setAwardingAttendee] = useState<AttendeeRosterItem | null>(null);
@@ -150,6 +155,28 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
+  // Delete attendee handler
+  const handleConfirmDeleteAttendee = async (attendee: AttendeeRosterItem) => {
+    if (!event) return;
+    setIsDeletingAttendee(true);
+    try {
+      const attendeeId = attendee.registrationId || attendee.id;
+      await api.events.removeAttendee(event.id, attendeeId);
+
+      setRoster((prev) =>
+        prev.filter((r) => r.id !== attendee.id && r.registrationId !== attendee.registrationId)
+      );
+
+      setAwardSuccessMsg(`"${attendee.name}" has been removed from this event.`);
+      setTimeout(() => setAwardSuccessMsg(null), 4000);
+      setDeleteConfirmToast(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove attendee.');
+    } finally {
+      setIsDeletingAttendee(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto space-y-6 animate-pulse py-8">
@@ -194,6 +221,58 @@ export const EventDetailPage: React.FC = () => {
 
   return (
     <div className="w-full space-y-8 pb-24">
+      {/* Delete Attendee Confirmation Toast */}
+      {deleteConfirmToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4 animate-fade-in">
+          <div className="bg-[#2D1F23] text-white p-4.5 rounded-3xl shadow-2xl border border-red-500/30 space-y-3 backdrop-blur-md">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <div className="p-2 bg-red-500/20 text-red-400 rounded-xl shrink-0 mt-0.5">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-serif font-bold text-sm text-white">Remove Attendee from Event?</h4>
+                  <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">
+                    Are you sure you want to remove <strong className="text-white">{deleteConfirmToast.name}</strong> ({deleteConfirmToast.email}) from this event?
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmToast(null)}
+                className="p-1 text-gray-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmToast(null)}
+                disabled={isDeletingAttendee}
+                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-gray-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmDeleteAttendee(deleteConfirmToast)}
+                disabled={isDeletingAttendee}
+                className="px-4 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+              >
+                {isDeletingAttendee ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>{isDeletingAttendee ? 'Removing...' : 'Confirm Remove'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Back Navigation & Breadcrumb */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Link
@@ -434,6 +513,7 @@ export const EventDetailPage: React.FC = () => {
                   <th className="py-3 px-2">Status</th>
                   <th className="py-3 px-2">Current Badges</th>
                   <th className="py-3 px-2 text-right">Award Higher Badge</th>
+                  <th className="py-3 px-2 text-right">Remove</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -465,15 +545,25 @@ export const EventDetailPage: React.FC = () => {
                         )}
                       </div>
                     </td>
-                    <td className="py-3.5 px-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setAwardingAttendee(att)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#63474D] hover:bg-[#523a3f] text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
-                      >
-                        <Award className="w-3.5 h-3.5 text-[#FFA686]" />
-                        <span>Award Badge</span>
-                      </button>
+                    <td className="py-3.5 px-2 text-right" colSpan={2}>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAwardingAttendee(att)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#63474D] hover:bg-[#523a3f] text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                        >
+                          <Award className="w-3.5 h-3.5 text-[#FFA686]" />
+                          <span>Award Badge</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirmToast(att)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                          title={`Remove ${att.name} from event`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -532,6 +622,7 @@ export const EventDetailPage: React.FC = () => {
                   <th className="py-3 px-2">Registration Date</th>
                   <th className="py-3 px-2">Status</th>
                   <th className="py-3 px-2">Registration Answers</th>
+                  <th className="py-3 px-2 text-right">Remove</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -574,6 +665,17 @@ export const EventDetailPage: React.FC = () => {
                         ) : (
                           <span className="text-gray-400 italic">None</span>
                         )}
+                      </td>
+                      <td className="py-3.5 px-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirmToast(att)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                          title={`Remove ${att.name} from event`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove</span>
+                        </button>
                       </td>
                     </tr>
                   );

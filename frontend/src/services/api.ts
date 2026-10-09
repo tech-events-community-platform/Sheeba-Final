@@ -726,7 +726,7 @@ export const api = {
           body: JSON.stringify(data),
         });
         if (res.data) {
-          const idx = eventsStore.findIndex((e) => e.id === id);
+          const idx = eventsStore.findIndex((e) => e.id === id || e.shareLinkToken === id);
           if (idx !== -1) {
             eventsStore[idx] = { ...eventsStore[idx], ...res.data };
             saveEventsStore();
@@ -736,7 +736,7 @@ export const api = {
       } catch (e) {
         console.warn('Backend event update fallback:', e);
       }
-      const idx = eventsStore.findIndex((e) => e.id === id);
+      const idx = eventsStore.findIndex((e) => e.id === id || e.shareLinkToken === id);
       if (idx !== -1) {
         eventsStore[idx] = { ...eventsStore[idx], ...data };
         saveEventsStore();
@@ -753,6 +753,17 @@ export const api = {
       }
       eventsStore = eventsStore.filter((e) => e.id !== id);
       saveEventsStore();
+      return true;
+    },
+
+    removeAttendee: async (eventId: string, attendeeId: string): Promise<boolean> => {
+      try {
+        await requestApi(`/events/${eventId}/attendees/${attendeeId}`, {
+          method: 'DELETE',
+        });
+      } catch (e) {
+        console.warn('Backend remove attendee fallback:', e);
+      }
       return true;
     },
   },
