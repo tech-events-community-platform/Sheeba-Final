@@ -89,8 +89,10 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         posterImageUrl: event.posterImageUrl || event.bannerUrl || '',
       });
 
+      setBannerSource('upload');
       setErrorMsg(null);
       setSuccessMsg(null);
+      setBannerUploadError(null);
     }
   }, [event, isOpen]);
 
@@ -100,21 +102,18 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const config = getCloudinaryConfig();
-    if (!config.cloudName || !config.uploadPreset) {
-      setShowCloudinaryConfig(true);
-      return;
-    }
-
     setIsUploadingBanner(true);
     setBannerUploadError(null);
     try {
       const url = await uploadToCloudinary(file);
       setFormData((prev) => ({ ...prev, posterImageUrl: url }));
     } catch (err: any) {
-      setBannerUploadError(err.message || 'Failed to upload image. Please check Cloudinary configuration.');
+      setBannerUploadError(err.message || 'Failed to upload image to Cloudinary.');
     } finally {
       setIsUploadingBanner(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -125,6 +124,9 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     }
     saveCloudinaryConfig(tempCloudName.trim(), tempUploadPreset.trim());
     setShowCloudinaryConfig(false);
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 150);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -511,13 +513,6 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                 {bannerUploadError && (
                   <div className="p-2.5 bg-red-50 text-red-700 text-xs rounded-xl flex items-center justify-between">
                     <span>{bannerUploadError}</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowCloudinaryConfig(true)}
-                      className="underline font-bold ml-2 cursor-pointer"
-                    >
-                      Configure Cloudinary
-                    </button>
                   </div>
                 )}
               </div>
