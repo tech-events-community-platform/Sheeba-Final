@@ -21,6 +21,7 @@ import {
   HelpCircle,
   Edit,
   Trash2,
+  Check,
 } from 'lucide-react';
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 import { EditEventModal } from '../../components/organizer/EditEventModal';
@@ -61,6 +62,21 @@ export const EventDetailPage: React.FC = () => {
 
   // Registration Answers Modal State
   const [selectedAnswersAttendee, setSelectedAnswersAttendee] = useState<AttendeeRosterItem | null>(null);
+
+  // Approval workflow state
+  const [approvalTab, setApprovalTab] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingAttendee, setRejectingAttendee] = useState<AttendeeRosterItem | null>(null);
+  const [rejectionReason, setRejectionReason] = useState<string>('');
+  const [isSubmittingReject, setIsSubmittingReject] = useState(false);
+  const [approvalActionMsg, setApprovalActionMsg] = useState<string | null>(null);
+
+  // Bulk action state
+  const [selectedRegistrationIds, setSelectedRegistrationIds] = useState<string[]>([]);
+  const [isBulkApproving, setIsBulkApproving] = useState(false);
+  const [selectedAttendedIds, setSelectedAttendedIds] = useState<string[]>([]);
+  const [isBulkAwarding, setIsBulkAwarding] = useState(false);
+  const [bulkBadgeCode, setBulkBadgeCode] = useState<BadgeCode>('participant');
 
   const fetchEventData = async () => {
     if (!id) return;
@@ -177,6 +193,130 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
+  // Approval / Rejection Handlers
+  const handleApproveAttendee = async (attendee: AttendeeRosterItem) => {
+    if (!event) return;
+    const regId = attendee.registrationId || attendee.id;
+    setApprovingId(regId);
+    try {
+      await api.roster.approveRegistration(event.id, regId);
+      setApprovalActionMsg(`Approved "${attendee.name}"! Entry pass issued and confirmation emailed.`);
+      setTimeout(() => setApprovalActionMsg(null), 5000);
+      await fetchEventData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve attendee.');
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleConfirmRejectAttendee = async () => {
+    if (!event || !rejectingAttendee) return;
+    const regId = rejectingAttendee.registrationId || rejectingAttendee.id;
+    setIsSubmittingReject(true);
+    try {
+      await api.roster.rejectRegistration(event.id, regId, rejectionReason.trim() || undefined);
+      setApprovalActionMsg(`Registration for "${rejectingAttendee.name}" has been declined.`);
+      setTimeout(() => setApprovalActionMsg(null), 5000);
+      setRejectingAttendee(null);
+      setRejectionReason('');
+      await fetchEventData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to reject attendee.');
+    } finally {
+      setIsSubmittingReject(false);
+    }
+  };
+
+  // Bulk Approval Handlers
+  const handleToggleRegistration = (id: string) => {
+    setSelectedRegistrationIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllRegistrations = () => {
+    const selectable = displayedRegisteredList.map((item) => item.registrationId || item.id);
+    const allSelected = selectable.length > 0 && selectable.every((id) => selectedRegistrationIds.includes(id));
+    if (allSelected) {
+      setSelectedRegistrationIds([]);
+    } else {
+      setSelectedRegistrationIds(selectable);
+    }
+  };
+
+  const handleBulkApprove = async () => {
+    if (!event || selectedRegistrationIds.length === 0) return;
+    setIsBulkApproving(true);
+    try {
+      await api.roster.bulkApproveRegistrations(event.id, selectedRegistrationIds);
+      setApprovalActionMsg(`Approved ${selectedRegistrationIds.length} applicant(s)! Entry passes issued and emails sent.`);
+      setTimeout(() => setApprovalActionMsg(null), 5000);
+      setSelectedRegistrationIds([]);
+      await fetchEventData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to bulk approve applicants.');
+    } finally {
+      setIsBulkApproving(false);
+    }
+  };
+
+  const handleApproveAllPending = async () => {
+    if (!event) return;
+    const pendingIds = roster.filter((r) => r.approvalStatus === 'pending').map((r) => r.registrationId || r.id);
+    if (pendingIds.length === 0) return;
+    if (!window.confirm(`Approve all ${pendingIds.length} pending applications and issue their entry passes?`)) return;
+    setIsBulkApproving(true);
+    try {
+      await api.roster.bulkApproveRegistrations(event.id, pendingIds);
+      setApprovalActionMsg(`Approved all ${pendingIds.length} pending applicant(s)! Passes issued and emails sent.`);
+      setTimeout(() => setApprovalActionMsg(null), 5000);
+      setSelectedRegistrationIds([]);
+      await fetchEventData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to approve all pending applicants.');
+    } finally {
+      setIsBulkApproving(false);
+    }
+  };
+
+  // Bulk Badge Award Handlers
+  const handleToggleAttended = (id: string) => {
+    setSelectedAttendedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllAttended = () => {
+    const selectable = attendedList.map((item) => item.attendeeId || item.id);
+    const allSelected = selectable.length > 0 && selectable.every((id) => selectedAttendedIds.includes(id));
+    if (allSelected) {
+      setSelectedAttendedIds([]);
+    } else {
+      setSelectedAttendedIds(selectable);
+    }
+  };
+
+  const handleBulkAwardBadges = async () => {
+    if (!event || selectedAttendedIds.length === 0) return;
+    setIsBulkAwarding(true);
+    try {
+      await api.badges.bulkAwardBadges({
+        eventId: event.id,
+        attendeeRosterIds: selectedAttendedIds,
+        badgeCode: bulkBadgeCode,
+      });
+      setAwardSuccessMsg(`Successfully awarded "${bulkBadgeCode.toUpperCase()}" badge to ${selectedAttendedIds.length} attendee(s)!`);
+      setTimeout(() => setAwardSuccessMsg(null), 5000);
+      setSelectedAttendedIds([]);
+      await fetchEventData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to bulk award badges.');
+    } finally {
+      setIsBulkAwarding(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto space-y-6 animate-pulse py-8">
@@ -208,6 +348,17 @@ export const EventDetailPage: React.FC = () => {
     return item.name.toLowerCase().includes(q) || item.email.toLowerCase().includes(q);
   });
 
+  const pendingCount = roster.filter((r) => r.approvalStatus === 'pending').length;
+  const approvedCount = roster.filter((r) => !r.approvalStatus || r.approvalStatus === 'approved').length;
+  const rejectedCount = roster.filter((r) => r.approvalStatus === 'rejected').length;
+
+  const displayedRegisteredList = registeredList.filter((item) => {
+    if (approvalTab === 'pending') return item.approvalStatus === 'pending';
+    if (approvalTab === 'approved') return !item.approvalStatus || item.approvalStatus === 'approved';
+    if (approvalTab === 'rejected') return item.approvalStatus === 'rejected';
+    return true;
+  });
+
   // Section 3: Attended list (non-voided check-in only)
   const attendedList = roster.filter((item) => {
     const isAttended = item.status === 'Checked in' || item.badges?.includes('attended');
@@ -221,6 +372,25 @@ export const EventDetailPage: React.FC = () => {
 
   return (
     <div className="w-full space-y-8 pb-24">
+      {/* Action Notification Toast */}
+      {approvalActionMsg && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4 animate-fade-in">
+          <div className="bg-[#2D1F23] text-white px-4.5 py-3 rounded-2xl shadow-2xl border border-emerald-500/40 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-xs">
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{approvalActionMsg}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setApprovalActionMsg(null)}
+              className="text-gray-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Delete Attendee Confirmation Toast */}
       {deleteConfirmToast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4 animate-fade-in">
@@ -398,9 +568,57 @@ export const EventDetailPage: React.FC = () => {
                 <span className="text-[10px] uppercase font-bold text-gray-400 block">Capacity</span>
                 <span className="font-bold text-lg text-[#63474D]">{event.capacity}</span>
               </div>
+              {event.requiresApproval && (
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-600 block">Pending Review</span>
+                  <span className="font-bold text-lg text-amber-700">{pendingCount}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
+
+        {/* Approval Notice Banner */}
+        {event.requiresApproval && pendingCount > 0 && (
+          <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-100 text-amber-800 rounded-xl shrink-0">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-amber-900">
+                  {pendingCount} Attendee Application{pendingCount === 1 ? '' : 's'} Awaiting Organizer Approval
+                </p>
+                <p className="text-[11px] text-amber-700 mt-0.5">
+                  Review applicant questionnaire responses and approve or decline registrations before issuing entry passes.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setApprovalTab('pending');
+                  const el = document.getElementById('registered-list-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-3.5 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold cursor-pointer shadow-2xs transition-colors"
+              >
+                Review ({pendingCount})
+              </button>
+              <button
+                type="button"
+                disabled={isBulkApproving}
+                onClick={handleApproveAllPending}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-2xs transition-colors inline-flex items-center gap-1.5"
+                title="Approve all pending applications and issue passes"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>{isBulkApproving ? 'Approving...' : `Approve All (${pendingCount})`}</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Description */}
         {event.description && (
@@ -497,6 +715,47 @@ export const EventDetailPage: React.FC = () => {
           </Button>
         </div>
 
+        {/* Bulk Action Bar for Attended Badges */}
+        {selectedAttendedIds.length > 0 && (
+          <div className="p-3.5 bg-[#FAF7F5] border border-[#63474D]/25 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fade-in shadow-2xs">
+            <div className="flex items-center gap-2 text-xs font-bold text-[#2D1F23]">
+              <Award className="w-4 h-4 text-[#FFA686]" />
+              <span>{selectedAttendedIds.length} attendee{selectedAttendedIds.length === 1 ? '' : 's'} selected</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#756366] font-semibold">Award Badge:</span>
+              <select
+                value={bulkBadgeCode}
+                onChange={(e) => setBulkBadgeCode(e.target.value as BadgeCode)}
+                className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+              >
+                <option value="participant">Participant</option>
+                <option value="winner">Winner</option>
+                <option value="speaker">Speaker</option>
+              </select>
+
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={isBulkAwarding}
+                onClick={handleBulkAwardBadges}
+                icon={<Award className="w-3.5 h-3.5 text-[#FFA686]" />}
+              >
+                {isBulkAwarding ? 'Awarding...' : `Award to Selected (${selectedAttendedIds.length})`}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedAttendedIds([])}
+                className="px-2 py-1 text-xs text-gray-500 hover:text-black cursor-pointer font-medium"
+              >
+                Deselect
+              </button>
+            </div>
+          </div>
+        )}
+
         {attendedList.length === 0 ? (
           <div className="py-8 text-center text-xs text-gray-400">
             {roster.filter((r) => r.status === 'Checked in').length === 0
@@ -508,6 +767,15 @@ export const EventDetailPage: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px]">
                 <tr>
+                  <th className="py-3 px-2 w-8">
+                    <input
+                      type="checkbox"
+                      checked={attendedList.length > 0 && attendedList.every((att) => selectedAttendedIds.includes(att.attendeeId || att.id))}
+                      onChange={handleSelectAllAttended}
+                      className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                      title="Select all"
+                    />
+                  </th>
                   <th className="py-3 px-2">Attendee</th>
                   <th className="py-3 px-2">Check-in Time</th>
                   <th className="py-3 px-2">Status</th>
@@ -519,6 +787,14 @@ export const EventDetailPage: React.FC = () => {
               <tbody className="divide-y divide-gray-100">
                 {attendedList.map((att) => (
                   <tr key={att.id} className="hover:bg-gray-50/60 transition-colors">
+                    <td className="py-3.5 px-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedAttendedIds.includes(att.attendeeId || att.id)}
+                        onChange={() => handleToggleAttended(att.attendeeId || att.id)}
+                        className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                      />
+                    </td>
                     <td className="py-3.5 px-2">
                       <p className="font-bold text-[#2D1F23]">{att.name}</p>
                       <p className="text-[11px] text-gray-500">{att.email}</p>
@@ -579,12 +855,19 @@ export const EventDetailPage: React.FC = () => {
       </div>
 
       {/* Section: Registered List (Unboxed) */}
-      <div className="space-y-4">
+      <div id="registered-list-section" className="space-y-4">
         {/* Registered List Header: Heading, Search Bar in Middle, Add User Manually on Right */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <h2 className="font-serif font-bold text-xl text-[#2D1F23] shrink-0">
-            Registered List ({registeredList.length})
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="font-serif font-bold text-xl text-[#2D1F23] shrink-0">
+              Registered List ({registeredList.length})
+            </h2>
+            {event.requiresApproval && (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                Requires Approval
+              </span>
+            )}
+          </div>
 
           <div className="w-full sm:max-w-md flex-1">
             <input
@@ -609,27 +892,120 @@ export const EventDetailPage: React.FC = () => {
           </Button>
         </div>
 
-        {registeredList.length === 0 ? (
+        {/* Approval Filter Tabs (if event requires approval) */}
+        {event.requiresApproval && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-2">
+            {[
+              { id: 'all', label: 'All Registrants', count: registeredList.length },
+              { id: 'pending', label: 'Pending Review', count: pendingCount, highlight: pendingCount > 0 },
+              { id: 'approved', label: 'Approved', count: approvedCount },
+              { id: 'rejected', label: 'Declined', count: rejectedCount },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setApprovalTab(tab.id as any)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  approvalTab === tab.id
+                    ? 'bg-[#63474D] text-white shadow-2xs'
+                    : tab.highlight
+                    ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                    : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                    approvalTab === tab.id
+                      ? 'bg-white/20 text-white'
+                      : tab.highlight
+                      ? 'bg-amber-200 text-amber-900'
+                      : 'bg-black/5 text-[#756366]'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Bulk Action Bar for Registrations */}
+        {selectedRegistrationIds.length > 0 && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fade-in shadow-2xs">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
+              <Check className="w-4 h-4 text-emerald-600" />
+              <span>{selectedRegistrationIds.length} application{selectedRegistrationIds.length === 1 ? '' : 's'} selected</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={isBulkApproving}
+                onClick={handleBulkApprove}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                icon={<Check className="w-3.5 h-3.5" />}
+              >
+                {isBulkApproving ? 'Approving...' : `Approve Selected (${selectedRegistrationIds.length})`}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedRegistrationIds([])}
+                className="px-2 py-1 text-xs text-gray-500 hover:text-black cursor-pointer font-medium"
+              >
+                Deselect
+              </button>
+            </div>
+          </div>
+        )}
+
+        {displayedRegisteredList.length === 0 ? (
           <div className="py-8 text-center text-xs text-gray-400">
-            {roster.length === 0 ? 'No registrations received yet.' : 'No registrants match your search filter.'}
+            {roster.length === 0
+              ? 'No registrations received yet.'
+              : approvalTab === 'pending'
+              ? 'No pending applications to review.'
+              : 'No registrants match your search filter.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px]">
                 <tr>
+                  <th className="py-3 px-2 w-8">
+                    <input
+                      type="checkbox"
+                      checked={displayedRegisteredList.length > 0 && displayedRegisteredList.every((att) => selectedRegistrationIds.includes(att.registrationId || att.id))}
+                      onChange={handleSelectAllRegistrations}
+                      className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                      title="Select all"
+                    />
+                  </th>
                   <th className="py-3 px-2">Attendee Name & Email</th>
                   <th className="py-3 px-2">Registration Date</th>
                   <th className="py-3 px-2">Status</th>
                   <th className="py-3 px-2">Registration Answers</th>
-                  <th className="py-3 px-2 text-right">Remove</th>
+                  <th className="py-3 px-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {registeredList.map((att) => {
+                {displayedRegisteredList.map((att) => {
                   const isCheckedIn = att.status === 'Checked in' || att.badges?.includes('attended');
+                  const isPending = att.approvalStatus === 'pending';
+                  const isRejected = att.approvalStatus === 'rejected';
+
                   return (
                     <tr key={att.id} className="hover:bg-gray-50/60 transition-colors">
+                      <td className="py-3.5 px-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedRegistrationIds.includes(att.registrationId || att.id)}
+                          onChange={() => handleToggleRegistration(att.registrationId || att.id)}
+                          className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                        />
+                      </td>
                       <td className="py-3.5 px-2">
                         <p className="font-bold text-[#2D1F23]">{att.name}</p>
                         <p className="text-[11px] text-gray-500">{att.email}</p>
@@ -638,17 +1014,35 @@ export const EventDetailPage: React.FC = () => {
                         {att.registrationDate}
                       </td>
                       <td className="py-3.5 px-2">
-                        {/* Unboxed status, CLICKABLE to view attendee answers */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedAnswersAttendee(att)}
-                          className="text-left cursor-pointer hover:underline focus:outline-none transition-colors"
-                          title="Click to view answers to questions"
-                        >
-                          <span className={`font-semibold ${isCheckedIn ? 'text-[#2A7B5F]' : 'text-[#63474D]'}`}>
-                            {isCheckedIn ? 'Checked in' : 'Registered'}
+                        {isPending ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAnswersAttendee(att)}
+                            className="text-left cursor-pointer hover:underline focus:outline-none transition-colors"
+                            title="Click to view submitted questionnaire responses"
+                          >
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              Pending Review
+                            </span>
+                          </button>
+                        ) : isRejected ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
+                            <X className="w-3 h-3 text-red-600" />
+                            Declined
                           </span>
-                        </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAnswersAttendee(att)}
+                            className="text-left cursor-pointer hover:underline focus:outline-none transition-colors"
+                            title="Click to view answers to questions"
+                          >
+                            <span className={`font-semibold ${isCheckedIn ? 'text-[#2A7B5F]' : 'text-[#63474D]'}`}>
+                              {isCheckedIn ? 'Checked in' : 'Approved'}
+                            </span>
+                          </button>
+                        )}
                       </td>
                       <td className="py-3.5 px-2 max-w-xs truncate text-gray-600">
                         {att.answers && Object.keys(att.answers).length > 0 ? (
@@ -667,15 +1061,71 @@ export const EventDetailPage: React.FC = () => {
                         )}
                       </td>
                       <td className="py-3.5 px-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setDeleteConfirmToast(att)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                          title={`Remove ${att.name} from event`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Remove</span>
-                        </button>
+                        {isPending ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedAnswersAttendee(att)}
+                              className="px-2.5 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium cursor-pointer"
+                              title="Review submitted answers"
+                            >
+                              Answers
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleApproveAttendee(att)}
+                              disabled={approvingId === (att.registrationId || att.id)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                              title="Approve attendee and issue pass"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>{approvingId === (att.registrationId || att.id) ? 'Approving...' : 'Approve'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRejectingAttendee(att);
+                                setRejectionReason('');
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold transition-all cursor-pointer"
+                              title="Decline registration"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Reject</span>
+                            </button>
+                          </div>
+                        ) : isRejected ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleApproveAttendee(att)}
+                              disabled={approvingId === (att.registrationId || att.id)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 text-gray-700 text-xs font-medium transition-all cursor-pointer"
+                              title="Re-approve application"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Re-approve</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmToast(att)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                              title={`Remove record`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmToast(att)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                            title={`Remove ${att.name} from event`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Remove</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -930,7 +1380,38 @@ export const EventDetailPage: React.FC = () => {
               )}
             </div>
 
-            <div className="pt-3 border-t border-gray-100 flex items-center justify-end">
+            <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+              {selectedAnswersAttendee.approvalStatus === 'pending' ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const att = selectedAnswersAttendee;
+                      setSelectedAnswersAttendee(null);
+                      handleApproveAttendee(att);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Approve Application</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const att = selectedAnswersAttendee;
+                      setSelectedAnswersAttendee(null);
+                      setRejectingAttendee(att);
+                      setRejectionReason('');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold transition-all cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Decline</span>
+                  </button>
+                </div>
+              ) : (
+                <div />
+              )}
               <Button
                 onClick={() => setSelectedAnswersAttendee(null)}
                 variant="outline"
@@ -938,6 +1419,76 @@ export const EventDetailPage: React.FC = () => {
               >
                 Close
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Decline / Rejection Modal */}
+      {rejectingAttendee && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+          <div
+            onClick={() => !isSubmittingReject && setRejectingAttendee(null)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+          />
+
+          <div className="relative bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-gray-100 z-10 space-y-4 animate-fade-in">
+            <div className="flex items-start justify-between pb-3 border-b border-gray-100">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-red-600">
+                  Decline Registration
+                </span>
+                <h3 className="font-serif font-bold text-lg text-[#2D1F23]">
+                  Reject Application
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {rejectingAttendee.name} ({rejectingAttendee.email})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectingAttendee(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-gray-600 leading-relaxed">
+                Are you sure you want to decline this registration? An email notification will be sent to the attendee informing them that their application was not approved.
+              </p>
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Reason / Feedback (Optional)
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Prerequisites not met, capacity reached, or duplicate entry..."
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setRejectingAttendee(null)}
+                disabled={isSubmittingReject}
+                className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRejectAttendee}
+                disabled={isSubmittingReject}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingReject ? 'Declining...' : 'Confirm Decline'}
+              </button>
             </div>
           </div>
         </div>

@@ -20,6 +20,8 @@ export class EventController {
         capacity,
         isPaid,
         ticketPrice,
+        requiresApproval,
+        requires_approval,
         customQuestions,
         bannerUrl,
       } = req.body;
@@ -36,6 +38,7 @@ export class EventController {
         capacity,
         isPaid,
         ticketPrice,
+        requiresApproval: requiresApproval ?? requires_approval ?? false,
         customQuestions,
         bannerUrl,
       });
@@ -195,6 +198,49 @@ export class EventController {
       await EventService.removeAttendeeFromEvent(eventId, targetId, userId, userRole);
 
       return sendSuccess(res, null, 'Attendee removed from event successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async approveRegistration(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const eventId = req.params.id as string;
+      const registrationId = (req.params.registrationId || req.params.attendeeId) as string;
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+
+      const result = await EventService.approveAttendeeRegistration(eventId, registrationId, userId, userRole);
+      return sendSuccess(res, result, 'Attendee application approved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async rejectRegistration(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const eventId = req.params.id as string;
+      const registrationId = (req.params.registrationId || req.params.attendeeId) as string;
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+      const reason = req.body?.reason;
+
+      const result = await EventService.rejectAttendeeRegistration(eventId, registrationId, userId, userRole, reason);
+      return sendSuccess(res, result, 'Attendee application rejected.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async bulkApproveRegistrations(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const eventId = req.params.id as string;
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+      const registrationIds = (req.body?.registrationIds || []) as string[];
+
+      const result = await EventService.bulkApproveRegistrations(eventId, userId, userRole, registrationIds);
+      return sendSuccess(res, result, `Successfully approved ${result.approvedCount} applicant(s).`);
     } catch (error) {
       next(error);
     }

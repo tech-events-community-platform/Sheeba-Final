@@ -71,12 +71,16 @@ export const MyEventsPage: React.FC = () => {
       isEventPassed((ticket as any).rawEventDate || eventObj.date || ticket.eventDate || ticket.expiresAt)
     );
     const isAttended = ticket.status === 'Checked in' || ticket.status === 'Used';
+    const isPending = Boolean(ticket.isPending || ticket.approvalStatus === 'pending' || ticket.status === 'Pending Approval');
+    const isRejected = Boolean(ticket.approvalStatus === 'rejected' || ticket.status === 'Rejected');
 
     return {
       ticket,
       event: eventObj,
       isPassed,
       isAttended,
+      isPending,
+      isRejected,
     };
   });
 
@@ -183,7 +187,7 @@ export const MyEventsPage: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {upcomingEvents.map(({ ticket, event }) => (
+              {upcomingEvents.map(({ ticket, event, isPending, isRejected }) => (
                 <div
                   key={ticket.id}
                   className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E8DDD7] hover:border-[#63474D] transition-all shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5"
@@ -193,10 +197,22 @@ export const MyEventsPage: React.FC = () => {
                       <Badge variant="primary" className="uppercase font-mono text-[10px]">
                         {event.type || ticket.eventType}
                       </Badge>
-                      <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2A7B5F] bg-[#2A7B5F]/10 px-2.5 py-0.5 rounded-full">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Registration Confirmed</span>
-                      </div>
+                      {isPending ? (
+                        <div className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Pending Organizer Approval</span>
+                        </div>
+                      ) : isRejected ? (
+                        <div className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
+                          <X className="w-3.5 h-3.5 text-red-600" />
+                          <span>Application Declined</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2A7B5F] bg-[#2A7B5F]/10 px-2.5 py-0.5 rounded-full">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Registration Confirmed</span>
+                        </div>
+                      )}
                       <span className="font-mono text-[10px] text-[#756366] bg-[#FAF7F5] border border-[#E8DDD7] px-2 py-0.5 rounded">
                         Pass: {ticket.id}
                       </span>
@@ -233,31 +249,64 @@ export const MyEventsPage: React.FC = () => {
 
                   {/* Actions for Upcoming Event */}
                   <div className="flex flex-row md:flex-col items-center sm:items-end gap-2 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-[#E8DDD7]">
-                    <Button
-                      type="button"
-                      variant="primary"
-                      size="sm"
-                      onClick={() => handleViewTicketQr(ticket.id)}
-                      icon={<QrCode className="w-4 h-4" />}
-                      className="w-full md:w-auto"
-                    >
-                      View QR Pass
-                    </Button>
-
-                    <Link
-                      to={`/app/ticket/${ticket.eventId}`}
-                      className="w-full md:w-auto"
-                    >
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        icon={<ExternalLink className="w-3.5 h-3.5" />}
+                    {isPending ? (
+                      <Link
+                        to={`/app/ticket/${ticket.eventId}`}
                         className="w-full md:w-auto"
                       >
-                        Pass View
-                      </Button>
-                    </Link>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          icon={<Clock className="w-3.5 h-3.5 text-amber-700" />}
+                          className="w-full md:w-auto border-amber-200 bg-amber-50/50 text-amber-900"
+                        >
+                          Check Status
+                        </Button>
+                      </Link>
+                    ) : isRejected ? (
+                      <Link
+                        to={`/e/${ticket.eventId}`}
+                        className="w-full md:w-auto"
+                      >
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full md:w-auto"
+                        >
+                          Event Info
+                        </Button>
+                      </Link>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          onClick={() => handleViewTicketQr(ticket.id)}
+                          icon={<QrCode className="w-4 h-4" />}
+                          className="w-full md:w-auto"
+                        >
+                          View QR Pass
+                        </Button>
+
+                        <Link
+                          to={`/app/ticket/${ticket.eventId}`}
+                          className="w-full md:w-auto"
+                        >
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            icon={<ExternalLink className="w-3.5 h-3.5" />}
+                            className="w-full md:w-auto"
+                          >
+                            Pass View
+                          </Button>
+                        </Link>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -384,6 +433,8 @@ export const MyEventsPage: React.FC = () => {
                 const isHighlighted = highlightedTicketId === ticket.id;
                 const isPassed = Boolean(ticket.isExpired || isEventPassed((ticket as any).rawEventDate || ticket.eventDate || ticket.expiresAt));
                 const isAttended = ticket.status === 'Checked in' || ticket.status === 'Used';
+                const isPending = Boolean(ticket.isPending || ticket.approvalStatus === 'pending' || ticket.status === 'Pending Approval');
+                const isRejected = Boolean(ticket.approvalStatus === 'rejected' || ticket.status === 'Rejected');
 
                 return (
                   <div
@@ -412,7 +463,15 @@ export const MyEventsPage: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {isAttended ? (
+                        {isPending ? (
+                          <Badge variant="warning" icon={<Clock className="w-3 h-3 text-amber-700" />}>
+                            Pending Review
+                          </Badge>
+                        ) : isRejected ? (
+                          <Badge variant="error" icon={<X className="w-3 h-3 text-red-600" />}>
+                            Declined
+                          </Badge>
+                        ) : isAttended ? (
                           <Badge variant="success" icon={<ShieldCheck className="w-3 h-3" />}>
                             Attended • Badge Earned
                           </Badge>
@@ -431,58 +490,84 @@ export const MyEventsPage: React.FC = () => {
                     {/* Main Content: QR Code Left + Details Right */}
                     <div className="p-6 flex flex-col md:flex-row items-center md:items-stretch gap-6">
                       {/* Live Dynamic QR Code Section (Clickable to open Attendee Box) */}
-                      <div
-                        onClick={() => setSelectedAttendeeTicket(ticket)}
-                        title="Click QR Code to view Attendee Information Box"
-                        className="flex flex-col items-center justify-center p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] shrink-0 text-center w-full md:w-auto cursor-pointer hover:border-[#63474D] hover:shadow-md transition-all group"
-                      >
-                        <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] shadow-2xs group-hover:scale-105 transition-transform relative">
-                          <QRCodeSVG
-                            value={ticket.attendeeName || 'Attendee'}
-                            size={160}
-                            bgColor="#ffffff"
-                            fgColor="#2D1F23"
-                            level="M"
-                            includeMargin={false}
-                            className={isPassed && !isAttended ? 'opacity-30 grayscale' : ''}
-                          />
-                          {isPassed && !isAttended && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-white/70 backdrop-blur-[1px] rounded-xl">
-                              <span className="text-[10px] font-bold text-[#8C2838] bg-[#8C2838]/10 px-2 py-0.5 rounded-full border border-[#8C2838]/20 shadow-xs">
-                                Pass Expired
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="mt-2.5 text-center w-full max-w-[180px]">
-                          <span className="text-[10px] font-bold text-[#63474D] bg-[#63474D]/10 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 group-hover:bg-[#63474D] group-hover:text-white transition-colors">
-                            <Sparkles className="w-3 h-3 text-[#FFA686]" />
-                            Click QR for Info
+                      {isPending ? (
+                        <div className="flex flex-col items-center justify-center p-6 bg-amber-50/60 rounded-2xl border border-amber-200 shrink-0 text-center w-full md:w-56">
+                          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-3">
+                            <Clock className="w-8 h-8 text-amber-600 animate-pulse" />
+                          </div>
+                          <span className="text-xs font-bold text-amber-900 mb-1">
+                            Application Pending
                           </span>
-                          <p className="text-xs font-bold text-[#2D1F23] truncate mt-1">
-                            {ticket.attendeeName}
+                          <p className="text-[11px] text-amber-700 leading-relaxed max-w-[170px]">
+                            Organizer review in progress. Your entry pass and QR code will appear here once approved.
                           </p>
-                          <p className="text-[11px] font-mono font-bold text-[#63474D]">
-                            {ticket.ticketCode || 'SHB-PASS'}
-                          </p>
-                          {isAttended ? (
-                            <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center justify-center gap-1">
-                              <ShieldCheck className="w-3 h-3 text-[#2A7B5F]" />
-                              <span>Attended & Verified</span>
-                            </span>
-                          ) : isPassed ? (
-                            <span className="text-[10px] font-bold text-[#756366] mt-1 flex items-center justify-center gap-1">
-                              <Clock className="w-3 h-3 text-[#756366]" />
-                              <span>Expired at End of Day</span>
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center justify-center gap-1">
-                              <Sparkles className="w-3 h-3 text-[#2A7B5F]" />
-                              <span>Scan to Verify Attendee</span>
-                            </span>
-                          )}
                         </div>
-                      </div>
+                      ) : isRejected ? (
+                        <div className="flex flex-col items-center justify-center p-6 bg-red-50/60 rounded-2xl border border-red-200 shrink-0 text-center w-full md:w-56">
+                          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-3">
+                            <X className="w-8 h-8 text-red-600" />
+                          </div>
+                          <span className="text-xs font-bold text-red-900 mb-1">
+                            Application Declined
+                          </span>
+                          <p className="text-[11px] text-red-700 leading-relaxed max-w-[170px]">
+                            This registration was not approved by the event organizer.
+                          </p>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => setSelectedAttendeeTicket(ticket)}
+                          title="Click QR Code to view Attendee Information Box"
+                          className="flex flex-col items-center justify-center p-4 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] shrink-0 text-center w-full md:w-auto cursor-pointer hover:border-[#63474D] hover:shadow-md transition-all group"
+                        >
+                          <div className="bg-white p-3 rounded-xl border border-[#E8DDD7] shadow-2xs group-hover:scale-105 transition-transform relative">
+                            <QRCodeSVG
+                              value={ticket.attendeeName || 'Attendee'}
+                              size={160}
+                              bgColor="#ffffff"
+                              fgColor="#2D1F23"
+                              level="M"
+                              includeMargin={false}
+                              className={isPassed && !isAttended ? 'opacity-30 grayscale' : ''}
+                            />
+                            {isPassed && !isAttended && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-white/70 backdrop-blur-[1px] rounded-xl">
+                                <span className="text-[10px] font-bold text-[#8C2838] bg-[#8C2838]/10 px-2 py-0.5 rounded-full border border-[#8C2838]/20 shadow-xs">
+                                  Pass Expired
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="mt-2.5 text-center w-full max-w-[180px]">
+                            <span className="text-[10px] font-bold text-[#63474D] bg-[#63474D]/10 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 group-hover:bg-[#63474D] group-hover:text-white transition-colors">
+                              <Sparkles className="w-3 h-3 text-[#FFA686]" />
+                              Click QR for Info
+                            </span>
+                            <p className="text-xs font-bold text-[#2D1F23] truncate mt-1">
+                              {ticket.attendeeName}
+                            </p>
+                            <p className="text-[11px] font-mono font-bold text-[#63474D]">
+                              {ticket.ticketCode || 'SHB-PASS'}
+                            </p>
+                            {isAttended ? (
+                              <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center justify-center gap-1">
+                                <ShieldCheck className="w-3 h-3 text-[#2A7B5F]" />
+                                <span>Attended & Verified</span>
+                              </span>
+                            ) : isPassed ? (
+                              <span className="text-[10px] font-bold text-[#756366] mt-1 flex items-center justify-center gap-1">
+                                <Clock className="w-3 h-3 text-[#756366]" />
+                                <span>Expired at End of Day</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-[#2A7B5F] mt-1 flex items-center justify-center gap-1">
+                                <Sparkles className="w-3 h-3 text-[#2A7B5F]" />
+                                <span>Scan to Verify Attendee</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Event & Pass Details */}
                       <div className="flex-1 flex flex-col justify-between space-y-4 text-left w-full">
@@ -534,7 +619,17 @@ export const MyEventsPage: React.FC = () => {
                         {/* Action Buttons */}
                         <div className="pt-2 border-t border-[#E8DDD7] flex flex-wrap items-center justify-between gap-3 no-print">
                           <div className="flex items-center gap-1.5 text-xs font-semibold">
-                            {isAttended ? (
+                            {isPending ? (
+                              <div className="flex items-center gap-1.5 text-amber-700">
+                                <Clock className="w-4 h-4 text-amber-600" />
+                                <span>Awaiting organizer review. You will receive an email upon status change.</span>
+                              </div>
+                            ) : isRejected ? (
+                              <div className="flex items-center gap-1.5 text-red-600">
+                                <X className="w-4 h-4 text-red-600" />
+                                <span>Application was declined by the organizer.</span>
+                              </div>
+                            ) : isAttended ? (
                               <div className="flex items-center gap-1.5 text-[#2A7B5F]">
                                 <ShieldCheck className="w-4 h-4" />
                                 <span>Attendance verified at event door</span>
@@ -564,15 +659,17 @@ export const MyEventsPage: React.FC = () => {
                               </Button>
                             </Link>
 
-                            <Button
-                              type="button"
-                              variant="accent"
-                              size="sm"
-                              onClick={() => handlePrint(ticket.id)}
-                              icon={<Printer className="w-3.5 h-3.5" />}
-                            >
-                              Print / Save Pass
-                            </Button>
+                            {!isPending && !isRejected && (
+                              <Button
+                                type="button"
+                                variant="accent"
+                                size="sm"
+                                onClick={() => handlePrint(ticket.id)}
+                                icon={<Printer className="w-3.5 h-3.5" />}
+                              >
+                                Print / Save Pass
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>

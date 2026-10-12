@@ -1,5 +1,5 @@
 import { query, getClient } from '../config/db';
-import { IEvent, EventType, EventStatus, UserRole, AttendeeRosterItem, RegistrationQuestion } from '../types';
+import { IEvent, EventType, EventStatus, UserRole, AttendeeRosterItem, RegistrationQuestion, RegistrationApprovalStatus } from '../types';
 import { generateTicketToken, generateQrDataUrl, generateTicketCode, computeEventDayExpiration } from '../utils/qr.util';
 import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
@@ -70,6 +70,7 @@ export class EventService {
       isPaid,
       ticketPrice,
       currency: row.currency || 'ETB',
+      requiresApproval: Boolean(row.requires_approval),
       shareLinkToken: row.share_link_token || row.id,
       customQuestions: typeof row.custom_questions === 'string' ? JSON.parse(row.custom_questions) : row.custom_questions || [],
       bannerUrl: posterUrl,
@@ -93,6 +94,7 @@ export class EventService {
       capacity: number;
       isPaid?: boolean;
       ticketPrice?: number;
+      requiresApproval?: boolean;
       customQuestions?: any[];
       bannerUrl?: string;
       posterImageUrl?: string;
@@ -111,6 +113,7 @@ export class EventService {
       capacity,
       isPaid = false,
       ticketPrice = 0,
+      requiresApproval = false,
       customQuestions = [],
       bannerUrl,
       posterImageUrl,
@@ -125,8 +128,8 @@ export class EventService {
         organizer_id, title, description, event_type, category, event_date,
         start_time, end_time, time_str, location, venue_name, capacity,
         status, is_paid, ticket_price, currency, share_link_token,
-        custom_questions, banner_url, poster_image_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, 'ETB', $15, $16, $17, $18)
+        custom_questions, banner_url, poster_image_url, requires_approval
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, 'ETB', $15, $16, $17, $18, $19)
       RETURNING *`,
       [
         organizerId,
@@ -147,6 +150,7 @@ export class EventService {
         JSON.stringify(customQuestions),
         poster,
         poster,
+        Boolean(requiresApproval),
       ]
     );
 
@@ -282,7 +286,7 @@ export class EventService {
     data: any
   ): Promise<any> {
     const existing = await query(
-      'SELECT id, organizer_id, start_time, end_time FROM events WHERE id::text = $1 OR share_link_token = $1',
+      'SELECT id, organizer_id, share_link_token, start_time, end_time FROM events WHERE id::text = $1 OR share_link_token = $1',
       [eventId]
     );
     if (!existing.rowCount || existing.rowCount === 0) {
@@ -320,6 +324,7 @@ export class EventService {
       'banner_url',
       'poster_image_url',
       'custom_questions',
+      'requires_approval',
     ];
 
     const inputData: any = { ...data };
@@ -337,6 +342,8 @@ export class EventService {
           ? 'ticket_price'
           : key === 'isPaid'
           ? 'is_paid'
+          : key === 'requiresApproval'
+          ? 'requires_approval'
           : key === 'date'
           ? 'event_date'
           : key === 'startTime'
@@ -357,7 +364,9 @@ export class EventService {
       if (allowedFields.includes(dbKey)) {
         fields.push(`${dbKey} = $${counter++}`);
         values.push(
-          dbKey === 'custom_questions'
+          dbKey === 'requires_approval'
+            ? Boolean(value)
+            : dbKey === 'custom_questions'
             ? typeof value === 'string'
               ? value
               : JSON.stringify(value || [])
@@ -386,6 +395,9 @@ export class EventService {
     CacheService.delPrefix('events:list');
     CacheService.delPrefix(`event:${realId}`);
     CacheService.delPrefix(`event:${eventId}`);
+    if ((existing.rows[0] as any)?.share_link_token) {
+      CacheService.delPrefix(`event:${(existing.rows[0] as any).share_link_token}`);
+    }
     CacheService.del(`report:${realId}`);
     CacheService.del(`report:${eventId}`);
     return this.getEventById(realId);
@@ -424,7 +436,16 @@ export class EventService {
     userId: string;
     answers?: Record<string, any>;
     paymentReference?: string;
-  }): Promise<{ ticket: any; isPaymentRequired: boolean; checkoutUrl?: string }> {
+  }): Promise<{
+    ticket: any;
+    isPaymentRequired: boolean;
+    checkoutUrl?: string;
+    registrationId?: string;
+    isPendingApproval?: boolean;
+    approvalStatus?: string;
+    requiresApproval?: boolean;
+    message?: string;
+  }> {
     const { eventId, userId, answers = {}, paymentReference } = params;
 
     const event = await this.getEventById(eventId);
@@ -503,14 +524,91 @@ export class EventService {
       }
     }
 
-    // Reject duplicate registration server-side (Section 3)
-    const existingReg = await query('SELECT id FROM registrations WHERE event_id = $1 AND user_id = $2', [event.id, userId]);
+    // Reject duplicate registration or handle pending/rejected/payment completion
+    const existingReg = await query(
+      'SELECT id, approval_status, payment_status FROM registrations WHERE event_id = $1 AND user_id = $2',
+      [event.id, userId]
+    );
+
     if (existingReg.rowCount && existingReg.rowCount > 0) {
-      const err: any = new Error('You are already registered for this event.');
-      err.statusCode = 409;
-      throw err;
+      const regRow = existingReg.rows[0] as any;
+      const existingStatus = regRow.approval_status;
+
+      // Case 1: Approved attendee completing ticket payment
+      if (existingStatus === 'approved' && event.isPaid && paymentReference && regRow.payment_status !== 'settled') {
+        // Proceed to ticket generation below using existing registration
+      } else if (existingStatus === 'pending') {
+        const err: any = new Error('Your application for this event is currently under review by the organizer.');
+        err.statusCode = 409;
+        err.code = 'REGISTRATION_PENDING';
+        throw err;
+      } else if (existingStatus === 'rejected') {
+        const err: any = new Error('Your application for this event was not accepted.');
+        err.statusCode = 409;
+        err.code = 'REGISTRATION_REJECTED';
+        throw err;
+      } else {
+        const err: any = new Error('You are already registered for this event.');
+        err.statusCode = 409;
+        throw err;
+      }
     }
 
+    const requiresApproval = Boolean(event.requiresApproval);
+
+    // Case 2: Event requires manual organizer approval
+    if (requiresApproval && (!existingReg.rowCount || existingReg.rows[0]?.approval_status !== 'approved')) {
+      const client = await getClient();
+      try {
+        await client.query('BEGIN');
+
+        const regRes = await client.query(
+          `INSERT INTO registrations (event_id, user_id, status, approval_status, answers, payment_reference, payment_status)
+           VALUES ($1, $2, 'registered', 'pending', $3, $4, 'unsettled')
+           RETURNING id`,
+          [event.id, userId, JSON.stringify(answers), paymentReference || null]
+        );
+        const registrationId = regRes.rows[0].id;
+
+        await client.query('COMMIT');
+
+        CacheService.delPrefix('events:list');
+        CacheService.delPrefix(`event:${event.id}`);
+        CacheService.del(`report:${event.id}`);
+
+        const userRes = await query('SELECT full_name, email FROM users WHERE id = $1', [userId]);
+        const attendeeUser = userRes.rows[0] || {};
+
+        try {
+          if (attendeeUser.email) {
+            await EmailService.sendApplicationSubmittedPendingEmail(
+              attendeeUser.email,
+              attendeeUser.full_name || 'Attendee',
+              event.title
+            );
+          }
+        } catch (emailErr) {
+          console.warn('Failed to dispatch application pending email:', emailErr);
+        }
+
+        return {
+          ticket: null,
+          registrationId,
+          isPaymentRequired: false,
+          isPendingApproval: true,
+          approvalStatus: 'pending',
+          requiresApproval: true,
+          message: 'Your application has been submitted and is pending organizer approval.',
+        };
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
+    // Case 3: Standard Instant Pass or Approved Attendee Settling Payment
     // Handle Paid Event Check (Chapa ETB)
     if (event.isPaid && !paymentReference) {
       return {
@@ -524,13 +622,24 @@ export class EventService {
     try {
       await client.query('BEGIN');
 
-      const regRes = await client.query(
-        `INSERT INTO registrations (event_id, user_id, status, answers, payment_reference, payment_status)
-         VALUES ($1, $2, 'registered', $3, $4, 'settled')
-         RETURNING id`,
-        [event.id, userId, JSON.stringify(answers), paymentReference || null]
-      );
-      const registrationId = regRes.rows[0].id;
+      let registrationId: string;
+      if (existingReg.rowCount && existingReg.rowCount > 0) {
+        registrationId = existingReg.rows[0].id;
+        await client.query(
+          `UPDATE registrations 
+           SET payment_reference = $1, payment_status = 'settled', updated_at = NOW() 
+           WHERE id = $2`,
+          [paymentReference || null, registrationId]
+        );
+      } else {
+        const regRes = await client.query(
+          `INSERT INTO registrations (event_id, user_id, status, approval_status, answers, payment_reference, payment_status)
+           VALUES ($1, $2, 'registered', 'approved', $3, $4, 'settled')
+           RETURNING id`,
+          [event.id, userId, JSON.stringify(answers), paymentReference || null]
+        );
+        registrationId = regRes.rows[0].id;
+      }
 
       const eventDate = event.rawDate || event.date;
       const ticketCode = generateTicketCode(eventDate);
@@ -562,6 +671,8 @@ export class EventService {
           id, ticket_code, registration_id, event_id, user_id, qr_token, qr_code_data_url,
           status, is_paid, ticket_price, currency, expires_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ISSUED', $8, $9, 'ETB', $10)
+        ON CONFLICT (registration_id) DO UPDATE SET 
+          status = 'ISSUED', qr_token = EXCLUDED.qr_token, qr_code_data_url = EXCLUDED.qr_code_data_url, updated_at = NOW()
         RETURNING *`,
         [ticketId, ticketCode, registrationId, event.id, userId, qrToken, qrDataUrl, event.isPaid, event.ticketPrice, expiresAt]
       );
@@ -611,7 +722,7 @@ export class EventService {
         currency: 'ETB',
       };
 
-      // Trigger separate registration-confirmation email with date, time, location (Section 4)
+      // Trigger confirmation email
       try {
         if (attendeeUser.email) {
           await EmailService.sendRegistrationConfirmationEmail(
@@ -660,6 +771,7 @@ export class EventService {
       SELECT 
         r.id AS roster_id,
         r.id AS registration_id,
+        r.approval_status,
         u.id AS attendee_id,
         u.full_name AS name,
         u.email,
@@ -699,6 +811,7 @@ export class EventService {
         organization: row.organization || undefined,
         registrationDate: new Date(row.registered_at).toISOString().split('T')[0],
         status: (isCheckedIn ? 'Checked in' : 'Registered') as 'Checked in' | 'Registered',
+        approvalStatus: (row.approval_status || 'approved') as RegistrationApprovalStatus,
         checkInTime: checkInTimeDate
           ? new Date(checkInTimeDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' EAT'
           : undefined,
@@ -709,6 +822,291 @@ export class EventService {
 
     CacheService.set(cacheKey, roster, 20);
     return roster;
+  }
+
+  static async approveAttendeeRegistration(
+    eventId: string,
+    registrationId: string,
+    userId: string,
+    userRole: UserRole
+  ): Promise<any> {
+    const existing = await query(
+      'SELECT id, organizer_id FROM events WHERE id::text = $1 OR share_link_token = $1',
+      [eventId]
+    );
+    if (!existing.rowCount || existing.rowCount === 0) {
+      const err: any = new Error('Event not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const realEventId = (existing.rows[0] as any).id;
+    if (existing.rows[0].organizer_id !== userId && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. Only the event organizer can approve applications.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    const event = await this.getEventById(realEventId);
+
+    // Fetch registration
+    const regRes = await query(
+      `SELECT r.*, u.full_name, u.email, u.phone, u.organization
+       FROM registrations r
+       JOIN users u ON r.user_id = u.id
+       WHERE r.id = $1 AND r.event_id = $2`,
+      [registrationId, realEventId]
+    );
+
+    if (!regRes.rowCount || regRes.rowCount === 0) {
+      const err: any = new Error('Registration record not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const reg = regRes.rows[0];
+    const attendeeUser = {
+      id: reg.user_id,
+      full_name: reg.full_name,
+      email: reg.email,
+      phone: reg.phone,
+      organization: reg.organization,
+    };
+
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE registrations 
+         SET approval_status = 'approved', updated_at = NOW() 
+         WHERE id = $1`,
+        [registrationId]
+      );
+
+      let formattedTicket: any = null;
+
+      // If free or already settled, issue ticket and QR code pass immediately
+      if (!event.isPaid || event.ticketPrice <= 0 || reg.payment_status === 'settled') {
+        const existingTicket = await client.query('SELECT * FROM tickets WHERE registration_id = $1', [registrationId]);
+
+        let rawTicket: any = null;
+        if (existingTicket.rowCount && existingTicket.rowCount > 0) {
+          rawTicket = existingTicket.rows[0];
+          await client.query("UPDATE tickets SET status = 'ISSUED', updated_at = NOW() WHERE id = $1", [rawTicket.id]);
+        } else {
+          const eventDate = event.rawDate || event.date;
+          const ticketCode = generateTicketCode(eventDate);
+          const ticketId = (await client.query('SELECT gen_random_uuid() AS id')).rows[0].id;
+          const expiresAt = computeEventDayExpiration(eventDate);
+          const qrToken = generateTicketToken(ticketId, event.id, eventDate);
+
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const verifyUrl = `${frontendUrl}/verify-ticket?token=${encodeURIComponent(qrToken)}&code=${encodeURIComponent(ticketCode)}`;
+          const qrPayload = [
+            `SHEEBA VERIFIED PASS`,
+            `Attendee: ${attendeeUser.full_name}`,
+            attendeeUser.email ? `Email: ${attendeeUser.email}` : '',
+            `Event: ${event.title}`,
+            `Code: ${ticketCode}`,
+            `Status: Valid`,
+            `Verify: ${verifyUrl}`,
+          ].filter(Boolean).join('\n');
+
+          const qrDataUrl = await generateQrDataUrl(qrPayload);
+
+          const ticketRes = await client.query(
+            `INSERT INTO tickets (
+              id, ticket_code, registration_id, event_id, user_id, qr_token, qr_code_data_url,
+              status, is_paid, ticket_price, currency, expires_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ISSUED', $8, $9, 'ETB', $10)
+            RETURNING *`,
+            [ticketId, ticketCode, registrationId, event.id, attendeeUser.id, qrToken, qrDataUrl, event.isPaid, event.ticketPrice, expiresAt]
+          );
+          rawTicket = ticketRes.rows[0];
+        }
+
+        formattedTicket = {
+          id: rawTicket.ticket_code || rawTicket.id,
+          registrationId,
+          eventId: event.id,
+          eventTitle: event.title,
+          eventType: event.type,
+          eventDate: event.date,
+          eventTime: event.time,
+          eventLocation: event.location,
+          attendeeId: attendeeUser.id,
+          attendeeName: attendeeUser.full_name,
+          attendeeEmail: attendeeUser.email,
+          qrToken: rawTicket.qr_token,
+          qrDataUrl: rawTicket.qr_code_data_url,
+          status: 'Valid',
+          issuedAt: rawTicket.created_at,
+          expiresAt: rawTicket.expires_at,
+          isPaid: rawTicket.is_paid,
+          ticketPrice: rawTicket.ticket_price,
+          currency: 'ETB',
+        };
+      }
+
+      await client.query('COMMIT');
+
+      CacheService.delPrefix('events:list');
+      CacheService.delPrefix(`event:${event.id}`);
+      CacheService.del(`report:${event.id}`);
+
+      // Dispatch Email Notification
+      try {
+        if (attendeeUser.email) {
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const ticketUrl = `${frontendUrl}/e/${event.shareLinkToken || event.id}/checkout`;
+          const isPendingPayment = Boolean(event.isPaid && event.ticketPrice > 0 && reg.payment_status !== 'settled');
+
+          await EmailService.sendApplicationApprovedEmail(
+            attendeeUser.email,
+            attendeeUser.full_name || 'Attendee',
+            event.title,
+            event.date,
+            event.time,
+            event.location,
+            isPendingPayment,
+            event.ticketPrice,
+            ticketUrl
+          );
+        }
+      } catch (emailErr) {
+        console.warn('Failed to send application approval email:', emailErr);
+      }
+
+      return {
+        success: true,
+        approvalStatus: 'approved',
+        ticket: formattedTicket,
+        isPaymentRequired: Boolean(event.isPaid && event.ticketPrice > 0 && reg.payment_status !== 'settled'),
+        message: 'Attendee application approved successfully.',
+      };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async rejectAttendeeRegistration(
+    eventId: string,
+    registrationId: string,
+    userId: string,
+    userRole: UserRole,
+    reason?: string
+  ): Promise<any> {
+    const existing = await query(
+      'SELECT id, organizer_id FROM events WHERE id::text = $1 OR share_link_token = $1',
+      [eventId]
+    );
+    if (!existing.rowCount || existing.rowCount === 0) {
+      const err: any = new Error('Event not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const realEventId = (existing.rows[0] as any).id;
+    if (existing.rows[0].organizer_id !== userId && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. Only the event organizer can reject applications.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    const event = await this.getEventById(realEventId);
+
+    const regRes = await query(
+      `SELECT r.*, u.full_name, u.email
+       FROM registrations r
+       JOIN users u ON r.user_id = u.id
+       WHERE r.id = $1 AND r.event_id = $2`,
+      [registrationId, realEventId]
+    );
+
+    if (!regRes.rowCount || regRes.rowCount === 0) {
+      const err: any = new Error('Registration record not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const reg = regRes.rows[0];
+
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE registrations 
+         SET approval_status = 'rejected', updated_at = NOW() 
+         WHERE id = $1`,
+        [registrationId]
+      );
+
+      // Cancel ticket if one existed
+      await client.query(
+        "UPDATE tickets SET status = 'CANCELLED', updated_at = NOW() WHERE registration_id = $1",
+        [registrationId]
+      );
+
+      await client.query('COMMIT');
+
+      CacheService.delPrefix('events:list');
+      CacheService.delPrefix(`event:${event.id}`);
+      CacheService.del(`report:${event.id}`);
+
+      try {
+        if (reg.email) {
+          await EmailService.sendApplicationRejectedEmail(
+            reg.email,
+            reg.full_name || 'Attendee',
+            event.title,
+            reason
+          );
+        }
+      } catch (emailErr) {
+        console.warn('Failed to send rejection email:', emailErr);
+      }
+
+      return {
+        success: true,
+        approvalStatus: 'rejected',
+        message: 'Attendee application rejected.',
+      };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async bulkApproveRegistrations(
+    eventId: string,
+    userId: string,
+    userRole: UserRole,
+    registrationIds: string[]
+  ): Promise<{ approvedCount: number; failedCount: number; results: any[] }> {
+    let approvedCount = 0;
+    let failedCount = 0;
+    const results: any[] = [];
+
+    for (const regId of registrationIds) {
+      try {
+        const res = await this.approveAttendeeRegistration(eventId, regId, userId, userRole);
+        results.push({ registrationId: regId, success: true, ...res });
+        approvedCount++;
+      } catch (err: any) {
+        console.warn(`Bulk approve error for registration ${regId}:`, err.message);
+        results.push({ registrationId: regId, success: false, error: err.message });
+        failedCount++;
+      }
+    }
+
+    return { approvedCount, failedCount, results };
   }
 
   static async removeAttendeeFromEvent(

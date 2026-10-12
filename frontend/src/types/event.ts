@@ -39,6 +39,7 @@ export interface Event {
   isPaid: boolean;
   ticketPrice: number; // In ETB
   currency: 'ETB';
+  requiresApproval?: boolean;
   shareLinkToken: string;
   customQuestions: RegistrationQuestion[];
   includeDefaultQuestions?: boolean;

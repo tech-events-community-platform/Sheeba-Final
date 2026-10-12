@@ -44,6 +44,7 @@ export const CreateEventPage: React.FC = () => {
     capacity: 100,
     isPaid: false,
     ticketPrice: 0,
+    requiresApproval: false,
     description: '',
     posterImageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
   });
@@ -300,6 +301,7 @@ export const CreateEventPage: React.FC = () => {
         isPaid: formData.isPaid,
         ticketPrice: formData.isPaid ? Number(formData.ticketPrice) : 0,
         currency: 'ETB',
+        requiresApproval: formData.requiresApproval,
         organizerId: user?.id || 'demo-organizer-001',
         organizerName: user?.organization || user?.name || 'GDG Addis',
         bannerUrl: formData.posterImageUrl,
@@ -666,6 +668,27 @@ export const CreateEventPage: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Require Organizer Approval Toggle */}
+            <div className="pt-3 border-t border-[#E8DDD7] flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-[#2D1F23] block">
+                  Require Organizer Approval
+                </span>
+                <span className="text-[11px] text-[#756366] block mt-0.5">
+                  Review attendee submissions before approving them and issuing ticket passes.
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.requiresApproval}
+                  onChange={(e) => setFormData({ ...formData, requiresApproval: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#63474D]"></div>
+              </label>
+            </div>
           </div>
 
           {/* 3. Registration Questions (Unboxed, free spacing, customizable answer choices) */}
