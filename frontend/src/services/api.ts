@@ -749,10 +749,11 @@ export const api = {
     delete: async (id: string): Promise<boolean> => {
       try {
         await requestApi(`/events/${id}`, { method: 'DELETE' });
-      } catch (e) {
+      } catch (e: any) {
+        if (e?.status === 403 || e?.status === 401) throw e;
         console.warn('Backend event delete fallback:', e);
       }
-      eventsStore = eventsStore.filter((e) => e.id !== id);
+      eventsStore = eventsStore.filter((e) => e.id !== id && e.shareLinkToken !== id);
       saveEventsStore();
       return true;
     },
@@ -762,7 +763,8 @@ export const api = {
         await requestApi(`/events/${eventId}/attendees/${attendeeId}`, {
           method: 'DELETE',
         });
-      } catch (e) {
+      } catch (e: any) {
+        if (e?.status === 403 || e?.status === 401) throw e;
         console.warn('Backend remove attendee fallback:', e);
       }
       return true;

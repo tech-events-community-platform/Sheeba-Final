@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { Event } from '../../types/event';
 import type { AttendeeRosterItem, BadgeCode } from '../../types/attendance';
@@ -30,10 +30,13 @@ import { manualAttendeeFormSchema, awardBadgeFormSchema, validateForm } from '..
 
 export const EventDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [roster, setRoster] = useState<AttendeeRosterItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDeleteEventModalOpen, setIsDeleteEventModalOpen] = useState(false);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
 
   // Search queries for both independent lists (Section 3)
   const [registeredSearch, setRegisteredSearch] = useState('');
@@ -280,6 +283,37 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
+  const handleBulkDeleteRegistrations = async () => {
+    if (!event || selectedRegistrationIds.length === 0) return;
+    if (!window.confirm(`Are you sure you want to remove ${selectedRegistrationIds.length} registered attendee(s) from this event?`)) return;
+    setIsDeletingAttendee(true);
+    try {
+      for (const regId of selectedRegistrationIds) {
+        await api.events.removeAttendee(event.id, regId);
+      }
+      setAwardSuccessMsg(`Removed ${selectedRegistrationIds.length} attendee(s) from event.`);
+      setTimeout(() => setAwardSuccessMsg(null), 4000);
+      setSelectedRegistrationIds([]);
+      await fetchEventData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to remove selected attendees.');
+    } finally {
+      setIsDeletingAttendee(false);
+    }
+  };
+
+  const handleConfirmDeleteEvent = async () => {
+    if (!event) return;
+    setIsDeletingEvent(true);
+    try {
+      await api.events.delete(event.id);
+      navigate('/organizer');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete event.');
+      setIsDeletingEvent(false);
+    }
+  };
+
   // Bulk Badge Award Handlers
   const handleToggleAttended = (id: string) => {
     setSelectedAttendedIds((prev) =>
@@ -443,6 +477,49 @@ export const EventDetailPage: React.FC = () => {
         </div>
       )}
 
+      {/* Delete Event Confirmation Modal */}
+      {isDeleteEventModalOpen && event && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[#2D1F23] text-white p-6 rounded-3xl max-w-md w-full shadow-2xl border border-red-500/30 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-red-500/20 text-red-400 rounded-2xl shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-base text-white">Permanently Delete Event?</h4>
+                <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                  Are you sure you want to delete <strong className="text-white">"{event.title}"</strong>? This will permanently remove the event, its roster, passes, and all associated reports.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setIsDeleteEventModalOpen(false)}
+                disabled={isDeletingEvent}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-gray-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteEvent}
+                disabled={isDeletingEvent}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+              >
+                {isDeletingEvent ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>{isDeletingEvent ? 'Deleting...' : 'Confirm Delete'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Back Navigation & Breadcrumb */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Link
@@ -472,6 +549,15 @@ export const EventDetailPage: React.FC = () => {
               View Report
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsDeleteEventModalOpen(true)}
+            className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+            icon={<Trash2 className="w-4 h-4 text-red-600" />}
+          >
+            Delete Event
+          </Button>
         </div>
       </div>
 
@@ -942,12 +1028,23 @@ export const EventDetailPage: React.FC = () => {
               <Button
                 variant="primary"
                 size="sm"
-                disabled={isBulkApproving}
+                disabled={isBulkApproving || isDeletingAttendee}
                 onClick={handleBulkApprove}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white border-none"
                 icon={<Check className="w-3.5 h-3.5" />}
               >
                 {isBulkApproving ? 'Approving...' : `Approve Selected (${selectedRegistrationIds.length})`}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isBulkApproving || isDeletingAttendee}
+                onClick={handleBulkDeleteRegistrations}
+                className="border-red-200 text-red-600 hover:bg-red-50 bg-white"
+                icon={<Trash2 className="w-3.5 h-3.5 text-red-600" />}
+              >
+                {isDeletingAttendee ? 'Deleting...' : `Delete Selected (${selectedRegistrationIds.length})`}
               </Button>
 
               <button
@@ -1092,6 +1189,14 @@ export const EventDetailPage: React.FC = () => {
                             >
                               <X className="w-3.5 h-3.5" />
                               <span>Reject</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmToast(att)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                              title={`Delete registration for ${att.name}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ) : isRejected ? (

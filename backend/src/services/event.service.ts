@@ -405,7 +405,7 @@ export class EventService {
 
   static async deleteEvent(eventId: string, userId: string, userRole: UserRole): Promise<boolean> {
     const existing = await query(
-      'SELECT id, organizer_id FROM events WHERE id::text = $1 OR share_link_token = $1',
+      'SELECT id, organizer_id, share_link_token FROM events WHERE id::text = $1 OR share_link_token = $1',
       [eventId]
     );
     if (!existing.rowCount || existing.rowCount === 0) {
@@ -426,6 +426,11 @@ export class EventService {
     CacheService.delPrefix('events:list');
     CacheService.delPrefix(`event:${realId}`);
     CacheService.delPrefix(`event:${eventId}`);
+    if ((existing.rows[0] as any)?.share_link_token) {
+      CacheService.delPrefix(`event:${(existing.rows[0] as any).share_link_token}`);
+    }
+    CacheService.del(`event:${realId}:roster`);
+    CacheService.del(`event:${eventId}:roster`);
     CacheService.del(`report:${realId}`);
     CacheService.del(`report:${eventId}`);
     return true;
