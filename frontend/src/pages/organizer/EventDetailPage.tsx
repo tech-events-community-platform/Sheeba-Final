@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 import { EditEventModal } from '../../components/organizer/EditEventModal';
+import { ReviewsSection } from '../../components/reviews/ReviewsSection';
 import { getCalendarTile } from '../../utils/date';
 import { manualAttendeeFormSchema, awardBadgeFormSchema, validateForm } from '../../schemas';
 
@@ -694,6 +695,15 @@ export const EventDetailPage: React.FC = () => {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Attendee Reviews & Feedback Section */}
+      <div className="pt-8 border-t border-gray-100">
+        <ReviewsSection
+          eventId={event.id}
+          eventTitle={event.title}
+          isOrganizerView={true}
+        />
       </div>
 
       {/* Award Badge Modal (Shared action offering Participant / Winner / Speaker) */}

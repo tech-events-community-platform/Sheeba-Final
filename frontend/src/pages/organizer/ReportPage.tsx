@@ -6,6 +6,7 @@ import type { Event } from '../../types/event';
 import type { SponsorReportData } from '../../types/attendance';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { ReviewsSection } from '../../components/reviews/ReviewsSection';
 import { reportNarrativeUpdateFormSchema, validateForm } from '../../schemas';
 import {
   BarChart3,
@@ -1992,6 +1993,15 @@ export const ReportPage: React.FC = () => {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Audited Attendee Feedback & Sentiment for Sponsors */}
+            <div className="pt-6 border-t border-gray-200">
+              <ReviewsSection
+                eventId={selectedEventId}
+                eventTitle={report.eventTitle}
+                isSponsorView={true}
+              />
             </div>
 
             {/* Formal Attestation & Sign-off Block */}

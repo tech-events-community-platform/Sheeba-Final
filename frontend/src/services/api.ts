@@ -2,6 +2,7 @@ import type { Event, EventType } from '../types/event';
 import type { Ticket } from '../types/ticket';
 import type { BadgeAward, BadgeCode, SponsorReportData, AttendeeRosterItem } from '../types/attendance';
 import type { User, UserRole, ProfileVisibility } from '../types/user';
+import type { EventReviewItem, EventReviewsSummary } from '../types/review';
 import { getEndOfEventDay } from '../utils/date';
 
 /**
@@ -1771,6 +1772,56 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+    },
+  },
+
+  reviews: {
+    getEventReviews: async (eventId: string): Promise<EventReviewsSummary> => {
+      try {
+        const res = await requestApi(`/reviews/event/${eventId}`, { skipCache: true });
+        if (res.data) return res.data;
+      } catch (err) {
+        console.warn('Failed to load event reviews:', err);
+      }
+      return {
+        averageRating: 0,
+        totalReviews: 0,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        reviews: [],
+        myReview: null,
+      };
+    },
+
+    getMyReview: async (eventId: string): Promise<EventReviewItem | null> => {
+      try {
+        const res = await requestApi(`/reviews/event/${eventId}/my`, { skipCache: true });
+        return res.data || null;
+      } catch {
+        return null;
+      }
+    },
+
+    submitReview: async (eventId: string, data: { rating: number; comment: string; isAnonymous?: boolean }): Promise<EventReviewItem> => {
+      const res = await requestApi(`/reviews/event/${eventId}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      return res.data;
+    },
+
+    updateReview: async (reviewId: string, data: { rating?: number; comment?: string; isAnonymous?: boolean }): Promise<EventReviewItem> => {
+      const res = await requestApi(`/reviews/${reviewId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+      return res.data;
+    },
+
+    deleteReview: async (reviewId: string): Promise<boolean> => {
+      await requestApi(`/reviews/${reviewId}`, {
+        method: 'DELETE',
+      });
+      return true;
     },
   },
 };

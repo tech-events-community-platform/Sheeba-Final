@@ -17,7 +17,10 @@ import {
   Sparkles,
   X,
   AlertTriangle,
+  Star,
 } from 'lucide-react';
+import { ReviewModal } from '../../components/reviews/ReviewModal';
+import type { EventReviewItem } from '../../types/review';
 import { printTicketPass } from '../../utils/printTicket';
 import { isEventPassed } from '../../utils/date';
 
@@ -29,6 +32,23 @@ export const MyEventsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'Upcoming' | 'Past' | 'Tickets'>('Upcoming');
   const [highlightedTicketId, setHighlightedTicketId] = useState<string | null>(null);
   const [selectedAttendeeTicket, setSelectedAttendeeTicket] = useState<Ticket | null>(null);
+  const [reviewModalEvent, setReviewModalEvent] = useState<{ id: string; title: string } | null>(null);
+  const [myExistingReview, setMyExistingReview] = useState<EventReviewItem | null>(null);
+  const [loadingReview, setLoadingReview] = useState(false);
+
+  const handleOpenReview = async (eventId: string, eventTitle: string) => {
+    setLoadingReview(true);
+    try {
+      const existing = await api.reviews.getMyReview(eventId);
+      setMyExistingReview(existing);
+      setReviewModalEvent({ id: eventId, title: eventTitle });
+    } catch {
+      setMyExistingReview(null);
+      setReviewModalEvent({ id: eventId, title: eventTitle });
+    } finally {
+      setLoadingReview(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -361,6 +381,17 @@ export const MyEventsPage: React.FC = () => {
                         Pass Record
                       </Button>
                     </Link>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenReview(ticket.eventId, event.title || ticket.eventTitle)}
+                      icon={<Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
+                      className="w-full md:w-auto cursor-pointer"
+                    >
+                      Feedback / Review
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -683,6 +714,23 @@ export const MyEventsPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Attendee Event Review Modal */}
+      {reviewModalEvent && (
+        <ReviewModal
+          isOpen={Boolean(reviewModalEvent)}
+          onClose={() => setReviewModalEvent(null)}
+          eventId={reviewModalEvent.id}
+          eventTitle={reviewModalEvent.title}
+          existingReview={myExistingReview}
+          onReviewSaved={(saved) => {
+            setMyExistingReview(saved);
+          }}
+          onReviewDeleted={() => {
+            setMyExistingReview(null);
+          }}
+        />
       )}
     </div>
   );
