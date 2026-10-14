@@ -13,10 +13,11 @@ import {
   X,
   Users,
   AlertCircle,
+  Filter,
+  Check,
 } from 'lucide-react';
 import { validateForm } from '../../utils/validation';
 import { awardBadgeFormSchema, bulkAwardBadgeFormSchema } from '../../schemas/badge.schema';
-
 
 export const BadgesPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -30,6 +31,7 @@ export const BadgesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [badgeFilter, setBadgeFilter] = useState<'all' | 'needs-participant' | 'needs-winner' | 'needs-speaker'>('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Award Modal state
@@ -37,6 +39,7 @@ export const BadgesPage: React.FC = () => {
   const [modalMode, setModalMode] = useState<'single' | 'bulk'>('single');
   const [targetAttendee, setTargetAttendee] = useState<AttendeeRosterItem | null>(null);
   const [selectedBadgeCode, setSelectedBadgeCode] = useState<BadgeCode>('participant');
+  const [organizerNote, setOrganizerNote] = useState('');
   const [isSubmittingAward, setIsSubmittingAward] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -49,7 +52,7 @@ export const BadgesPage: React.FC = () => {
         const evts = await api.events.getAll(user?.id);
         const myEvents = user?.role === 'ADMIN' ? evts : evts.filter((e) => e.organizerId === user?.id || !user?.id);
 
-        // Section 6: Sort Ongoing first, Upcoming next, Past last
+        // Sort Ongoing first, Upcoming next, Past last
         const sorted = [...myEvents].sort((a, b) => {
           const stateA = api.getEventTimeStatus(a);
           const stateB = api.getEventTimeStatus(b);
@@ -80,7 +83,7 @@ export const BadgesPage: React.FC = () => {
     fetchEvents();
   }, [id, user?.id, user?.role]);
 
-  // 2. Load only attendees who hold an Attended badge for the selected event (Section 6)
+  // 2. Load only attendees who hold an Attended badge for the selected event
   const loadAttendedHolders = async (eventId: string) => {
     if (!eventId) return;
     setLoading(true);
@@ -108,27 +111,71 @@ export const BadgesPage: React.FC = () => {
     navigate(`/organizer/badges/${eventId}`);
   };
 
-  // Checkbox Selection
+  // Filtered attendees based on search and badge filter
+  const filteredHolders = useMemo(() => {
+    let list = attendedAttendees;
+
+    if (badgeFilter === 'needs-participant') {
+      list = list.filter((a) => !(a.badges || []).includes('participant'));
+    } else if (badgeFilter === 'needs-winner') {
+      list = list.filter((a) => !(a.badges || []).includes('winner'));
+    } else if (badgeFilter === 'needs-speaker') {
+      list = list.filter((a) => !(a.badges || []).includes('speaker'));
+    }
+
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return list;
+    return list.filter(
+      (a) => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
+    );
+  }, [attendedAttendees, badgeFilter, searchQuery]);
+
+  // Checkbox Selection Helpers
   const toggleSelectAttendee = (attendeeId: string) => {
     setSelectedIds((prev) =>
       prev.includes(attendeeId) ? prev.filter((i) => i !== attendeeId) : [...prev, attendeeId]
     );
   };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === filteredHolders.length) {
-      setSelectedIds([]);
+  const isAllFilteredSelected =
+    filteredHolders.length > 0 &&
+    filteredHolders.every((h) => selectedIds.includes(h.attendeeId || h.id));
+
+  const isAllTotalSelected =
+    attendedAttendees.length > 0 &&
+    selectedIds.length === attendedAttendees.length;
+
+  const isPartiallySelected =
+    selectedIds.length > 0 && !isAllFilteredSelected;
+
+  // Toggle selection for visible/filtered attendees
+  const toggleSelectAllFiltered = () => {
+    if (isAllFilteredSelected) {
+      const filteredIds = new Set(filteredHolders.map((h) => h.attendeeId || h.id));
+      setSelectedIds((prev) => prev.filter((id) => !filteredIds.has(id)));
     } else {
-      setSelectedIds(filteredHolders.map((h) => h.attendeeId || h.id));
+      const filteredIds = filteredHolders.map((h) => h.attendeeId || h.id);
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
     }
+  };
+
+  // Select ALL attendees in the entire event
+  const handleSelectAllTotalUsers = () => {
+    const allIds = attendedAttendees.map((h) => h.attendeeId || h.id);
+    setSelectedIds(allIds);
+  };
+
+  // Deselect All
+  const handleDeselectAll = () => {
+    setSelectedIds([]);
   };
 
   // Open Award Modal for Single Attendee
   const openSingleAwardModal = (attendee: AttendeeRosterItem) => {
     setModalError(null);
+    setOrganizerNote('');
     setTargetAttendee(attendee);
     setModalMode('single');
-    // Default to a badge they don't already have
     const held = attendee.badges || [];
     if (!held.includes('participant')) setSelectedBadgeCode('participant');
     else if (!held.includes('winner')) setSelectedBadgeCode('winner');
@@ -141,19 +188,21 @@ export const BadgesPage: React.FC = () => {
   const openBulkAwardModal = () => {
     if (selectedIds.length === 0) return;
     setModalError(null);
+    setOrganizerNote('');
     setTargetAttendee(null);
     setModalMode('bulk');
     setSelectedBadgeCode('participant');
     setIsModalOpen(true);
   };
 
-  // Shared Award Badge Submission (Section 7: calls shared endpoint)
+  // Shared Award Badge Submission
   const handleConfirmAward = async () => {
     if (modalMode === 'single') {
       const validation = validateForm(awardBadgeFormSchema, {
         eventId: selectedEventId,
         attendeeId: targetAttendee?.attendeeId || targetAttendee?.id || '',
         selectedBadgeCode,
+        notes: organizerNote.trim() || undefined,
       });
       if (!validation.success) {
         setModalError(validation.error || 'Please select an event, attendee, and badge type.');
@@ -164,6 +213,7 @@ export const BadgesPage: React.FC = () => {
         eventId: selectedEventId,
         selectedIds,
         selectedBadgeCode,
+        notes: organizerNote.trim() || undefined,
       });
       if (!validation.success) {
         setModalError(validation.error || 'Please select attendees and badge type.');
@@ -180,19 +230,22 @@ export const BadgesPage: React.FC = () => {
           eventId: selectedEventId,
           attendeeId: targetAttendee.attendeeId || targetAttendee.id,
           badgeCode: selectedBadgeCode,
+          notes: organizerNote.trim() || undefined,
         });
         setSuccessToast(
           `Awarded "${selectedBadgeCode.toUpperCase()}" badge to ${targetAttendee.name}.`
         );
       } else if (modalMode === 'bulk') {
-        await api.badges.bulkAwardBadges({
+        const res = await api.badges.bulkAwardBadges({
           eventId: selectedEventId,
           attendeeRosterIds: selectedIds,
           badgeCode: selectedBadgeCode,
           awardedByOrganizerId: user?.id || 'current',
+          notes: organizerNote.trim() || undefined,
         });
+        const awardedCount = res?.awardedCount ?? selectedIds.length;
         setSuccessToast(
-          `Awarded "${selectedBadgeCode.toUpperCase()}" badge to ${selectedIds.length} verified attendees.`
+          `Successfully approved "${selectedBadgeCode.toUpperCase()}" badge for ${awardedCount} attendee(s)!`
         );
         setSelectedIds([]);
       }
@@ -207,13 +260,11 @@ export const BadgesPage: React.FC = () => {
     }
   };
 
-  const filteredHolders = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return attendedAttendees;
-    return attendedAttendees.filter(
-      (a) => a.name.toLowerCase().includes(q) || a.email.toLowerCase().includes(q)
-    );
-  }, [attendedAttendees, searchQuery]);
+  // Preview attendees selected for the modal
+  const selectedAttendeesList = useMemo(() => {
+    if (modalMode === 'single' && targetAttendee) return [targetAttendee];
+    return attendedAttendees.filter((a) => selectedIds.includes(a.attendeeId || a.id));
+  }, [modalMode, targetAttendee, attendedAttendees, selectedIds]);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-24">
@@ -284,7 +335,6 @@ export const BadgesPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Verified Attendees and Count by themselves without any rectangular box */}
           <div className="text-center sm:text-right shrink-0">
             <span className="text-[11px] font-bold uppercase text-[#FFA686] block tracking-wider">
               Verified Attendees
@@ -296,35 +346,143 @@ export const BadgesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Action Toolbar & Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search attended people by name or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-          />
+      {/* Action Toolbar, Quick Filters & Select All Controls */}
+      <div className="space-y-3 pt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Search box */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search attended people by name or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Quick "Select All Users" and Actions */}
+          <div className="flex items-center flex-wrap gap-2">
+            {attendedAttendees.length > 0 && (
+              <button
+                type="button"
+                onClick={isAllTotalSelected ? handleDeselectAll : handleSelectAllTotalUsers}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                  isAllTotalSelected
+                    ? 'bg-[#63474D] text-white hover:bg-[#523a3f]'
+                    : 'bg-white border border-[#E8DDD7] text-[#2D1F23] hover:bg-[#FAF7F5]'
+                }`}
+                title="Select every attended attendee for this event"
+              >
+                <CheckSquare className="w-3.5 h-3.5 text-[#FFA686]" />
+                <span>
+                  {isAllTotalSelected ? `Deselect All (${attendedAttendees.length})` : `Select All Users (${attendedAttendees.length})`}
+                </span>
+              </button>
+            )}
+
+            {selectedIds.length > 0 && (
+              <Button
+                onClick={openBulkAwardModal}
+                variant="accent"
+                size="sm"
+                icon={<Award className="w-4 h-4" />}
+                className="cursor-pointer"
+              >
+                Approve Badges ({selectedIds.length})
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Bulk Action Control */}
-        <div className="flex items-center gap-2">
-          {selectedIds.length > 0 && (
-            <Button
-              onClick={openBulkAwardModal}
-              variant="accent"
-              size="sm"
-              icon={<Award className="w-4 h-4" />}
+        {/* Quick Filter Tabs (Filter by missing badge) */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1 shrink-0 mr-1">
+            <Filter className="w-3 h-3" /> Filter:
+          </span>
+          {[
+            { id: 'all', label: `All Attended (${attendedAttendees.length})` },
+            {
+              id: 'needs-participant',
+              label: `Needs Participant (${attendedAttendees.filter((a) => !(a.badges || []).includes('participant')).length})`,
+            },
+            {
+              id: 'needs-winner',
+              label: `Needs Winner (${attendedAttendees.filter((a) => !(a.badges || []).includes('winner')).length})`,
+            },
+            {
+              id: 'needs-speaker',
+              label: `Needs Speaker (${attendedAttendees.filter((a) => !(a.badges || []).includes('speaker')).length})`,
+            },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setBadgeFilter(tab.id as any)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                badgeFilter === tab.id
+                  ? 'bg-[#63474D] text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
             >
-              Approve Badges ({selectedIds.length})
-            </Button>
-          )}
+              {tab.label}
+            </button>
+          ))}
         </div>
+
+        {/* Sticky/Prominent Selection Summary Bar */}
+        {selectedIds.length > 0 && (
+          <div className="p-3 bg-[#FAF7F5] border border-[#E8DDD7] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-fade-in">
+            <div className="flex items-center gap-3">
+              <span className="w-6 h-6 rounded-lg bg-[#63474D] text-white flex items-center justify-center text-xs font-bold">
+                {selectedIds.length}
+              </span>
+              <span className="text-xs font-bold text-[#2D1F23]">
+                {selectedIds.length} of {attendedAttendees.length} attendees selected
+              </span>
+              {selectedIds.length < attendedAttendees.length && (
+                <button
+                  type="button"
+                  onClick={handleSelectAllTotalUsers}
+                  className="text-xs font-bold text-[#63474D] hover:underline cursor-pointer"
+                >
+                  Select all {attendedAttendees.length}
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleDeselectAll}
+                className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-white cursor-pointer"
+              >
+                Clear Selection
+              </button>
+              <Button
+                onClick={openBulkAwardModal}
+                variant="accent"
+                size="sm"
+                icon={<Award className="w-4 h-4" />}
+                className="cursor-pointer"
+              >
+                Approve Badge for {selectedIds.length} User{selectedIds.length === 1 ? '' : 's'}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Attended Holders List (Only attendees who attended) */}
+      {/* Attended Holders List */}
       <div className="bg-white rounded-3xl border border-[#E8DDD7] overflow-hidden shadow-xs">
         {loading ? (
           <div className="p-8 space-y-3 animate-pulse">
@@ -345,16 +503,21 @@ export const BadgesPage: React.FC = () => {
             <table className="w-full text-left text-xs">
               <thead className="bg-[#FAF7F5] border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px]">
                 <tr>
-                  <th className="py-3 px-4 w-10">
+                  <th className="py-3 px-4 w-12">
                     <button
                       type="button"
-                      onClick={toggleSelectAll}
-                      className="p-1 text-gray-500 hover:text-[#63474D] cursor-pointer"
+                      onClick={toggleSelectAllFiltered}
+                      className="p-1 text-gray-500 hover:text-[#63474D] cursor-pointer flex items-center gap-1"
+                      title={isAllFilteredSelected ? 'Deselect visible' : 'Select all visible users'}
                     >
-                      {selectedIds.length === filteredHolders.length && filteredHolders.length > 0 ? (
+                      {isAllFilteredSelected ? (
                         <CheckSquare className="w-4 h-4 text-[#63474D]" />
+                      ) : isPartiallySelected ? (
+                        <div className="w-4 h-4 border-2 border-[#63474D] rounded-sm flex items-center justify-center bg-[#FAF7F5]">
+                          <div className="w-2 h-0.5 bg-[#63474D]" />
+                        </div>
                       ) : (
-                        <Square className="w-4 h-4" />
+                        <Square className="w-4 h-4 text-gray-400" />
                       )}
                     </button>
                   </th>
@@ -385,7 +548,7 @@ export const BadgesPage: React.FC = () => {
                           {isSelected ? (
                             <CheckSquare className="w-4 h-4 text-[#63474D]" />
                           ) : (
-                            <Square className="w-4 h-4" />
+                            <Square className="w-4 h-4 text-gray-300 hover:text-gray-500" />
                           )}
                         </button>
                       </td>
@@ -438,7 +601,7 @@ export const BadgesPage: React.FC = () => {
         )}
       </div>
 
-      {/* Approve Badge Modal (Fixed Set: Winner, Participant, Speaker) */}
+      {/* Approve Badge Modal (Single & Bulk) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
           <div
@@ -450,7 +613,7 @@ export const BadgesPage: React.FC = () => {
             <div className="flex items-start justify-between pb-3 border-b border-gray-100">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
-                  {modalMode === 'bulk' ? `Bulk Approve (${selectedIds.length} Attendees)` : 'Approve Badge'}
+                  {modalMode === 'bulk' ? `Bulk Badge Approval (${selectedIds.length} Users)` : 'Approve Badge'}
                 </span>
                 <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
                   {modalMode === 'bulk' ? `${selectedIds.length} Selected Attendees` : targetAttendee?.name}
@@ -459,9 +622,29 @@ export const BadgesPage: React.FC = () => {
                   {currentEvent?.title}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => !isSubmittingAward && setIsModalOpen(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="space-y-3">
+            {/* Selected Attendees Preview in Bulk Mode */}
+            {modalMode === 'bulk' && (
+              <div className="p-3 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D] block">
+                  Selected Attendees ({selectedAttendeesList.length}):
+                </span>
+                <p className="text-xs text-[#2D1F23] font-medium leading-relaxed">
+                  {selectedAttendeesList.slice(0, 5).map((a) => a.name).join(', ')}
+                  {selectedAttendeesList.length > 5 && ` and ${selectedAttendeesList.length - 5} more...`}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-4">
               {modalError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
@@ -475,16 +658,16 @@ export const BadgesPage: React.FC = () => {
               <div className="flex flex-col gap-3">
                 {[
                   {
-                    code: 'winner' as BadgeCode,
-                    label: 'Winner',
-                    image: '/badges/hackathon-winner-badge.webp',
-                    description: 'Awarded for podium placement and competitive track achievements.',
-                  },
-                  {
                     code: 'participant' as BadgeCode,
                     label: 'Participant',
                     image: '/badges/participant-badge.webp',
                     description: 'Awarded for active project submission and verified participation.',
+                  },
+                  {
+                    code: 'winner' as BadgeCode,
+                    label: 'Winner',
+                    image: '/badges/hackathon-winner-badge.webp',
+                    description: 'Awarded for podium placement and competitive track achievements.',
                   },
                   {
                     code: 'speaker' as BadgeCode,
@@ -504,14 +687,12 @@ export const BadgesPage: React.FC = () => {
                           : 'border border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      {/* Badge Image - Unboxed with no rectangle background behind it, taking vertical space */}
                       <img
                         src={b.image}
                         alt={`${b.label} Badge`}
-                        className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-xl shrink-0"
+                        className="w-16 h-16 sm:w-18 sm:h-18 object-contain rounded-xl shrink-0"
                       />
 
-                      {/* Details */}
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="flex items-center gap-2">
                           <h4 className="font-serif font-bold text-base text-[#2D1F23]">
@@ -528,7 +709,6 @@ export const BadgesPage: React.FC = () => {
                         </p>
                       </div>
 
-                      {/* Radio Indicator */}
                       <div className="shrink-0 pr-1">
                         <div
                           className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
@@ -545,6 +725,22 @@ export const BadgesPage: React.FC = () => {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Optional Organizer Citation Note */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-[#2D1F23] flex items-center justify-between">
+                  <span>Organizer Citation / Note (Optional):</span>
+                  <span className="text-[10px] font-normal text-gray-400">Max 1000 characters</span>
+                </label>
+                <textarea
+                  value={organizerNote}
+                  onChange={(e) => setOrganizerNote(e.target.value)}
+                  placeholder="e.g. Completed frontend hackathon track, 1st place winner, keynote speaker..."
+                  rows={2}
+                  maxLength={1000}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
               </div>
             </div>
 
@@ -563,7 +759,9 @@ export const BadgesPage: React.FC = () => {
                 variant="primary"
                 size="sm"
               >
-                Confirm & Approve Badge
+                {modalMode === 'bulk'
+                  ? `Confirm & Approve Badges (${selectedIds.length})`
+                  : 'Confirm & Approve Badge'}
               </Button>
             </div>
           </div>

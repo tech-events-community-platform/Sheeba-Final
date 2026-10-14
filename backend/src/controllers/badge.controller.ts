@@ -71,7 +71,7 @@ export class BadgeController {
 
   static async bulkAwardBadges(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { eventId, attendeeRosterIds, attendeeUserIds, badgeCode } = req.body;
+      const { eventId, attendeeRosterIds, attendeeUserIds, badgeCode, notes, organizerNote } = req.body;
       const organizerId = req.user!.userId;
       const userRole = req.user!.role;
 
@@ -82,6 +82,7 @@ export class BadgeController {
         badgeCode: badgeCode as BadgeCode,
         awardedByOrganizerId: organizerId,
         userRole,
+        notes: notes || organizerNote,
       });
 
       return sendSuccess(res, result, `Successfully awarded ${result.awardedCount} badge(s).`);

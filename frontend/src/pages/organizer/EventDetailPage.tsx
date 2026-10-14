@@ -484,17 +484,27 @@ export const EventDetailPage: React.FC = () => {
             />
           </div>
 
-          <Button
-            onClick={() => {
-              setManualUserError(null);
-              setIsAddUserModalOpen(true);
-            }}
-            variant="primary"
-            size="sm"
-            className="shrink-0"
-          >
-            Add User Manually
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link to={`/organizer/badges/${event.id}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<Award className="w-3.5 h-3.5 text-[#63474D]" />}
+              >
+                Bulk Approve Badges
+              </Button>
+            </Link>
+            <Button
+              onClick={() => {
+                setManualUserError(null);
+                setIsAddUserModalOpen(true);
+              }}
+              variant="primary"
+              size="sm"
+            >
+              Add User Manually
+            </Button>
+          </div>
         </div>
 
         {attendedList.length === 0 ? (

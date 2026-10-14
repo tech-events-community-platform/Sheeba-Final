@@ -1155,7 +1155,26 @@ export const api = {
       attendeeRosterIds: string[];
       badgeCode: BadgeCode;
       awardedByOrganizerId: string;
+      notes?: string;
     }): Promise<{ awardedCount: number }> => {
+      try {
+        const res = await requestApi('/badges/bulk-award', {
+          method: 'POST',
+          body: JSON.stringify({
+            eventId: params.eventId,
+            attendeeRosterIds: params.attendeeRosterIds,
+            attendeeUserIds: params.attendeeRosterIds,
+            badgeCode: params.badgeCode,
+            notes: params.notes,
+          }),
+        });
+        if (res && res.data) {
+          return res.data;
+        }
+      } catch (err: any) {
+        console.warn('Backend bulkAwardBadges request failed, applying fallback:', err);
+      }
+
       let count = 0;
       for (const attendeeId of params.attendeeRosterIds) {
         try {
@@ -1164,6 +1183,7 @@ export const api = {
             attendeeId,
             badgeCode: params.badgeCode,
             awardedByOrganizerId: params.awardedByOrganizerId,
+            notes: params.notes,
           });
           count++;
         } catch (e) {

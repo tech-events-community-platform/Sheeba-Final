@@ -42,6 +42,8 @@ export const bulkAwardBadgeSchema = z
       .array(z.string().trim().min(1, 'Attendee ID cannot be empty.'))
       .optional(),
     badgeCode: badgeCodeEnum,
+    notes: z.string().trim().max(1000, 'Notes cannot exceed 1000 characters.').optional(),
+    organizerNote: z.string().trim().max(1000, 'Notes cannot exceed 1000 characters.').optional(),
   })
   .superRefine((data, ctx) => {
     const userIds = data.attendeeUserIds || data.attendeeRosterIds;

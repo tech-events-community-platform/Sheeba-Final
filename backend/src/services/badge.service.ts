@@ -228,8 +228,9 @@ export class BadgeService {
     badgeCode: BadgeCode;
     awardedByOrganizerId: string;
     userRole?: UserRole;
+    notes?: string;
   }): Promise<{ awardedCount: number }> {
-    const { eventId, attendeeUserIds, badgeCode, awardedByOrganizerId, userRole } = params;
+    const { eventId, attendeeUserIds, badgeCode, awardedByOrganizerId, userRole, notes } = params;
 
     const eventRes = await query('SELECT organizer_id FROM events WHERE id = $1', [eventId]);
     if (!eventRes.rowCount || eventRes.rowCount === 0) {
@@ -253,6 +254,7 @@ export class BadgeService {
           badgeCode,
           awardedByOrganizerId,
           userRole,
+          notes,
         });
         count++;
       } catch (err) {
