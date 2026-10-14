@@ -120,13 +120,26 @@ export class BadgeService {
           json_agg(b.badge_code) FILTER (WHERE b.id IS NOT NULL AND b.revoked_at IS NULL),
           '[]'::json
         ) AS badges
-       FROM check_ins ci
-       JOIN registrations r ON ci.registration_id = r.id
-       JOIN users u ON ci.user_id = u.id
-       LEFT JOIN badge_awards b ON b.event_id = ci.event_id AND b.user_id = u.id
-       WHERE ci.event_id = $1 AND ci.voided_at IS NULL
+       FROM registrations r
+       JOIN users u ON r.user_id = u.id
+       LEFT JOIN check_ins ci ON ci.registration_id = r.id AND ci.voided_at IS NULL
+       LEFT JOIN tickets t ON t.registration_id = r.id
+       LEFT JOIN badge_awards b ON b.event_id = r.event_id AND b.user_id = u.id
+       WHERE r.event_id = $1 
+         AND r.status = 'registered'
+         AND (
+           (ci.id IS NOT NULL AND ci.voided_at IS NULL)
+           OR t.status IN ('CHECKED_IN', 'Used')
+           OR EXISTS (
+             SELECT 1 FROM badge_awards ba 
+             WHERE ba.event_id = r.event_id 
+               AND ba.user_id = u.id 
+               AND ba.badge_code = 'attended' 
+               AND ba.revoked_at IS NULL
+           )
+         )
        GROUP BY ci.id, r.id, u.id
-       ORDER BY ci.approved_at ASC`,
+       ORDER BY COALESCE(ci.approved_at, r.registered_at) ASC`,
       [eventId]
     );
 

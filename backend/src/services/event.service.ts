@@ -163,6 +163,7 @@ export class EventService {
 
     // Invalidate cached event lists
     CacheService.delPrefix('events:list');
+    CacheService.delPrefix('http:');
 
     return formatted;
   }
@@ -216,12 +217,18 @@ export class EventService {
         u.organization AS organizer_organization,
         u.email AS organizer_email,
         COUNT(DISTINCT r.id) AS registered_count,
-        COUNT(DISTINCT CASE WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) OR t.status = 'CHECKED_IN' THEN r.id END) AS checked_in_count
+        COUNT(DISTINCT CASE 
+          WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
+            OR t.status IN ('CHECKED_IN', 'Used')
+            OR (b.id IS NOT NULL AND b.revoked_at IS NULL)
+          THEN r.id 
+        END) AS checked_in_count
       FROM events e
       JOIN users u ON e.organizer_id = u.id
       LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered'
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON e.id = t.event_id AND t.registration_id = r.id
+      LEFT JOIN badge_awards b ON b.event_id = e.id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
       ${whereClause}
       GROUP BY e.id, u.id
       ORDER BY e.event_date DESC
@@ -247,12 +254,18 @@ export class EventService {
         u.organization AS organizer_organization,
         u.email AS organizer_email,
         COUNT(DISTINCT r.id) AS registered_count,
-        COUNT(DISTINCT CASE WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) OR t.status = 'CHECKED_IN' THEN r.id END) AS checked_in_count
+        COUNT(DISTINCT CASE 
+          WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
+            OR t.status IN ('CHECKED_IN', 'Used')
+            OR (b.id IS NOT NULL AND b.revoked_at IS NULL)
+          THEN r.id 
+        END) AS checked_in_count
       FROM events e
       JOIN users u ON e.organizer_id = u.id
       LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered'
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON e.id = t.event_id AND t.registration_id = r.id
+      LEFT JOIN badge_awards b ON b.event_id = e.id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
       WHERE e.id::text = $1 OR e.share_link_token = $1
       GROUP BY e.id, u.id
     `;
@@ -687,7 +700,14 @@ export class EventService {
     const result = await query(queryText, [event.id]);
 
     const roster = result.rows.map((row) => {
-      const isCheckedIn = Boolean((row.check_in_id && !row.voided_at) || row.ticket_status === 'CHECKED_IN');
+      const badgesList = Array.isArray(row.badges) ? row.badges : [];
+      const hasAttendedBadge = badgesList.includes('attended');
+      const isCheckedIn = Boolean(
+        (row.check_in_id && !row.voided_at) || 
+        row.ticket_status === 'CHECKED_IN' || 
+        row.ticket_status === 'Used' || 
+        hasAttendedBadge
+      );
       const checkInTimeDate = row.check_in_time;
       return {
         id: row.attendee_id,

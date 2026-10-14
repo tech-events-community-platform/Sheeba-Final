@@ -12,7 +12,15 @@ export class AdminService {
         (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'sponsor') AS total_sponsors,
         (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'sponsor' AND approval_status = 'pending') AS pending_sponsors,
         (SELECT COUNT(*)::INTEGER FROM registrations WHERE status = 'registered') AS total_registrations,
-        (SELECT COUNT(*)::INTEGER FROM tickets WHERE status = 'CHECKED_IN') AS total_check_ins,
+        (SELECT COUNT(DISTINCT r.id)::INTEGER 
+         FROM registrations r 
+         LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL 
+         LEFT JOIN tickets t ON t.registration_id = r.id 
+         LEFT JOIN badge_awards b ON b.event_id = r.event_id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL 
+         WHERE (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
+            OR t.status IN ('CHECKED_IN', 'Used') 
+            OR (b.id IS NOT NULL AND b.revoked_at IS NULL)
+        ) AS total_check_ins,
         (SELECT COUNT(*)::INTEGER FROM badge_awards WHERE revoked_at IS NULL) AS total_badges
     `);
 
@@ -42,10 +50,17 @@ export class AdminService {
       SELECT 
         u.id, u.full_name, u.email, u.phone, u.role, u.is_active, u.approval_status, u.created_at,
         COUNT(DISTINCT r.id)::INTEGER AS events_registered,
-        COUNT(DISTINCT CASE WHEN t.status = 'CHECKED_IN' THEN t.id END)::INTEGER AS events_attended
+        COUNT(DISTINCT CASE 
+          WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
+            OR t.status IN ('CHECKED_IN', 'Used') 
+            OR (b.id IS NOT NULL AND b.revoked_at IS NULL) 
+          THEN r.id 
+        END)::INTEGER AS events_attended
       FROM users u
       LEFT JOIN registrations r ON u.id = r.user_id AND r.status = 'registered'
+      LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON u.id = t.user_id
+      LEFT JOIN badge_awards b ON b.event_id = r.event_id AND b.user_id = u.id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
       WHERE u.role = 'attendee' OR u.role IS NULL OR u.role != 'admin'
       GROUP BY u.id
       ORDER BY u.created_at DESC
@@ -56,10 +71,18 @@ export class AdminService {
         u.id, u.full_name, u.email, u.phone, u.organization, u.role, u.is_active, u.approval_status,
         u.is_organizer, u.organizer_approval_status, u.created_at,
         COUNT(DISTINCT e.id)::INTEGER AS events_count,
-        COUNT(DISTINCT CASE WHEN t.status = 'CHECKED_IN' THEN t.id END)::INTEGER AS total_check_ins
+        COUNT(DISTINCT CASE 
+          WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
+            OR t.status IN ('CHECKED_IN', 'Used') 
+            OR (b.id IS NOT NULL AND b.revoked_at IS NULL) 
+          THEN r.id 
+        END)::INTEGER AS total_check_ins
       FROM users u
       LEFT JOIN events e ON u.id = e.organizer_id
-      LEFT JOIN tickets t ON e.id = t.event_id
+      LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered'
+      LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
+      LEFT JOIN tickets t ON e.id = t.event_id AND t.registration_id = r.id
+      LEFT JOIN badge_awards b ON b.event_id = e.id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
       WHERE u.role = 'organizer' OR u.is_organizer = TRUE OR (u.organizer_approval_status IS NOT NULL AND u.organizer_approval_status != 'none')
       GROUP BY u.id
       ORDER BY 

@@ -615,15 +615,24 @@ export const api = {
 
   // Events API
   events: {
-    getAll: async (organizerId?: string): Promise<Event[]> => {
+    getAll: async (organizerId?: string, skipCache: boolean = false): Promise<Event[]> => {
       try {
         const queryParam = organizerId ? `?organizerId=${encodeURIComponent(organizerId)}` : '';
-        const res = await requestApi(`/events${queryParam}`);
+        const res = await requestApi(`/events${queryParam}`, { skipCache });
         if (res.data && Array.isArray(res.data)) {
           if (!organizerId) {
             eventsStore = res.data;
-            saveEventsStore();
+          } else {
+            res.data.forEach((fetchedEvt: Event) => {
+              const idx = eventsStore.findIndex((e) => e.id === fetchedEvt.id);
+              if (idx !== -1) {
+                eventsStore[idx] = fetchedEvt;
+              } else {
+                eventsStore.push(fetchedEvt);
+              }
+            });
           }
+          saveEventsStore();
           return res.data;
         }
       } catch (e) {
