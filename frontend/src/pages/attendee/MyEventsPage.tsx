@@ -278,6 +278,17 @@ export const MyEventsPage: React.FC = () => {
                         Pass View
                       </Button>
                     </Link>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenReview(ticket.eventId, event.title || ticket.eventTitle)}
+                      icon={<Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
+                      className="w-full md:w-auto cursor-pointer"
+                    >
+                      Feedback / Review
+                    </Button>
                   </div>
                 </div>
               ))}
