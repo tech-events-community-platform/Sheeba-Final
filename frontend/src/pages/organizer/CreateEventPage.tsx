@@ -13,6 +13,7 @@ import {
   X,
   UploadCloud,
   Image as ImageIcon,
+  Globe,
 } from 'lucide-react';
 import { getOrganizerDefaultQuestions } from '../../utils/defaultQuestions';
 import {
@@ -43,6 +44,7 @@ export const CreateEventPage: React.FC = () => {
     location: '',
     capacity: 100,
     isPaid: false,
+    isPublicized: false,
     ticketPrice: 0,
     description: '',
     posterImageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80',
@@ -298,11 +300,13 @@ export const CreateEventPage: React.FC = () => {
         capacity: Number(formData.capacity),
         description: formData.description,
         isPaid: formData.isPaid,
+        isPublicized: formData.isPublicized,
         ticketPrice: formData.isPaid ? Number(formData.ticketPrice) : 0,
         currency: 'ETB',
         organizerId: user?.id || 'demo-organizer-001',
         organizerName: user?.organization || user?.name || 'GDG Addis',
         bannerUrl: formData.posterImageUrl,
+        posterImageUrl: formData.posterImageUrl,
         customQuestions: formattedQuestions,
         includeDefaultQuestions,
       });
@@ -342,6 +346,12 @@ export const CreateEventPage: React.FC = () => {
           <p className="text-xs text-[#756366] max-w-md mx-auto leading-relaxed">
             Your shareable registration link is live. Anyone with this link can register and answer your custom questions.
           </p>
+          {createdEvent.isPublicized && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EAF4EF] text-[#2A7B5F] text-xs font-bold border border-[#2A7B5F]/20 mt-1">
+              <Globe className="w-3.5 h-3.5" />
+              <span>Publicized in Sheeba Discovery</span>
+            </div>
+          )}
         </div>
 
         {/* Share Link Row (Unboxed, only inputs and buttons) */}
@@ -405,13 +415,13 @@ export const CreateEventPage: React.FC = () => {
               {errors.title && <p className="text-[11px] text-red-600 mt-1">{errors.title}</p>}
             </div>
 
-            <div className="flex flex-wrap items-start gap-4">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-start gap-4">
+              <div className="w-full sm:w-auto">
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1">Event Type *</label>
                 <select
                   value={selectedTypeOption}
                   onChange={(e) => handleTypeChange(e.target.value)}
-                  className="w-48 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
+                  className="w-full sm:w-48 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
                 >
                   <option value="meetup">Meetup</option>
                   <option value="workshop">Workshop</option>
@@ -422,7 +432,7 @@ export const CreateEventPage: React.FC = () => {
               </div>
 
               {selectedTypeOption === 'other' && (
-                <div className="flex-1 min-w-[200px] animate-fade-in">
+                <div className="w-full sm:flex-1 sm:min-w-[200px] animate-fade-in">
                   <label className="block text-xs font-bold text-[#2D1F23] mb-1">Specify Event Type *</label>
                   <input
                     type="text"
@@ -435,37 +445,37 @@ export const CreateEventPage: React.FC = () => {
                 </div>
               )}
 
-              <div>
+              <div className="w-full sm:w-auto">
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1">Date *</label>
                 <input
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-48 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  className="w-full sm:w-48 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                 />
                 {errors.date && <p className="text-[11px] text-red-600 mt-1">{errors.date}</p>}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-4">
+              <div className="w-full sm:w-auto">
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1">Start Time</label>
                 <input
                   type="text"
                   placeholder="09:00 AM"
                   value={formData.startTime}
                   onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="w-36 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  className="w-full sm:w-36 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                 />
               </div>
-              <div>
+              <div className="w-full sm:w-auto">
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1">End Time</label>
                 <input
                   type="text"
                   placeholder="05:00 PM"
                   value={formData.endTime}
                   onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="w-36 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  className="w-full sm:w-36 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                 />
               </div>
             </div>
@@ -606,7 +616,7 @@ export const CreateEventPage: React.FC = () => {
                   const val = e.target.value.replace(/[^0-9]/g, '');
                   setFormData({ ...formData, capacity: val === '' ? 0 : parseInt(val, 10) });
                 }}
-                className="w-36 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                className="w-full sm:w-36 px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
               />
               <p className="text-[10px] text-[#756366] mt-1">Registration automatically closes when capacity is reached.</p>
             </div>
@@ -668,7 +678,39 @@ export const CreateEventPage: React.FC = () => {
             )}
           </div>
 
-          {/* 3. Registration Questions (Unboxed, free spacing, customizable answer choices) */}
+          {/* 3. Community Visibility & Discovery ("Publicize in Sheeba") */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-[#E8DDD7] shadow-2xs space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-[#63474D]" />
+                  3. Publicize in Sheeba Discovery
+                </h2>
+                <p className="text-xs text-[#756366] leading-relaxed max-w-md">
+                  Feature this event in Sheeba's community event discovery section. Any attendee can browse, discover, and register after signing up. Your direct share link remains active simultaneously.
+                </p>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1 select-none">
+                <input
+                  type="checkbox"
+                  checked={formData.isPublicized}
+                  onChange={(e) => setFormData({ ...formData, isPublicized: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2A7B5F]"></div>
+              </label>
+            </div>
+
+            {formData.isPublicized && (
+              <div className="p-3 bg-[#EAF4EF] border border-[#2A7B5F]/20 rounded-2xl flex items-center gap-2 text-xs text-[#2A7B5F] animate-fade-in font-medium">
+                <Globe className="w-4 h-4 shrink-0" />
+                <span>This event will be published to Sheeba's Mini Event Discovery section.</span>
+              </div>
+            )}
+          </div>
+
+          {/* 4. Registration Questions (Unboxed, free spacing, customizable answer choices) */}
           <div className="space-y-4 pt-6 border-t border-gray-100">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>

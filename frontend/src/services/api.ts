@@ -616,9 +616,12 @@ export const api = {
 
   // Events API
   events: {
-    getAll: async (organizerId?: string, skipCache: boolean = false): Promise<Event[]> => {
+    getAll: async (organizerId?: string, skipCache: boolean = false, isPublicized?: boolean): Promise<Event[]> => {
       try {
-        const queryParam = organizerId ? `?organizerId=${encodeURIComponent(organizerId)}` : '';
+        const params = new URLSearchParams();
+        if (organizerId) params.append('organizerId', organizerId);
+        if (isPublicized !== undefined) params.append('isPublicized', String(isPublicized));
+        const queryParam = params.toString() ? `?${params.toString()}` : '';
         const res = await requestApi(`/events${queryParam}`, { skipCache });
         if (res.data && Array.isArray(res.data)) {
           if (!organizerId) {
@@ -642,7 +645,22 @@ export const api = {
       if (organizerId) {
         return eventsStore.filter((e) => e.organizerId === organizerId);
       }
+      if (isPublicized !== undefined) {
+        return eventsStore.filter((e) => Boolean(e.isPublicized) === isPublicized);
+      }
       return [...eventsStore];
+    },
+
+    getDiscoveryEvents: async (skipCache: boolean = false): Promise<Event[]> => {
+      try {
+        const res = await requestApi('/events?isPublicized=true', { skipCache });
+        if (res.data && Array.isArray(res.data)) {
+          return res.data;
+        }
+      } catch (e) {
+        console.warn('Discovery events fetch fallback:', e);
+      }
+      return eventsStore.filter((e) => Boolean(e.isPublicized));
     },
 
     getById: async (id: string): Promise<Event | null> => {
@@ -682,11 +700,13 @@ export const api = {
             venueName: data.venueName || data.location,
             capacity: Number(data.capacity) || 100,
             isPaid: Boolean(data.isPaid),
+            isPublicized: Boolean(data.isPublicized),
             ticketPrice: Number(data.ticketPrice) || 0,
             currency: 'ETB',
             customQuestions: data.customQuestions || [],
             includeDefaultQuestions: data.includeDefaultQuestions !== undefined ? data.includeDefaultQuestions : true,
             bannerUrl: data.bannerUrl,
+            posterImageUrl: data.bannerUrl,
           }),
         });
         if (res.data) {

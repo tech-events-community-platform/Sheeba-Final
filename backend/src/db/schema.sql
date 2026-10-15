@@ -87,6 +87,8 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS custom_questions JSONB NOT NULL DEFA
 ALTER TABLE events ADD COLUMN IF NOT EXISTS poster_image_url TEXT;
 ALTER TABLE events DROP CONSTRAINT IF EXISTS events_status_check;
 ALTER TABLE events ADD CONSTRAINT events_status_check CHECK (status IN ('open', 'closed', 'completed', 'canceled', 'cancelled', 'postponed', 'draft', 'published'));
+ALTER TABLE events ADD COLUMN IF NOT EXISTS is_publicized BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS idx_events_is_publicized ON events(is_publicized) WHERE is_publicized = TRUE;
 
 -- Registrations Table
 CREATE TABLE IF NOT EXISTS registrations (

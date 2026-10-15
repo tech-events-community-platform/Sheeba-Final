@@ -6,6 +6,7 @@ import { HowItWorksSection } from '../../components/sections/HowItWorksSection';
 import { LiveTicketSimulatorSection } from '../../components/sections/LiveTicketSimulatorSection';
 import { StrideMilestoneCard } from '../../components/sections/StrideMilestoneCard';
 import { ContactUsSection } from '../../components/sections/ContactUsSection';
+import { EventDiscoverySection } from '../../components/events/EventDiscoverySection';
 import FadeIn from '../../components/FadeIn';
 import { ArrowRight } from 'lucide-react';
 
@@ -31,7 +32,14 @@ export const LandingPage: React.FC = () => {
       {/* 4. LIVE TICKET & BADGE DASHBOARD SIMULATOR */}
       <LiveTicketSimulatorSection />
 
-      {/* 5. CONTACT US SECTION (BREVO-POWERED INBOX DISPATCH) */}
+      {/* 5. EXPLORE COMMUNITY EVENTS (PUBLICIZED IN SHEEBA) */}
+      <section id="explore-events" className="max-w-6xl mx-auto px-4 sm:px-6">
+        <FadeIn direction="up">
+          <EventDiscoverySection limit={6} />
+        </FadeIn>
+      </section>
+
+      {/* 6. CONTACT US SECTION (BREVO-POWERED INBOX DISPATCH) */}
       <ContactUsSection id="contact" />
 
       {/* 6. MINIMALISTIC CLOSING CTA */}

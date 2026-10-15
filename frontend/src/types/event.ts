@@ -37,6 +37,7 @@ export interface Event {
   checkedInCount: number;
   status: EventStatus;
   isPaid: boolean;
+  isPublicized?: boolean;
   ticketPrice: number; // In ETB
   currency: 'ETB';
   shareLinkToken: string;

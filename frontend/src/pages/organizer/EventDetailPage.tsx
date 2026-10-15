@@ -21,6 +21,7 @@ import {
   HelpCircle,
   Edit,
   Trash2,
+  Globe,
 } from 'lucide-react';
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 import { EditEventModal } from '../../components/organizer/EditEventModal';
@@ -88,6 +89,23 @@ export const EventDetailPage: React.FC = () => {
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const [togglingPublicize, setTogglingPublicize] = useState(false);
+
+  const handleTogglePublicize = async () => {
+    if (!event) return;
+    setTogglingPublicize(true);
+    try {
+      const nextStatus = !event.isPublicized;
+      const updated = await api.events.update(event.id, { isPublicized: nextStatus });
+      setEvent((prev) => (prev ? { ...prev, isPublicized: nextStatus } : updated));
+    } catch (err: any) {
+      console.error('Failed to toggle publicize status:', err);
+      alert(err.message || 'Failed to update discovery status.');
+    } finally {
+      setTogglingPublicize(false);
+    }
   };
 
   // Manual Attendee Creation (Walk-in check-in)
@@ -439,6 +457,39 @@ export const EventDetailPage: React.FC = () => {
               <ExternalLink className="w-3.5 h-3.5" />
             </Link>
           </div>
+        </div>
+
+        {/* Sheeba Community Discovery Toggle */}
+        <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <span className="text-[10px] uppercase font-bold text-[#756366] block">
+              Sheeba Community Discovery
+            </span>
+            <p className="text-xs text-[#2D1F23] font-medium">
+              {event.isPublicized
+                ? 'Publicized in Sheeba Discovery (Attendees can discover and register from community feed)'
+                : 'Direct Share Link Only (Private: only people with your direct URL can register)'}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={togglingPublicize}
+            onClick={handleTogglePublicize}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              event.isPublicized
+                ? 'bg-[#EAF4EF] text-[#2A7B5F] hover:bg-[#d8ece1] border border-[#2A7B5F]/30'
+                : 'bg-gray-100 text-[#63474D] hover:bg-gray-200 border border-gray-200'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>
+              {togglingPublicize
+                ? 'Updating...'
+                : event.isPublicized
+                ? 'Publicized in Discovery (Click to make Private)'
+                : 'Publicize in Sheeba'}
+            </span>
+          </button>
         </div>
 
         {/* Registration Form Questions Summary & Quick Access */}

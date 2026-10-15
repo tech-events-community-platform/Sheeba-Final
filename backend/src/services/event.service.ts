@@ -69,6 +69,7 @@ export class EventService {
       timeState,
       isPaid,
       ticketPrice,
+      isPublicized: Boolean(row.is_publicized),
       currency: row.currency || 'ETB',
       shareLinkToken: row.share_link_token || row.id,
       customQuestions: typeof row.custom_questions === 'string' ? JSON.parse(row.custom_questions) : row.custom_questions || [],
@@ -93,6 +94,7 @@ export class EventService {
       capacity: number;
       isPaid?: boolean;
       ticketPrice?: number;
+      isPublicized?: boolean;
       customQuestions?: any[];
       bannerUrl?: string;
       posterImageUrl?: string;
@@ -111,6 +113,7 @@ export class EventService {
       capacity,
       isPaid = false,
       ticketPrice = 0,
+      isPublicized = false,
       customQuestions = [],
       bannerUrl,
       posterImageUrl,
@@ -124,9 +127,9 @@ export class EventService {
       `INSERT INTO events (
         organizer_id, title, description, event_type, category, event_date,
         start_time, end_time, time_str, location, venue_name, capacity,
-        status, is_paid, ticket_price, currency, share_link_token,
+        status, is_paid, is_publicized, ticket_price, currency, share_link_token,
         custom_questions, banner_url, poster_image_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, 'ETB', $15, $16, $17, $18)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, $15, 'ETB', $16, $17, $18, $19)
       RETURNING *`,
       [
         organizerId,
@@ -142,6 +145,7 @@ export class EventService {
         venueName,
         capacity,
         isPaid,
+        Boolean(isPublicized),
         ticketPrice,
         shareLinkToken,
         JSON.stringify(customQuestions),
@@ -173,6 +177,7 @@ export class EventService {
     type?: string;
     status?: string;
     organizerId?: string;
+    isPublicized?: boolean | string;
   } = {}) {
     const cacheKey = `events:list:${JSON.stringify(filters || {})}`;
     const cached = CacheService.get<any[]>(cacheKey);
@@ -180,7 +185,7 @@ export class EventService {
       return cached;
     }
 
-    const { search, type, status, organizerId } = filters;
+    const { search, type, status, organizerId, isPublicized } = filters;
 
     const conditions: string[] = [];
     const values: any[] = [];
@@ -189,6 +194,14 @@ export class EventService {
     if (organizerId) {
       conditions.push(`e.organizer_id = $${counter++}`);
       values.push(organizerId);
+    }
+
+    if (isPublicized !== undefined) {
+      if (isPublicized === true || isPublicized === 'true') {
+        conditions.push(`e.is_publicized = TRUE`);
+      } else if (isPublicized === false || isPublicized === 'false') {
+        conditions.push(`e.is_publicized = FALSE`);
+      }
     }
 
     if (status && status !== 'All') {
@@ -325,6 +338,7 @@ export class EventService {
       'capacity',
       'status',
       'is_paid',
+      'is_publicized',
       'ticket_price',
       'event_date',
       'start_time',
@@ -350,6 +364,8 @@ export class EventService {
           ? 'ticket_price'
           : key === 'isPaid'
           ? 'is_paid'
+          : key === 'isPublicized' || key === 'is_publicized'
+          ? 'is_publicized'
           : key === 'date'
           ? 'event_date'
           : key === 'startTime'
@@ -376,6 +392,8 @@ export class EventService {
               : JSON.stringify(value || [])
             : dbKey === 'event_date'
             ? new Date(value as string)
+            : dbKey === 'is_publicized'
+            ? Boolean(value)
             : value
         );
       }

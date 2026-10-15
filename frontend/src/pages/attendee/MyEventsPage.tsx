@@ -20,6 +20,7 @@ import {
   Star,
 } from 'lucide-react';
 import { ReviewModal } from '../../components/reviews/ReviewModal';
+import { EventDiscoverySection } from '../../components/events/EventDiscoverySection';
 import type { EventReviewItem } from '../../types/review';
 import { printTicketPass } from '../../utils/printTicket';
 import { isEventPassed } from '../../utils/date';
@@ -29,7 +30,7 @@ export const MyEventsPage: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'Upcoming' | 'Past' | 'Tickets'>('Upcoming');
+  const [activeTab, setActiveTab] = useState<'Upcoming' | 'Past' | 'Tickets' | 'Discover'>('Upcoming');
   const [highlightedTicketId, setHighlightedTicketId] = useState<string | null>(null);
   const [selectedAttendeeTicket, setSelectedAttendeeTicket] = useState<Ticket | null>(null);
   const [reviewModalEvent, setReviewModalEvent] = useState<{ id: string; title: string } | null>(null);
@@ -174,6 +175,20 @@ export const MyEventsPage: React.FC = () => {
           <QrCode className="w-4 h-4" />
           <span>My Tickets ({tickets.length})</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Discover')}
+          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTab === 'Discover'
+              ? 'border-[#2A7B5F] text-[#2A7B5F]'
+              : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-[#2A7B5F]" />
+          <span>Explore Events</span>
+          <span className="px-1.5 py-0.2 text-[10px] bg-[#EAF4EF] text-[#2A7B5F] rounded-full font-bold">New</span>
+        </button>
       </div>
 
       {/* Tab Contents */}
@@ -191,15 +206,18 @@ export const MyEventsPage: React.FC = () => {
               <img src="/calendar.webp" alt="Calendar" className="w-10 h-10 object-contain mx-auto" />
               <h3 className="font-serif text-base font-bold text-[#2D1F23]">No Upcoming Registrations</h3>
               <p className="text-xs text-[#756366] font-light max-w-md mx-auto">
-                You haven't registered for any upcoming events yet. {pastEvents.length > 0 ? `You have ${pastEvents.length} past event${pastEvents.length > 1 ? 's' : ''} in your history.` : ''}
+                You haven't registered for any upcoming events yet. Discover verified hackathons, workshops, and meetups happening in Ethiopia.
               </p>
-              {pastEvents.length > 0 && (
-                <div className="pt-2">
+              <div className="pt-2 flex flex-wrap justify-center gap-2">
+                <Button variant="accent" size="sm" onClick={() => setActiveTab('Discover')} icon={<Sparkles className="w-3.5 h-3.5" />}>
+                  Explore Sheeba Events
+                </Button>
+                {pastEvents.length > 0 && (
                   <Button variant="outline" size="sm" onClick={() => setActiveTab('Past')}>
                     View Past Events ({pastEvents.length})
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
@@ -409,8 +427,8 @@ export const MyEventsPage: React.FC = () => {
             </div>
           )}
         </div>
-      ) : (
-        /* TAB 2: My Tickets (QR Codes per Event) */
+      ) : activeTab === 'Tickets' ? (
+        /* TAB 3: My Tickets (QR Codes per Event) */
         <div className="space-y-4">
           {tickets.length === 0 ? (
             <div className="bg-white rounded-3xl p-10 text-center border border-[#E8DDD7] space-y-3 shadow-xs">
@@ -625,7 +643,12 @@ export const MyEventsPage: React.FC = () => {
             </div>
           )}
         </div>
-      )}
+      ) : activeTab === 'Discover' ? (
+        /* TAB 4: Publicized Community Events Discovery */
+        <EventDiscoverySection
+          registeredEventIds={tickets.map((t) => t.eventId)}
+        />
+      ) : null}
 
       {/* ATTRACTIVE ATTENDEE INFORMATION MODAL BOX */}
       {selectedAttendeeTicket && (

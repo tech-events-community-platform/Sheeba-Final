@@ -39,6 +39,7 @@ export const eventFormSchema = z
     description: z.string().trim().min(1, 'Description is required'),
     capacity: z.coerce.number().int('Capacity must be an integer').min(1, 'Capacity must be at least 1'),
     isPaid: z.boolean().default(false),
+    isPublicized: z.boolean().default(false),
     ticketPrice: z.coerce.number().min(0, 'Ticket price cannot be negative').default(0),
     posterImageUrl: z.string().trim().optional(),
   })
