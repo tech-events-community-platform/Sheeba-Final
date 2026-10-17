@@ -631,4 +631,170 @@ export class EmailService {
 
     await this.dispatchEmail(toEmail, emailSubject, htmlBody, fullName);
   }
+
+  /**
+   * Application Received (Pending Review) Email
+   */
+  static async sendApplicationSubmittedPendingEmail(
+    toEmail: string,
+    fullName: string,
+    eventTitle: string
+  ): Promise<void> {
+    const subject = `Application Received: ${eventTitle}`;
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization & Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <div style="display: inline-block; background-color: #FFF8F6; color: #AA767C; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #E8DDD7;">
+            Under Review
+          </div>
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Application Received for ${eventTitle}</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Hello ${fullName},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Thank you for applying to attend <strong>${eventTitle}</strong>. The organizer is currently reviewing attendee applications to curate the event cohort.
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            You will receive an email as soon as your application status is updated. If accepted, your official dynamic QR entrance pass will be issued immediately.
+          </p>
+
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/events" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; display: inline-block;">
+              View Application Status
+            </a>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 24px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Application Approved Email
+   */
+  static async sendApplicationApprovedEmail(
+    toEmail: string,
+    fullName: string,
+    eventTitle: string,
+    date: string,
+    time: string,
+    location: string,
+    isPaid: boolean,
+    ticketPrice: number,
+    actionUrl: string
+  ): Promise<void> {
+    const subject = isPaid
+      ? `Application Approved: Complete Payment for ${eventTitle}`
+      : `Application Approved! Your pass for ${eventTitle} is ready`;
+
+    const ctaText = isPaid ? `Pay ${ticketPrice} ETB & Claim Ticket` : 'View Your QR Entrance Pass';
+    const ctaSubtext = isPaid
+      ? `Your application has been accepted! Please complete payment of <strong>${ticketPrice} ETB</strong> to generate and unlock your verifiable entrance QR ticket.`
+      : `Congratulations! Your application has been approved by the organizer. Your official dynamic QR entrance pass has been generated and is ready in your wallet.`;
+
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization & Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <div style="display: inline-block; background-color: #E8F5E9; color: #2E7D32; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 10px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #C8E6C9;">
+            Application Approved
+          </div>
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">You're In! Welcome to ${eventTitle}</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Hello ${fullName},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            ${ctaSubtext}
+          </p>
+
+          <div style="background-color: #FAF7F5; border: 1px solid #E8DDD7; border-radius: 12px; padding: 16px; margin: 20px 0;">
+            <p style="margin: 6px 0; font-size: 13px;"><strong>Event:</strong> ${eventTitle}</p>
+            <p style="margin: 6px 0; font-size: 13px;"><strong>Date:</strong> ${date}</p>
+            <p style="margin: 6px 0; font-size: 13px;"><strong>Time:</strong> ${time}</p>
+            <p style="margin: 6px 0; font-size: 13px;"><strong>Venue:</strong> ${location}</p>
+            ${isPaid ? `<p style="margin: 6px 0; font-size: 13px;"><strong>Ticket Fee:</strong> ${ticketPrice} ETB</p>` : ''}
+          </div>
+
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${actionUrl}" style="background-color: #63474D; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+              ${ctaText}
+            </a>
+          </div>
+
+          <p style="font-size: 12px; color: #756366; text-align: center; margin-top: 16px;">
+            Present your QR pass at the entrance on event day for instant verification and automated badge issuance.
+          </p>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 24px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Application Rejected Notification Email
+   */
+  static async sendApplicationRejectedEmail(
+    toEmail: string,
+    fullName: string,
+    eventTitle: string,
+    reason?: string
+  ): Promise<void> {
+    const subject = `Update on your registration for ${eventTitle}`;
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization & Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Registration Update for ${eventTitle}</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Hello ${fullName},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Thank you for your interest in attending <strong>${eventTitle}</strong>. Due to limited venue capacity and cohort size constraints, the organizing team was unable to accept your application for this specific session.
+          </p>
+          ${reason ? `<div style="background-color: #FAF7F5; border-left: 4px solid #63474D; padding: 12px 16px; margin: 16px 0; font-size: 13px; color: #2D1F23;">${reason}</div>` : ''}
+          <p style="color: #555; line-height: 1.6; margin: 0 0 20px 0; font-size: 14px;">
+            We encourage you to explore other upcoming community hackathons, tech meetups, and workshops hosted on Sheeba.
+          </p>
+
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 13px; display: inline-block;">
+              Browse Upcoming Events
+            </a>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 24px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
 }

@@ -73,6 +73,8 @@ export const createEventSchema = z
     ticketPrice: z.coerce.number().min(0, 'Ticket price cannot be negative.').optional().default(0),
     ticket_price: z.coerce.number().optional(),
     currency: z.string().trim().optional().default('ETB'),
+    requiresApproval: z.boolean().optional().default(false),
+    requires_approval: z.boolean().optional(),
     customQuestions: z.array(registrationQuestionSchema).optional().default([]),
     custom_questions: z.array(registrationQuestionSchema).optional(),
     includeDefaultQuestions: z.boolean().optional().default(true),
@@ -86,6 +88,7 @@ export const createEventSchema = z
     const isPaid = data.isPaid ?? data.is_paid ?? false;
     const isPublicized = data.isPublicized ?? data.is_publicized ?? false;
     const ticketPrice = data.ticketPrice ?? data.ticket_price ?? 0;
+    const requiresApproval = data.requiresApproval ?? data.requires_approval ?? false;
     const banner = data.posterImageUrl || data.poster_image_url || data.bannerUrl || data.banner_url || '';
     const venue = data.venueName || data.venue_name || data.location;
     const questions = data.customQuestions.length > 0 ? data.customQuestions : (data.custom_questions || []);
@@ -97,6 +100,8 @@ export const createEventSchema = z
       isPaid,
       isPublicized,
       ticketPrice: isPaid ? ticketPrice : 0,
+      requiresApproval,
+      requires_approval: requiresApproval,
       bannerUrl: banner || undefined,
       posterImageUrl: banner || undefined,
       venueName: venue,
@@ -149,6 +154,8 @@ export const updateEventSchema = z
     is_publicized: z.boolean().optional(),
     ticketPrice: z.coerce.number().min(0, 'Ticket price cannot be negative.').optional(),
     ticket_price: z.coerce.number().optional(),
+    requiresApproval: z.boolean().optional(),
+    requires_approval: z.boolean().optional(),
     currency: z.string().trim().optional(),
     customQuestions: z.array(registrationQuestionSchema).optional(),
     custom_questions: z.array(registrationQuestionSchema).optional(),
@@ -218,9 +225,14 @@ export const lookupAttendeeQuerySchema = z.object({
   query: z.string().trim().optional(),
 });
 
+export const bulkApproveRegistrationsSchema = z.object({
+  registrationIds: z.array(z.string().trim().min(1)).min(1, 'Please select at least one registration to approve.'),
+});
+
 export type RegistrationQuestionInput = z.infer<typeof registrationQuestionSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 export type UpdateEventInput = z.infer<typeof updateEventSchema>;
 export type EventQueryInput = z.infer<typeof eventQuerySchema>;
 export type RegisterEventInput = z.infer<typeof registerEventSchema>;
 export type LookupAttendeeQueryInput = z.infer<typeof lookupAttendeeQuerySchema>;
+export type BulkApproveRegistrationsInput = z.infer<typeof bulkApproveRegistrationsSchema>;

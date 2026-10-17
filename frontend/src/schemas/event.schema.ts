@@ -41,6 +41,7 @@ export const eventFormSchema = z
     isPaid: z.boolean().default(false),
     isPublicized: z.boolean().default(false),
     ticketPrice: z.coerce.number().min(0, 'Ticket price cannot be negative').default(0),
+    requiresApproval: z.boolean().optional().default(false),
     posterImageUrl: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
@@ -72,6 +73,7 @@ export const editEventSchema = z
     capacity: z.coerce.number().int('Capacity must be an integer.').min(1, 'Capacity must be at least 1.').default(100),
     isPaid: z.boolean().default(false),
     ticketPrice: z.coerce.number().min(0).default(0),
+    requiresApproval: z.boolean().optional().default(false),
     description: z.string().trim().optional(),
     venueName: z.string().trim().optional(),
     startTime: z.string().trim().optional(),

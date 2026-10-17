@@ -35,6 +35,8 @@ export interface Ticket {
   currency: 'ETB';
   isExpired?: boolean;
   approvalStatus?: string;
+  isPending?: boolean;
+  requiresApproval?: boolean;
   registrationStatus?: string;
   rawEventDate?: string;
 }

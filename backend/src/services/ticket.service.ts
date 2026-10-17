@@ -12,8 +12,13 @@ export class TicketService {
       : null;
     const isExpired = expiresAtDate ? now.getTime() > expiresAtDate.getTime() : false;
 
-    let computedStatus = row.status;
-    if (row.status === 'CHECKED_IN') {
+    const approvalStatus = row.approval_status || (row.qr_token ? 'approved' : 'pending');
+    let computedStatus = row.status || (approvalStatus === 'pending' ? 'Pending Approval' : 'Valid');
+    if (approvalStatus === 'pending') {
+      computedStatus = 'Pending Approval';
+    } else if (approvalStatus === 'rejected') {
+      computedStatus = 'Rejected';
+    } else if (row.status === 'CHECKED_IN') {
       computedStatus = 'Used';
     } else if (row.status === 'CANCELLED') {
       computedStatus = 'Cancelled';
@@ -24,9 +29,9 @@ export class TicketService {
     }
 
     return {
-      id: row.ticket_code || row.id,
-      rawId: row.id,
-      ticketCode: row.ticket_code || 'SHB-8921',
+      id: row.ticket_code || row.ticket_raw_id || row.id || row.registration_id,
+      rawId: row.ticket_raw_id || row.id,
+      ticketCode: row.ticket_code || (approvalStatus === 'pending' ? 'PENDING' : 'SHB-8921'),
       registrationId: row.registration_id,
       eventId: row.event_id,
       eventTitle: row.event_title || 'Tech Event',
@@ -39,10 +44,12 @@ export class TicketService {
       attendeeId: row.user_id,
       attendeeName: row.attendee_name || row.full_name,
       attendeeEmail: row.attendee_email || row.email,
-      qrToken: row.qr_token,
-      qrDataUrl: row.qr_code_data_url,
+      qrToken: row.qr_token || null,
+      qrDataUrl: row.qr_code_data_url || null,
       status: computedStatus,
       rawStatus: row.status,
+      approvalStatus,
+      isPending: approvalStatus === 'pending',
       isExpired,
       isPaid: Boolean(row.is_paid),
       ticketPrice: parseFloat(row.ticket_price || '0'),
@@ -56,7 +63,21 @@ export class TicketService {
   static async getAttendeeTickets(userId: string): Promise<any[]> {
     const sql = `
       SELECT 
-        t.*,
+        r.id AS registration_id,
+        r.approval_status,
+        r.payment_status,
+        t.id AS ticket_raw_id,
+        t.ticket_code,
+        t.qr_token,
+        t.qr_code_data_url,
+        t.status,
+        t.is_paid,
+        t.ticket_price,
+        t.currency,
+        t.expires_at,
+        t.checked_in_at,
+        t.created_at,
+        e.id AS event_id,
         e.title AS event_title,
         e.description AS event_description,
         e.event_type,
@@ -67,14 +88,16 @@ export class TicketService {
         e.location AS event_location,
         e.venue_name,
         e.banner_url AS event_banner_url,
+        u.id AS user_id,
         u.full_name AS attendee_name,
         u.email AS attendee_email,
         org.full_name AS organizer_name
-      FROM tickets t
-      JOIN events e ON t.event_id = e.id
-      JOIN users u ON t.user_id = u.id
+      FROM registrations r
+      JOIN events e ON r.event_id = e.id
+      JOIN users u ON r.user_id = u.id
       JOIN users org ON e.organizer_id = org.id
-      WHERE t.user_id = $1
+      LEFT JOIN tickets t ON t.registration_id = r.id
+      WHERE r.user_id = $1 AND r.status = 'registered'
       ORDER BY e.event_date DESC
     `;
 
@@ -85,7 +108,21 @@ export class TicketService {
   static async getTicketByEventAndUser(eventId: string, userId: string): Promise<any> {
     const sql = `
       SELECT 
-        t.*,
+        r.id AS registration_id,
+        r.approval_status,
+        r.payment_status,
+        t.id AS ticket_raw_id,
+        t.ticket_code,
+        t.qr_token,
+        t.qr_code_data_url,
+        t.status,
+        t.is_paid,
+        t.ticket_price,
+        t.currency,
+        t.expires_at,
+        t.checked_in_at,
+        t.created_at,
+        e.id AS event_id,
         e.title AS event_title,
         e.description AS event_description,
         e.event_type,
@@ -96,14 +133,16 @@ export class TicketService {
         e.location AS event_location,
         e.venue_name,
         e.banner_url AS event_banner_url,
+        u.id AS user_id,
         u.full_name AS attendee_name,
         u.email AS attendee_email,
         org.full_name AS organizer_name
-      FROM tickets t
-      JOIN events e ON t.event_id = e.id
-      JOIN users u ON t.user_id = u.id
+      FROM registrations r
+      JOIN events e ON r.event_id = e.id
+      JOIN users u ON r.user_id = u.id
       JOIN users org ON e.organizer_id = org.id
-      WHERE (t.event_id::text = $1 OR e.share_link_token = $1) AND t.user_id = $2
+      LEFT JOIN tickets t ON t.registration_id = r.id
+      WHERE (r.event_id::text = $1 OR e.share_link_token = $1) AND r.user_id = $2 AND r.status = 'registered'
     `;
 
     const result = await query(sql, [eventId, userId]);

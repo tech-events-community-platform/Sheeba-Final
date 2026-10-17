@@ -703,6 +703,7 @@ export const api = {
             isPublicized: Boolean(data.isPublicized),
             ticketPrice: Number(data.ticketPrice) || 0,
             currency: 'ETB',
+            requiresApproval: Boolean(data.requiresApproval),
             customQuestions: data.customQuestions || [],
             includeDefaultQuestions: data.includeDefaultQuestions !== undefined ? data.includeDefaultQuestions : true,
             bannerUrl: data.bannerUrl,
@@ -778,10 +779,11 @@ export const api = {
     delete: async (id: string): Promise<boolean> => {
       try {
         await requestApi(`/events/${id}`, { method: 'DELETE' });
-      } catch (e) {
+      } catch (e: any) {
+        if (e?.status === 403 || e?.status === 401) throw e;
         console.warn('Backend event delete fallback:', e);
       }
-      eventsStore = eventsStore.filter((e) => e.id !== id);
+      eventsStore = eventsStore.filter((e) => e.id !== id && e.shareLinkToken !== id);
       saveEventsStore();
       return true;
     },
@@ -791,7 +793,8 @@ export const api = {
         await requestApi(`/events/${eventId}/attendees/${attendeeId}`, {
           method: 'DELETE',
         });
-      } catch (e) {
+      } catch (e: any) {
+        if (e?.status === 403 || e?.status === 401) throw e;
         console.warn('Backend remove attendee fallback:', e);
       }
       return true;
@@ -805,7 +808,14 @@ export const api = {
       attendee: User;
       answers?: Record<string, any>;
       paymentReference?: string;
-    }): Promise<{ ticket: Ticket; isPaymentRequired: boolean; checkoutUrl?: string }> => {
+    }): Promise<{
+      ticket?: Ticket;
+      isPaymentRequired: boolean;
+      checkoutUrl?: string;
+      isPendingApproval?: boolean;
+      approvalStatus?: 'pending' | 'approved' | 'rejected';
+      message?: string;
+    }> => {
       try {
         const res = await requestApi(`/events/${params.eventId}/register`, {
           method: 'POST',
@@ -815,8 +825,10 @@ export const api = {
             paymentReference: params.paymentReference,
           }),
         });
-        if (res.data?.ticket) {
-          ticketsStore.unshift(res.data.ticket);
+        if (res.data) {
+          if (res.data.ticket) {
+            ticketsStore.unshift(res.data.ticket);
+          }
           return res.data;
         }
       } catch (err: any) {
@@ -834,6 +846,34 @@ export const api = {
 
       if (event.registeredCount >= event.capacity) {
         throw new Error('Event capacity has been reached.');
+      }
+
+      // If approval is required, register as pending without issuing pass upfront
+      if (event.requiresApproval) {
+        event.registeredCount += 1;
+        const regId = `reg_${Date.now()}`;
+        if (!attendeeRosterStore[event.id]) {
+          attendeeRosterStore[event.id] = [];
+        }
+        attendeeRosterStore[event.id].push({
+          id: `roster_${Date.now()}`,
+          registrationId: regId,
+          attendeeId: params.attendee.id,
+          name: params.attendee.name,
+          email: params.attendee.email,
+          registrationDate: new Date().toISOString().split('T')[0],
+          status: 'Registered',
+          approvalStatus: 'pending',
+          badges: [],
+          answers: params.answers,
+        });
+        return {
+          ticket: undefined,
+          isPaymentRequired: false,
+          isPendingApproval: true,
+          approvalStatus: 'pending',
+          message: 'Registration submitted! This event requires organizer approval before your ticket pass is issued.',
+        };
       }
 
       if (event.isPaid && !params.paymentReference) {
@@ -1184,7 +1224,7 @@ export const api = {
       eventId: string;
       attendeeRosterIds: string[];
       badgeCode: BadgeCode;
-      awardedByOrganizerId: string;
+      awardedByOrganizerId?: string;
       notes?: string;
     }): Promise<{ awardedCount: number }> => {
       try {
@@ -1283,6 +1323,26 @@ export const api = {
     },
     getEventRoster: async (eventId: string): Promise<AttendeeRosterItem[]> => {
       return api.roster.getByEventId(eventId);
+    },
+    approveRegistration: async (eventId: string, registrationId: string): Promise<any> => {
+      const res = await requestApi(`/events/${eventId}/registrations/${registrationId}/approve`, {
+        method: 'PATCH',
+      });
+      return res.data;
+    },
+    rejectRegistration: async (eventId: string, registrationId: string, reason?: string): Promise<any> => {
+      const res = await requestApi(`/events/${eventId}/registrations/${registrationId}/reject`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+    bulkApproveRegistrations: async (eventId: string, registrationIds: string[]): Promise<any> => {
+      const res = await requestApi(`/events/${eventId}/registrations/bulk-approve`, {
+        method: 'POST',
+        body: JSON.stringify({ registrationIds }),
+      });
+      return res.data;
     },
   },
 

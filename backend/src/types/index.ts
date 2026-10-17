@@ -86,6 +86,7 @@ export interface IEvent {
   custom_questions: RegistrationQuestion[];
   banner_url?: string | null;
   poster_image_url?: string | null;
+  requires_approval?: boolean;
   created_at: Date;
   updated_at: Date;
   // Computed / Joined fields
@@ -109,12 +110,14 @@ export interface ICheckIn {
 }
 
 export type RegistrationStatus = 'registered' | 'cancelled';
+export type RegistrationApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 export interface IRegistration {
   id: string;
   event_id: string;
   user_id: string;
   status: RegistrationStatus;
+  approval_status?: RegistrationApprovalStatus;
   answers: Record<string, any>;
   payment_reference?: string | null;
   payment_status?: string | null;
@@ -206,7 +209,9 @@ export interface AttendeeRosterItem {
   checkInTime?: string;
   badges: BadgeCode[];
   answers?: Record<string, any>;
-  
+  approvalStatus?: RegistrationApprovalStatus;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
 }
 
 

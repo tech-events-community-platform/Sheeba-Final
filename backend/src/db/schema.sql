@@ -85,6 +85,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAUL
 ALTER TABLE events ADD COLUMN IF NOT EXISTS share_link_token VARCHAR(100);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS custom_questions JSONB NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS poster_image_url TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE events DROP CONSTRAINT IF EXISTS events_status_check;
 ALTER TABLE events ADD CONSTRAINT events_status_check CHECK (status IN ('open', 'closed', 'completed', 'canceled', 'cancelled', 'postponed', 'draft', 'published'));
 ALTER TABLE events ADD COLUMN IF NOT EXISTS is_publicized BOOLEAN NOT NULL DEFAULT FALSE;
@@ -96,6 +97,7 @@ CREATE TABLE IF NOT EXISTS registrations (
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL DEFAULT 'registered' CHECK (status IN ('registered', 'cancelled')),
+    approval_status VARCHAR(50) NOT NULL DEFAULT 'approved' CHECK (approval_status IN ('pending', 'approved', 'rejected')),
     answers JSONB NOT NULL DEFAULT '{}'::jsonb,
     payment_reference VARCHAR(255),
     payment_status VARCHAR(50) NOT NULL DEFAULT 'settled',
@@ -106,6 +108,9 @@ CREATE TABLE IF NOT EXISTS registrations (
 );
 
 -- Alter table commands for registrations
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS approval_status VARCHAR(50) NOT NULL DEFAULT 'approved';
+ALTER TABLE registrations DROP CONSTRAINT IF EXISTS registrations_approval_status_check;
+ALTER TABLE registrations ADD CONSTRAINT registrations_approval_status_check CHECK (approval_status IN ('pending', 'approved', 'rejected'));
 ALTER TABLE registrations ADD COLUMN IF NOT EXISTS answers JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(255);
 ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) NOT NULL DEFAULT 'settled';

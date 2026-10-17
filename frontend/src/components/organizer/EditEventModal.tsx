@@ -51,6 +51,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     capacity: 100,
     isPaid: false,
     ticketPrice: 0,
+    requiresApproval: false,
     posterImageUrl: '',
   });
 
@@ -86,6 +87,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         capacity: event.capacity || 100,
         isPaid: Boolean(event.isPaid),
         ticketPrice: event.ticketPrice || 0,
+        requiresApproval: Boolean(event.requiresApproval),
         posterImageUrl: event.posterImageUrl || event.bannerUrl || '',
       });
 
@@ -158,6 +160,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         capacity: Number(formData.capacity) || 100,
         isPaid: Boolean(formData.isPaid),
         ticketPrice: formData.isPaid ? Number(formData.ticketPrice) || 0 : 0,
+        requiresApproval: Boolean(formData.requiresApproval),
         posterImageUrl: formData.posterImageUrl.trim(),
         bannerUrl: formData.posterImageUrl.trim(),
       };
@@ -439,6 +442,24 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                 />
               </div>
             )}
+
+            <div className="pt-3 border-t border-gray-200/80 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-[#2D1F23] block">Require Organizer Approval</span>
+                <span className="text-[11px] text-gray-500 block mt-0.5">
+                  Hold registrations in pending review until you approve them and issue ticket passes.
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.requiresApproval}
+                  onChange={(e) => setFormData({ ...formData, requiresApproval: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#63474D]"></div>
+              </label>
+            </div>
           </div>
 
           {/* Section 6: Poster / Banner with Upload from PC & Live Preview */}

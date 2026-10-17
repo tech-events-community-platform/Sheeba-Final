@@ -11,6 +11,9 @@ import {
   Copy,
   Clock,
   ChevronRight,
+  Trash2,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 
 export const OrganizerDashboardPage: React.FC = () => {
@@ -19,6 +22,9 @@ export const OrganizerDashboardPage: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteEventTarget, setDeleteEventTarget] = useState<Event | null>(null);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -41,6 +47,22 @@ export const OrganizerDashboardPage: React.FC = () => {
     navigator.clipboard.writeText(url);
     setCopiedId(token);
     setTimeout(() => setCopiedId(null), 2500);
+  };
+
+  const handleConfirmDeleteEvent = async () => {
+    if (!deleteEventTarget) return;
+    setIsDeletingEvent(true);
+    try {
+      await api.events.delete(deleteEventTarget.id);
+      setEvents((prev) => prev.filter((e) => e.id !== deleteEventTarget.id));
+      setDeleteSuccessMsg(`Event "${deleteEventTarget.title}" was successfully deleted.`);
+      setTimeout(() => setDeleteSuccessMsg(null), 4000);
+      setDeleteEventTarget(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete event.');
+    } finally {
+      setIsDeletingEvent(false);
+    }
   };
 
   // Section 2: Date-derived event status (Ongoing / Upcoming / Past)
@@ -95,6 +117,59 @@ export const OrganizerDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-16 w-full">
+      {/* Delete Event Confirmation Modal */}
+      {deleteEventTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-[#2D1F23] text-white p-6 rounded-3xl max-w-md w-full shadow-2xl border border-red-500/30 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-red-500/20 text-red-400 rounded-2xl shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-serif font-bold text-base text-white">Permanently Delete Event?</h4>
+                <p className="text-xs text-gray-300 mt-1 leading-relaxed">
+                  Are you sure you want to delete <strong className="text-white">"{deleteEventTarget.title}"</strong>? This will permanently remove the event, its roster, passes, and all associated reports.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setDeleteEventTarget(null)}
+                disabled={isDeletingEvent}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-gray-200 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteEvent}
+                disabled={isDeletingEvent}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+              >
+                {isDeletingEvent ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>{isDeletingEvent ? 'Deleting...' : 'Confirm Delete'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {deleteSuccessMsg && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-2xs animate-fade-in">
+          <div className="flex items-center gap-2">
+            <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0" />
+            <span>{deleteSuccessMsg}</span>
+          </div>
+        </div>
+      )}
+
       {/* 1. Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
         <div className="space-y-1">
@@ -210,6 +285,18 @@ export const OrganizerDashboardPage: React.FC = () => {
                                 <span className="text-[11px]">link</span>
                               </>
                             )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteEventTarget(evt);
+                            }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title={`Delete event "${evt.title}"`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
 
                           <div className="hidden sm:flex items-center text-[#AA767C] group-hover:text-[#63474D] group-hover:translate-x-0.5 transition-all">

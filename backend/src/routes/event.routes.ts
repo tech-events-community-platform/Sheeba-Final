@@ -11,6 +11,7 @@ import {
   eventQuerySchema,
   registerEventSchema,
   lookupAttendeeQuerySchema,
+  bulkApproveRegistrationsSchema,
 } from '../schemas/event.schema';
 
 const router = Router();
@@ -113,6 +114,29 @@ router.delete(
   authenticate,
   authorizeRoles('organizer', 'admin'),
   EventController.removeAttendee
+);
+
+router.patch(
+  '/:id/registrations/:registrationId/approve',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  EventController.approveRegistration
+);
+
+router.patch(
+  '/:id/registrations/:registrationId/reject',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  EventController.rejectRegistration
+);
+
+router.post(
+  '/:id/registrations/bulk-approve',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  validateBody(bulkApproveRegistrationsSchema),
+  EventController.bulkApproveRegistrations
 );
 
 export default router;

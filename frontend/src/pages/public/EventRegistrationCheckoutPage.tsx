@@ -13,6 +13,7 @@ import {
   Clock,
   ShieldCheck,
   Lock,
+  X,
 } from 'lucide-react';
 import { getCalendarTile, isEventPassed } from '../../utils/date';
 import { validateForm } from '../../utils/validation';
@@ -66,6 +67,8 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
   const [selectedPayment, setSelectedPayment] = useState<'telebirr' | 'cbe' | 'awash'>('telebirr');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isPendingApproval, setIsPendingApproval] = useState(false);
+  const [isRejected, setIsRejected] = useState(false);
 
   const effectiveQuestions = React.useMemo(() => {
     if (!event) return [];
@@ -94,9 +97,17 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
           try {
             const userTicket = await api.registration.getTicketByEvent(fetched.id, user.id);
             if (userTicket) {
-              setIsAlreadyRegistered(true);
               setConfirmedEmail(user.email);
-              setTicket(userTicket);
+              if (userTicket.isPending || userTicket.approvalStatus === 'pending') {
+                setIsPendingApproval(true);
+                setIsAlreadyRegistered(true);
+              } else if (userTicket.approvalStatus === 'rejected') {
+                setIsRejected(true);
+                setIsAlreadyRegistered(true);
+              } else {
+                setTicket(userTicket);
+                setIsAlreadyRegistered(true);
+              }
             }
           } catch {
             // Not registered yet
@@ -253,6 +264,11 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
         setTicket(res.ticket);
         setIsAlreadyRegistered(true);
         setIsConfirmed(true);
+      } else if (res.isPendingApproval || res.approvalStatus === 'pending') {
+        setConfirmedEmail(attendeeToRegister.email);
+        setIsPendingApproval(true);
+        setIsAlreadyRegistered(true);
+        setIsConfirmed(true);
       }
     } catch (err: any) {
       const msg = err.message || 'Registration failed.';
@@ -263,7 +279,15 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
         setIsConfirmed(true);
         try {
           const userTicket = await api.registration.getTicketByEvent(event.id, attendeeToRegister.id);
-          if (userTicket) setTicket(userTicket);
+          if (userTicket) {
+            if (userTicket.isPending || userTicket.approvalStatus === 'pending') {
+              setIsPendingApproval(true);
+            } else if (userTicket.approvalStatus === 'rejected') {
+              setIsRejected(true);
+            } else {
+              setTicket(userTicket);
+            }
+          }
         } catch {
           // ignore
         }
@@ -329,6 +353,114 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
               Explore Events
             </Button>
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Application Rejected View
+  if (isRejected) {
+    return (
+      <div className="w-full py-16 px-4 flex items-center justify-center animate-fade-in">
+        <div className="max-w-md w-full mx-auto space-y-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto text-red-700">
+            <X className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-red-700 block">
+              Application Status
+            </span>
+            <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-black">
+              Application Not Approved
+            </h1>
+            <p className="text-xs text-gray-700 leading-relaxed">
+              We regret to inform you that your registration application for <strong className="text-black">{event.title}</strong> was not approved by the event organizer.
+            </p>
+          </div>
+          <div className="flex justify-center gap-3 pt-2">
+            <Link to="/events">
+              <Button variant="primary" size="sm">Explore Events</Button>
+            </Link>
+            <Link to={backUrl}>
+              <Button variant="outline" size="sm">Back to Event</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Application Pending Review View
+  if (isPendingApproval) {
+    return (
+      <div className="w-full py-16 px-4 flex items-center justify-center animate-fade-in">
+        <div className="max-w-xl w-full mx-auto space-y-6 text-center">
+          <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center mx-auto text-amber-800 shadow-inner">
+            <Clock className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-amber-800 block">
+              Application Under Review
+            </span>
+            <h1 className="font-serif text-3xl sm:text-4xl font-extrabold text-black">
+              Application Submitted!
+            </h1>
+            <p className="text-xs sm:text-sm text-black max-w-md mx-auto leading-relaxed">
+              Your registration application for <strong className="text-black">{event.title}</strong> has been received and is currently under review by the event organizer.
+            </p>
+          </div>
+
+          {/* Logistics Line */}
+          <div className="pt-2 space-y-1 text-xs sm:text-sm text-black max-w-sm mx-auto">
+            <p className="font-semibold text-black flex items-center justify-center gap-1.5">
+              <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
+              <span>{cal.weekday ? `${cal.weekday}, ${cal.fullDate}` : event.date} • {event.time || `${event.startTime} - ${event.endTime}`}</span>
+            </p>
+            <p className="flex items-center justify-center gap-1.5 text-black">
+              <img src="/location.webp" alt="Location" className="w-4 h-4 object-contain shrink-0" />
+              <span>{event.venueName ? `${event.venueName}, ` : ''}{event.location}</span>
+            </p>
+          </div>
+
+          {/* Review Status Info Box */}
+          <div className="p-5 bg-amber-50/80 border border-amber-200 rounded-3xl max-w-md mx-auto text-left space-y-3">
+            <div className="flex items-start gap-2.5">
+              <div className="p-1.5 bg-amber-200/80 text-amber-900 rounded-xl mt-0.5 shrink-0">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-amber-950">What happens next?</h4>
+                <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                  The event organizer is reviewing applicant questionnaire responses. Once your application is approved:
+                </p>
+              </div>
+            </div>
+            <ul className="text-[11px] text-amber-900 space-y-1.5 pl-8 list-disc">
+              <li>
+                You will receive an approval confirmation email at <strong className="text-black">{confirmedEmail || user?.email || 'your email'}</strong>.
+              </li>
+              <li>
+                {event.isPaid && (event.ticketPrice || 0) > 0
+                  ? 'Your approval email will contain a checkout link to complete your ticket fee payment and unlock your entry pass.'
+                  : 'Your official digital ticket and dynamic QR entry pass will be generated and available in your account.'}
+              </li>
+              <li>You can check your application status at any time in your account.</li>
+            </ul>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-3 pt-4">
+            <Link to="/app/events">
+              <Button variant="primary" size="sm">
+                View in My Events
+              </Button>
+            </Link>
+            <Link to={backUrl}>
+              <Button variant="outline" size="sm" className="border-gray-400 text-black hover:bg-black/5">
+                Back to Event
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -725,54 +857,68 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
           </div>
         ) : null}
 
-        {/* Payment Section (ONLY displayed if the event is NOT free) */}
+        {/* Payment Section */}
         {event.isPaid && (event.ticketPrice || 0) > 0 && (
           <div className="space-y-4 pt-4 border-t border-gray-300">
-            <div>
-              <h2 className="font-serif font-bold text-lg text-black">
-                Payment Details
-              </h2>
-              <p className="text-xs text-gray-600 mt-0.5">
-                This is a paid event. Total admission fee: <strong className="text-black font-extrabold">{event.ticketPrice} ETB</strong>
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-black">
-                Select your preferred payment method:
-              </label>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                {[
-                  { id: 'telebirr' as const, name: 'Telebirr', desc: 'Direct USSD or App transfer' },
-                  { id: 'cbe' as const, name: 'CBE', desc: 'Commercial Bank of Ethiopia' },
-                  { id: 'awash' as const, name: 'Awash', desc: 'Awash Birr / Online Banking' },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setSelectedPayment(m.id)}
-                    className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                      selectedPayment === m.id
-                        ? 'bg-[#63474D]/15 border-[#63474D] text-black shadow-sm ring-2 ring-[#63474D]/30'
-                        : 'bg-white/40 border-gray-300 text-black hover:bg-white/60'
-                    }`}
-                  >
-                    <p className="font-bold text-sm text-black">{m.name}</p>
-                    <p className="text-[11px] text-gray-600 mt-1">{m.desc}</p>
-                  </button>
-                ))}
+            {event.requiresApproval ? (
+              <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-1.5">
+                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                  <Clock className="w-4 h-4 text-amber-700" />
+                  <span>Ticket Price: {event.ticketPrice} ETB (Payable upon approval)</span>
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  This event requires organizer approval. You do not need to pay upfront now. Once your application is reviewed and approved, you will receive an approval email with a payment link to complete your ticket purchase.
+                </p>
               </div>
+            ) : (
+              <>
+                <div>
+                  <h2 className="font-serif font-bold text-lg text-black">
+                    Payment Details
+                  </h2>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    This is a paid event. Total admission fee: <strong className="text-black font-extrabold">{event.ticketPrice} ETB</strong>
+                  </p>
+                </div>
 
-              <p className="text-[11px] text-gray-600 pt-2">
-                Upon submission, instructions to finalize your {selectedPayment.toUpperCase()} payment will be verified for your entry pass.
-              </p>
-            </div>
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-black">
+                    Select your preferred payment method:
+                  </label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    {[
+                      { id: 'telebirr' as const, name: 'Telebirr', desc: 'Direct USSD or App transfer' },
+                      { id: 'cbe' as const, name: 'CBE', desc: 'Commercial Bank of Ethiopia' },
+                      { id: 'awash' as const, name: 'Awash', desc: 'Awash Birr / Online Banking' },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setSelectedPayment(m.id)}
+                        className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                          selectedPayment === m.id
+                            ? 'bg-[#63474D]/15 border-[#63474D] text-black shadow-sm ring-2 ring-[#63474D]/30'
+                            : 'bg-white/40 border-gray-300 text-black hover:bg-white/60'
+                        }`}
+                      >
+                        <p className="font-bold text-sm text-black">{m.name}</p>
+                        <p className="text-[11px] text-gray-600 mt-1">{m.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-gray-600 pt-2">
+                    Upon submission, instructions to finalize your {selectedPayment.toUpperCase()} payment will be verified for your entry pass.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {/* Submit Action */}
-        <div className="pt-4 border-t border-gray-300 flex justify-start">
+        <div className="pt-4 border-t border-gray-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <Button
             type="submit"
             variant="primary"
@@ -780,8 +926,15 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
             isLoading={isSubmitting}
             className="px-8 py-3 text-xs font-bold rounded-xl shadow-md cursor-pointer"
           >
-            Submit Registration
+            {event.requiresApproval ? 'Submit Application for Approval' : 'Submit Registration'}
           </Button>
+
+          {event.requiresApproval && (
+            <p className="text-[11px] text-gray-600 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>Organizer will review your responses before issuing your ticket pass.</span>
+            </p>
+          )}
         </div>
       </form>
     </div>
