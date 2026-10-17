@@ -83,12 +83,14 @@ export default function Header() {
   const publicNavLinks = isHome
     ? [
         { name: 'Features', href: '#features', isInternal: true },
+        { name: 'Explore Events', href: '#explore-events', isInternal: true },
         { name: 'How It Works', href: '#how-it-works', isInternal: true },
         { name: 'Live Simulator', href: '#simulator', isInternal: true },
         { name: 'Contact Us', href: '#contact', isInternal: true },
       ]
     : [
         { name: 'Home', href: '/', isInternal: false },
+        { name: 'Explore Events', href: '/#explore-events', isInternal: false },
         { name: 'Contact Us', href: '/contact', isInternal: false },
       ];
 

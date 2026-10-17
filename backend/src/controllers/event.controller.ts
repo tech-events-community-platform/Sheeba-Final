@@ -19,11 +19,13 @@ export class EventController {
         venueName,
         capacity,
         isPaid,
+        isPublicized,
         ticketPrice,
         requiresApproval,
         requires_approval,
         customQuestions,
         bannerUrl,
+        posterImageUrl,
       } = req.body;
 
       const event = await EventService.createEvent(organizerId, {
@@ -37,10 +39,12 @@ export class EventController {
         venueName,
         capacity,
         isPaid,
+        isPublicized,
         ticketPrice,
         requiresApproval: requiresApproval ?? requires_approval ?? false,
         customQuestions,
-        bannerUrl,
+        bannerUrl: bannerUrl || posterImageUrl,
+        posterImageUrl: posterImageUrl || bannerUrl,
       });
 
       return sendSuccess(res, event, 'Event created successfully.', 201);
@@ -51,11 +55,17 @@ export class EventController {
 
   static async getEvents(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { search, type, status, organizerId } = req.query;
+      const { search, type, status, organizerId, isPublicized } = req.query;
 
-      // Platform events are private/share-link only; public listing of all events is disabled
-      if (!organizerId && (!req.user || !['admin', 'organizer'].includes(req.user.role?.toLowerCase() || ''))) {
-        return sendSuccess(res, [], 'Public event listing is disabled.');
+      const isPublicizedQuery = String(isPublicized).toLowerCase() === 'true';
+      const isPrivilegedUser = Boolean(req.user && ['admin', 'organizer'].includes(req.user.role?.toLowerCase() || ''));
+
+      let filterPublicized: boolean | undefined = undefined;
+      // If not organizer/admin or explicitly querying discovery feed, return publicized events only
+      if (!organizerId && !isPrivilegedUser) {
+        filterPublicized = true;
+      } else if (isPublicizedQuery) {
+        filterPublicized = true;
       }
 
       const events = await EventService.getEvents({
@@ -63,6 +73,7 @@ export class EventController {
         type: type as string,
         status: status as string,
         organizerId: organizerId as string,
+        isPublicized: filterPublicized,
       });
 
       return sendSuccess(res, events, 'Events retrieved successfully.');

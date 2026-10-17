@@ -30,7 +30,7 @@ export const OrganizerDashboardPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const evts = await api.events.getAll(user?.id);
+        const evts = await api.events.getAll(user?.id, true);
         setEvents(evts);
       } catch (err) {
         console.error('Failed to load events:', err);

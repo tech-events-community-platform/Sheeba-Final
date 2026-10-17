@@ -75,51 +75,53 @@ export const AdminEventsPage: React.FC = () => {
 
       {/* Table */}
       <div className="bg-white rounded-3xl border border-[#E8DDD7] overflow-hidden shadow-xs">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="bg-[#FAF7F5] border-b border-[#E8DDD7] text-[10px] font-bold uppercase tracking-wider text-[#756366]">
-              <th className="py-3 px-4">Event Title</th>
-              <th className="py-3 px-4">Organizer</th>
-              <th className="py-3 px-4">Type</th>
-              <th className="py-3 px-4">Date & Location</th>
-              <th className="py-3 px-4">Turnout</th>
-              <th className="py-3 px-4">Pricing</th>
-              <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E8DDD7] text-[#2D1F23]">
-            {filteredEvents.map((evt) => (
-              <tr key={evt.id} className="hover:bg-[#FAF7F5]/50">
-                <td className="py-3.5 px-4 font-bold max-w-xs truncate">{evt.title}</td>
-                <td className="py-3.5 px-4 text-[#AA767C] font-semibold">{evt.organizerName}</td>
-                <td className="py-3.5 px-4 uppercase font-mono text-[10px]">
-                  <Badge variant="primary">{evt.type}</Badge>
-                </td>
-                <td className="py-3.5 px-4">
-                  <p>{evt.date}</p>
-                  <p className="text-[10px] text-[#756366]">{evt.location.split(',')[0]}</p>
-                </td>
-                <td className="py-3.5 px-4 font-bold">
-                  {evt.checkedInCount} / {evt.registeredCount}
-                </td>
-                <td className="py-3.5 px-4 font-semibold">
-                  {evt.isPaid ? `${evt.ticketPrice} ETB` : 'Free'}
-                </td>
-                <td className="py-3.5 px-4">
-                  <Badge variant={evt.status === 'open' ? 'success' : 'gray'}>
-                    {evt.status}
-                  </Badge>
-                </td>
-                <td className="py-3.5 px-4 text-right space-x-2">
-                  <Link to={`/e/${evt.shareLinkToken}`} target="_blank" className="text-xs text-[#63474D] font-semibold hover:underline">
-                    Public Link
-                  </Link>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-[#FAF7F5] border-b border-[#E8DDD7] text-[10px] font-bold uppercase tracking-wider text-[#756366]">
+                <th className="py-3 px-4">Event Title</th>
+                <th className="py-3 px-4">Organizer</th>
+                <th className="py-3 px-4">Type</th>
+                <th className="py-3 px-4">Date & Location</th>
+                <th className="py-3 px-4">Turnout</th>
+                <th className="py-3 px-4">Pricing</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-[#E8DDD7] text-[#2D1F23]">
+              {filteredEvents.map((evt) => (
+                <tr key={evt.id} className="hover:bg-[#FAF7F5]/50">
+                  <td className="py-3.5 px-4 font-bold max-w-xs truncate">{evt.title}</td>
+                  <td className="py-3.5 px-4 text-[#AA767C] font-semibold">{evt.organizerName}</td>
+                  <td className="py-3.5 px-4 uppercase font-mono text-[10px]">
+                    <Badge variant="primary">{evt.type}</Badge>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <p>{evt.date}</p>
+                    <p className="text-[10px] text-[#756366]">{evt.location.split(',')[0]}</p>
+                  </td>
+                  <td className="py-3.5 px-4 font-bold">
+                    {evt.checkedInCount} / {evt.registeredCount}
+                  </td>
+                  <td className="py-3.5 px-4 font-semibold">
+                    {evt.isPaid ? `${evt.ticketPrice} ETB` : 'Free'}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <Badge variant={evt.status === 'open' ? 'success' : 'gray'}>
+                      {evt.status}
+                    </Badge>
+                  </td>
+                  <td className="py-3.5 px-4 text-right space-x-2">
+                    <Link to={`/e/${evt.shareLinkToken}`} target="_blank" className="text-xs text-[#63474D] font-semibold hover:underline">
+                      Public Link
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

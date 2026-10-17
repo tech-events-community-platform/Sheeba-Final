@@ -120,6 +120,14 @@ export const SponsorLayout: React.FC = () => {
         })}
       </div>
 
+      {/* Mobile Drawer Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden animate-fade-in"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar (Desktop + Mobile Drawer) with custom sponsor-sidebar.webp background */}
       <aside
         style={{

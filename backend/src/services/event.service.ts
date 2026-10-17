@@ -69,6 +69,7 @@ export class EventService {
       timeState,
       isPaid,
       ticketPrice,
+      isPublicized: Boolean(row.is_publicized),
       currency: row.currency || 'ETB',
       requiresApproval: Boolean(row.requires_approval),
       shareLinkToken: row.share_link_token || row.id,
@@ -94,6 +95,7 @@ export class EventService {
       capacity: number;
       isPaid?: boolean;
       ticketPrice?: number;
+      isPublicized?: boolean;
       requiresApproval?: boolean;
       customQuestions?: any[];
       bannerUrl?: string;
@@ -113,6 +115,7 @@ export class EventService {
       capacity,
       isPaid = false,
       ticketPrice = 0,
+      isPublicized = false,
       requiresApproval = false,
       customQuestions = [],
       bannerUrl,
@@ -127,9 +130,9 @@ export class EventService {
       `INSERT INTO events (
         organizer_id, title, description, event_type, category, event_date,
         start_time, end_time, time_str, location, venue_name, capacity,
-        status, is_paid, ticket_price, currency, share_link_token,
+        status, is_paid, is_publicized, ticket_price, currency, share_link_token,
         custom_questions, banner_url, poster_image_url, requires_approval
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, 'ETB', $15, $16, $17, $18, $19)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, $15, 'ETB', $16, $17, $18, $19, $19)
       RETURNING *`,
       [
         organizerId,
@@ -145,6 +148,7 @@ export class EventService {
         venueName,
         capacity,
         isPaid,
+        Boolean(isPublicized),
         ticketPrice,
         shareLinkToken,
         JSON.stringify(customQuestions),
@@ -167,6 +171,7 @@ export class EventService {
 
     // Invalidate cached event lists
     CacheService.delPrefix('events:list');
+    CacheService.delPrefix('http:');
 
     return formatted;
   }
@@ -176,6 +181,7 @@ export class EventService {
     type?: string;
     status?: string;
     organizerId?: string;
+    isPublicized?: boolean | string;
   } = {}) {
     const cacheKey = `events:list:${JSON.stringify(filters || {})}`;
     const cached = CacheService.get<any[]>(cacheKey);
@@ -183,7 +189,7 @@ export class EventService {
       return cached;
     }
 
-    const { search, type, status, organizerId } = filters;
+    const { search, type, status, organizerId, isPublicized } = filters;
 
     const conditions: string[] = [];
     const values: any[] = [];
@@ -192,6 +198,14 @@ export class EventService {
     if (organizerId) {
       conditions.push(`e.organizer_id = $${counter++}`);
       values.push(organizerId);
+    }
+
+    if (isPublicized !== undefined) {
+      if (isPublicized === true || isPublicized === 'true') {
+        conditions.push(`e.is_publicized = TRUE`);
+      } else if (isPublicized === false || isPublicized === 'false') {
+        conditions.push(`e.is_publicized = FALSE`);
+      }
     }
 
     if (status && status !== 'All') {
@@ -220,12 +234,18 @@ export class EventService {
         u.organization AS organizer_organization,
         u.email AS organizer_email,
         COUNT(DISTINCT r.id) AS registered_count,
-        COUNT(DISTINCT CASE WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) OR t.status = 'CHECKED_IN' THEN r.id END) AS checked_in_count
+        COUNT(DISTINCT CASE 
+          WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
+            OR t.status IN ('CHECKED_IN', 'Used')
+            OR (b.id IS NOT NULL AND b.revoked_at IS NULL)
+          THEN r.id 
+        END) AS checked_in_count
       FROM events e
       JOIN users u ON e.organizer_id = u.id
       LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered'
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON e.id = t.event_id AND t.registration_id = r.id
+      LEFT JOIN badge_awards b ON b.event_id = e.id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
       ${whereClause}
       GROUP BY e.id, u.id
       ORDER BY e.event_date DESC
@@ -251,12 +271,18 @@ export class EventService {
         u.organization AS organizer_organization,
         u.email AS organizer_email,
         COUNT(DISTINCT r.id) AS registered_count,
-        COUNT(DISTINCT CASE WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) OR t.status = 'CHECKED_IN' THEN r.id END) AS checked_in_count
+        COUNT(DISTINCT CASE 
+          WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
+            OR t.status IN ('CHECKED_IN', 'Used')
+            OR (b.id IS NOT NULL AND b.revoked_at IS NULL)
+          THEN r.id 
+        END) AS checked_in_count
       FROM events e
       JOIN users u ON e.organizer_id = u.id
       LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered'
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON e.id = t.event_id AND t.registration_id = r.id
+      LEFT JOIN badge_awards b ON b.event_id = e.id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
       WHERE e.id::text = $1 OR e.share_link_token = $1
       GROUP BY e.id, u.id
     `;
@@ -316,6 +342,7 @@ export class EventService {
       'capacity',
       'status',
       'is_paid',
+      'is_publicized',
       'ticket_price',
       'event_date',
       'start_time',
@@ -339,40 +366,40 @@ export class EventService {
         key === 'type'
           ? 'event_type'
           : key === 'ticketPrice'
-          ? 'ticket_price'
-          : key === 'isPaid'
-          ? 'is_paid'
-          : key === 'requiresApproval'
-          ? 'requires_approval'
-          : key === 'date'
-          ? 'event_date'
-          : key === 'startTime'
-          ? 'start_time'
-          : key === 'endTime'
-          ? 'end_time'
-          : key === 'time'
-          ? 'time_str'
-          : key === 'venueName'
-          ? 'venue_name'
-          : key === 'posterImageUrl'
-          ? 'poster_image_url'
-          : key === 'bannerUrl'
-          ? 'banner_url'
-          : key === 'customQuestions'
-          ? 'custom_questions'
-          : key;
+            ? 'ticket_price'
+            : key === 'isPaid'
+              ? 'is_paid'
+              : key === 'date'
+                ? 'event_date'
+                : key === 'startTime'
+                  ? 'start_time'
+                  : key === 'endTime'
+                    ? 'end_time'
+                    : key === 'time'
+                      ? 'time_str'
+                      : key === 'venueName'
+                        ? 'venue_name'
+                        : key === 'posterImageUrl'
+                          ? 'poster_image_url'
+                          : key === 'bannerUrl'
+                            ? 'banner_url'
+                            : key === 'customQuestions'
+                              ? 'custom_questions'
+                              : key;
       if (allowedFields.includes(dbKey)) {
         fields.push(`${dbKey} = $${counter++}`);
         values.push(
           dbKey === 'requires_approval'
             ? Boolean(value)
             : dbKey === 'custom_questions'
-            ? typeof value === 'string'
-              ? value
-              : JSON.stringify(value || [])
-            : dbKey === 'event_date'
-            ? new Date(value as string)
-            : value
+              ? typeof value === 'string'
+                ? value
+                : JSON.stringify(value || [])
+              : dbKey === 'event_date'
+                ? new Date(value as string)
+                : dbKey === 'is_publicized'
+                  ? Boolean(value)
+                  : value
         );
       }
     }
@@ -492,8 +519,8 @@ export class EventService {
         typeof qVal === 'string'
           ? qVal.trim().length > 0
           : Array.isArray(qVal)
-          ? qVal.length > 0
-          : qVal !== undefined && qVal !== null && qVal !== '';
+            ? qVal.length > 0
+            : qVal !== undefined && qVal !== null && qVal !== '';
 
       if (q.isRequired && !isFilled) {
         const err: any = new Error(`Please answer required question: "${q.questionText}"`);
@@ -516,8 +543,8 @@ export class EventService {
           const selectedList = Array.isArray(qVal)
             ? qVal
             : typeof qVal === 'string'
-            ? qVal.split(',').map((s: string) => s.trim())
-            : [];
+              ? qVal.split(',').map((s: string) => s.trim())
+              : [];
           const hasInvalid = selectedList.some((item: string) => !validOptionSet.has(item.trim()));
           if (hasInvalid) {
             const err: any = new Error(`Invalid options selected for question: "${q.questionText}".`);
@@ -804,7 +831,14 @@ export class EventService {
     const result = await query(queryText, [event.id]);
 
     const roster = result.rows.map((row) => {
-      const isCheckedIn = Boolean((row.check_in_id && !row.voided_at) || row.ticket_status === 'CHECKED_IN');
+      const badgesList = Array.isArray(row.badges) ? row.badges : [];
+      const hasAttendedBadge = badgesList.includes('attended');
+      const isCheckedIn = Boolean(
+        (row.check_in_id && !row.voided_at) ||
+        row.ticket_status === 'CHECKED_IN' ||
+        row.ticket_status === 'Used' ||
+        hasAttendedBadge
+      );
       const checkInTimeDate = row.check_in_time;
       return {
         id: row.attendee_id,

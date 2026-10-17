@@ -101,7 +101,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         {/* Master Comprehensive Event Table */}
         <div className="space-y-3">
           <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-2xs">
-            <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
               <thead className="bg-[#fcfafc] border-b border-gray-200 text-gray-700 font-bold uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="py-3 px-4">Operational Dimension</th>
@@ -173,6 +174,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 </tr>
               </tbody>
             </table>
+            </div>
           </div>
         </div>
 

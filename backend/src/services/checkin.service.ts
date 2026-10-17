@@ -671,6 +671,7 @@ export class CheckinService {
       CacheService.delPrefix(`event:${realEventId}`);
       CacheService.del(`report:${realEventId}`);
       CacheService.delPrefix('events:list');
+      CacheService.delPrefix('http:');
 
       const updatedAttendee = await this.lookupAttendee(realEventId, attendeeId);
       const rawBadge = badgeRes.rows[0];
@@ -769,6 +770,7 @@ export class CheckinService {
       CacheService.delPrefix(`event:${realEventId}`);
       CacheService.del(`report:${realEventId}`);
       CacheService.delPrefix('events:list');
+      CacheService.delPrefix('http:');
 
       const updatedAttendee = await this.lookupAttendee(realEventId, attendeeId);
 

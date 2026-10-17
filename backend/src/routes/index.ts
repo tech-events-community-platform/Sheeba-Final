@@ -11,6 +11,7 @@ import searchRoutes from './search.routes';
 import sponsorshipRoutes from './sponsorship.routes';
 import contactRoutes from './contact.routes';
 import uploadRoutes from './upload.routes';
+import reviewRoutes from './review.routes';
 
 const router = Router();
 
@@ -36,5 +37,7 @@ router.use('/search', searchRoutes);
 router.use('/sponsorships', sponsorshipRoutes);
 router.use('/contact', contactRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/reviews', reviewRoutes);
 
 export default router;
+

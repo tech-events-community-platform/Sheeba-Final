@@ -88,6 +88,8 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS poster_image_url TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS requires_approval BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE events DROP CONSTRAINT IF EXISTS events_status_check;
 ALTER TABLE events ADD CONSTRAINT events_status_check CHECK (status IN ('open', 'closed', 'completed', 'canceled', 'cancelled', 'postponed', 'draft', 'published'));
+ALTER TABLE events ADD COLUMN IF NOT EXISTS is_publicized BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS idx_events_is_publicized ON events(is_publicized) WHERE is_publicized = TRUE;
 
 -- Registrations Table
 CREATE TABLE IF NOT EXISTS registrations (
@@ -324,6 +326,23 @@ ALTER TABLE contact_messages ALTER COLUMN subject SET DEFAULT 'General Inquiry';
 CREATE INDEX IF NOT EXISTS idx_contact_messages_email ON contact_messages(email);
 CREATE INDEX IF NOT EXISTS idx_contact_messages_created_at ON contact_messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_contact_messages_status ON contact_messages(status);
+
+-- Event Reviews & Feedback Table (Attendees review events; only author can edit)
+CREATE TABLE IF NOT EXISTS event_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT NOT NULL,
+    is_anonymous BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_user_event_review UNIQUE (event_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_reviews_event_id ON event_reviews(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_reviews_user_id ON event_reviews(user_id);
+
 
 
 

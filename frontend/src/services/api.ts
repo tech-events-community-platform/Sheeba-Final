@@ -2,6 +2,7 @@ import type { Event, EventType } from '../types/event';
 import type { Ticket } from '../types/ticket';
 import type { BadgeAward, BadgeCode, SponsorReportData, AttendeeRosterItem } from '../types/attendance';
 import type { User, UserRole, ProfileVisibility } from '../types/user';
+import type { EventReviewItem, EventReviewsSummary } from '../types/review';
 import { getEndOfEventDay } from '../utils/date';
 
 /**
@@ -615,15 +616,27 @@ export const api = {
 
   // Events API
   events: {
-    getAll: async (organizerId?: string): Promise<Event[]> => {
+    getAll: async (organizerId?: string, skipCache: boolean = false, isPublicized?: boolean): Promise<Event[]> => {
       try {
-        const queryParam = organizerId ? `?organizerId=${encodeURIComponent(organizerId)}` : '';
-        const res = await requestApi(`/events${queryParam}`);
+        const params = new URLSearchParams();
+        if (organizerId) params.append('organizerId', organizerId);
+        if (isPublicized !== undefined) params.append('isPublicized', String(isPublicized));
+        const queryParam = params.toString() ? `?${params.toString()}` : '';
+        const res = await requestApi(`/events${queryParam}`, { skipCache });
         if (res.data && Array.isArray(res.data)) {
           if (!organizerId) {
             eventsStore = res.data;
-            saveEventsStore();
+          } else {
+            res.data.forEach((fetchedEvt: Event) => {
+              const idx = eventsStore.findIndex((e) => e.id === fetchedEvt.id);
+              if (idx !== -1) {
+                eventsStore[idx] = fetchedEvt;
+              } else {
+                eventsStore.push(fetchedEvt);
+              }
+            });
           }
+          saveEventsStore();
           return res.data;
         }
       } catch (e) {
@@ -632,7 +645,22 @@ export const api = {
       if (organizerId) {
         return eventsStore.filter((e) => e.organizerId === organizerId);
       }
+      if (isPublicized !== undefined) {
+        return eventsStore.filter((e) => Boolean(e.isPublicized) === isPublicized);
+      }
       return [...eventsStore];
+    },
+
+    getDiscoveryEvents: async (skipCache: boolean = false): Promise<Event[]> => {
+      try {
+        const res = await requestApi('/events?isPublicized=true', { skipCache });
+        if (res.data && Array.isArray(res.data)) {
+          return res.data;
+        }
+      } catch (e) {
+        console.warn('Discovery events fetch fallback:', e);
+      }
+      return eventsStore.filter((e) => Boolean(e.isPublicized));
     },
 
     getById: async (id: string): Promise<Event | null> => {
@@ -672,12 +700,14 @@ export const api = {
             venueName: data.venueName || data.location,
             capacity: Number(data.capacity) || 100,
             isPaid: Boolean(data.isPaid),
+            isPublicized: Boolean(data.isPublicized),
             ticketPrice: Number(data.ticketPrice) || 0,
             currency: 'ETB',
             requiresApproval: Boolean(data.requiresApproval),
             customQuestions: data.customQuestions || [],
             includeDefaultQuestions: data.includeDefaultQuestions !== undefined ? data.includeDefaultQuestions : true,
             bannerUrl: data.bannerUrl,
+            posterImageUrl: data.bannerUrl,
           }),
         });
         if (res.data) {
@@ -1195,21 +1225,24 @@ export const api = {
       attendeeRosterIds: string[];
       badgeCode: BadgeCode;
       awardedByOrganizerId?: string;
+      notes?: string;
     }): Promise<{ awardedCount: number }> => {
       try {
         const res = await requestApi('/badges/bulk-award', {
           method: 'POST',
           body: JSON.stringify({
             eventId: params.eventId,
+            attendeeRosterIds: params.attendeeRosterIds,
             attendeeUserIds: params.attendeeRosterIds,
             badgeCode: params.badgeCode,
+            notes: params.notes,
           }),
         });
-        if (res.data) {
+        if (res && res.data) {
           return res.data;
         }
       } catch (err: any) {
-        console.warn('Backend bulkAwardBadges error:', err);
+        console.warn('Backend bulkAwardBadges request failed, applying fallback:', err);
       }
 
       let count = 0;
@@ -1220,6 +1253,7 @@ export const api = {
             attendeeId,
             badgeCode: params.badgeCode,
             awardedByOrganizerId: params.awardedByOrganizerId,
+            notes: params.notes,
           });
           count++;
         } catch (e) {
@@ -1818,6 +1852,56 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+    },
+  },
+
+  reviews: {
+    getEventReviews: async (eventId: string): Promise<EventReviewsSummary> => {
+      try {
+        const res = await requestApi(`/reviews/event/${eventId}`, { skipCache: true });
+        if (res.data) return res.data;
+      } catch (err) {
+        console.warn('Failed to load event reviews:', err);
+      }
+      return {
+        averageRating: 0,
+        totalReviews: 0,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        reviews: [],
+        myReview: null,
+      };
+    },
+
+    getMyReview: async (eventId: string): Promise<EventReviewItem | null> => {
+      try {
+        const res = await requestApi(`/reviews/event/${eventId}/my`, { skipCache: true });
+        return res.data || null;
+      } catch {
+        return null;
+      }
+    },
+
+    submitReview: async (eventId: string, data: { rating: number; comment: string; isAnonymous?: boolean }): Promise<EventReviewItem> => {
+      const res = await requestApi(`/reviews/event/${eventId}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      return res.data;
+    },
+
+    updateReview: async (reviewId: string, data: { rating?: number; comment?: string; isAnonymous?: boolean }): Promise<EventReviewItem> => {
+      const res = await requestApi(`/reviews/${reviewId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+      return res.data;
+    },
+
+    deleteReview: async (reviewId: string): Promise<boolean> => {
+      await requestApi(`/reviews/${reviewId}`, {
+        method: 'DELETE',
+      });
+      return true;
     },
   },
 };

@@ -68,6 +68,8 @@ export const createEventSchema = z
     capacity: z.coerce.number().int('Capacity must be an integer.').positive('Capacity must be at least 1.'),
     isPaid: z.boolean().optional().default(false),
     is_paid: z.boolean().optional(),
+    isPublicized: z.boolean().optional().default(false),
+    is_publicized: z.boolean().optional(),
     ticketPrice: z.coerce.number().min(0, 'Ticket price cannot be negative.').optional().default(0),
     ticket_price: z.coerce.number().optional(),
     currency: z.string().trim().optional().default('ETB'),
@@ -84,6 +86,7 @@ export const createEventSchema = z
   .transform((data) => {
     const rawDate = data.date || data.event_date || '';
     const isPaid = data.isPaid ?? data.is_paid ?? false;
+    const isPublicized = data.isPublicized ?? data.is_publicized ?? false;
     const ticketPrice = data.ticketPrice ?? data.ticket_price ?? 0;
     const requiresApproval = data.requiresApproval ?? data.requires_approval ?? false;
     const banner = data.posterImageUrl || data.poster_image_url || data.bannerUrl || data.banner_url || '';
@@ -95,6 +98,7 @@ export const createEventSchema = z
       date: rawDate,
       event_date: rawDate,
       isPaid,
+      isPublicized,
       ticketPrice: isPaid ? ticketPrice : 0,
       requiresApproval,
       requires_approval: requiresApproval,
@@ -146,6 +150,8 @@ export const updateEventSchema = z
     status: z.enum(['open', 'closed', 'completed', 'canceled', 'postponed', 'draft', 'published']).optional(),
     isPaid: z.boolean().optional(),
     is_paid: z.boolean().optional(),
+    isPublicized: z.boolean().optional(),
+    is_publicized: z.boolean().optional(),
     ticketPrice: z.coerce.number().min(0, 'Ticket price cannot be negative.').optional(),
     ticket_price: z.coerce.number().optional(),
     requiresApproval: z.boolean().optional(),
@@ -187,6 +193,13 @@ export const eventQuerySchema = z.object({
   type: z.string().trim().optional(),
   status: z.string().trim().optional(),
   organizerId: z.string().trim().optional(),
+  isPublicized: z
+    .preprocess((val) => {
+      if (val === 'true' || val === true) return true;
+      if (val === 'false' || val === false) return false;
+      return undefined;
+    }, z.boolean().optional())
+    .optional(),
 });
 
 /**

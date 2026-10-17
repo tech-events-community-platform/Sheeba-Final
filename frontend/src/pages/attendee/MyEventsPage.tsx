@@ -17,7 +17,11 @@ import {
   Sparkles,
   X,
   AlertTriangle,
+  Star,
 } from 'lucide-react';
+import { ReviewModal } from '../../components/reviews/ReviewModal';
+import { EventDiscoverySection } from '../../components/events/EventDiscoverySection';
+import type { EventReviewItem } from '../../types/review';
 import { printTicketPass } from '../../utils/printTicket';
 import { isEventPassed } from '../../utils/date';
 
@@ -26,9 +30,26 @@ export const MyEventsPage: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'Upcoming' | 'Past' | 'Tickets'>('Upcoming');
+  const [activeTab, setActiveTab] = useState<'Upcoming' | 'Past' | 'Tickets' | 'Discover'>('Upcoming');
   const [highlightedTicketId, setHighlightedTicketId] = useState<string | null>(null);
   const [selectedAttendeeTicket, setSelectedAttendeeTicket] = useState<Ticket | null>(null);
+  const [reviewModalEvent, setReviewModalEvent] = useState<{ id: string; title: string } | null>(null);
+  const [myExistingReview, setMyExistingReview] = useState<EventReviewItem | null>(null);
+  const [loadingReview, setLoadingReview] = useState(false);
+
+  const handleOpenReview = async (eventId: string, eventTitle: string) => {
+    setLoadingReview(true);
+    try {
+      const existing = await api.reviews.getMyReview(eventId);
+      setMyExistingReview(existing);
+      setReviewModalEvent({ id: eventId, title: eventTitle });
+    } catch {
+      setMyExistingReview(null);
+      setReviewModalEvent({ id: eventId, title: eventTitle });
+    } finally {
+      setLoadingReview(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -123,11 +144,10 @@ export const MyEventsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('Upcoming')}
-          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'Upcoming'
-              ? 'border-[#63474D] text-[#63474D]'
-              : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
-          }`}
+          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${activeTab === 'Upcoming'
+            ? 'border-[#63474D] text-[#63474D]'
+            : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
+            }`}
         >
           <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain" />
           <span>Upcoming ({upcomingEvents.length})</span>
@@ -136,11 +156,10 @@ export const MyEventsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('Past')}
-          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'Past'
-              ? 'border-[#63474D] text-[#63474D]'
-              : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
-          }`}
+          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${activeTab === 'Past'
+            ? 'border-[#63474D] text-[#63474D]'
+            : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
+            }`}
         >
           <Clock className="w-4 h-4" />
           <span>Past Events ({pastEvents.length})</span>
@@ -149,11 +168,10 @@ export const MyEventsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('Tickets')}
-          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTab === 'Tickets'
-              ? 'border-[#63474D] text-[#63474D]'
-              : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
-          }`}
+          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${activeTab === 'Tickets'
+            ? 'border-[#63474D] text-[#63474D]'
+            : 'border-transparent text-[#756366] hover:text-[#2D1F23]'
+            }`}
         >
           <QrCode className="w-4 h-4" />
           <span>My Tickets ({tickets.length})</span>
@@ -175,15 +193,18 @@ export const MyEventsPage: React.FC = () => {
               <img src="/calendar.webp" alt="Calendar" className="w-10 h-10 object-contain mx-auto" />
               <h3 className="font-serif text-base font-bold text-[#2D1F23]">No Upcoming Registrations</h3>
               <p className="text-xs text-[#756366] font-light max-w-md mx-auto">
-                You haven't registered for any upcoming events yet. {pastEvents.length > 0 ? `You have ${pastEvents.length} past event${pastEvents.length > 1 ? 's' : ''} in your history.` : ''}
+                You haven't registered for any upcoming events yet. Discover verified hackathons, workshops, and meetups happening in Ethiopia.
               </p>
-              {pastEvents.length > 0 && (
-                <div className="pt-2">
+              <div className="pt-2 flex flex-wrap justify-center gap-2">
+                <Button variant="accent" size="sm" onClick={() => setActiveTab('Discover')} icon={<Sparkles className="w-3.5 h-3.5" />}>
+                  Explore Sheeba Events
+                </Button>
+                {pastEvents.length > 0 && (
                   <Button variant="outline" size="sm" onClick={() => setActiveTab('Past')}>
                     View Past Events ({pastEvents.length})
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
@@ -440,11 +461,10 @@ export const MyEventsPage: React.FC = () => {
                   <div
                     key={ticket.id}
                     id={`ticket-card-${ticket.id}`}
-                    className={`bg-white rounded-3xl border transition-all duration-300 overflow-hidden shadow-xs ${
-                      isHighlighted
-                        ? 'border-[#63474D] ring-2 ring-[#63474D]/20 shadow-md'
-                        : 'border-[#E8DDD7] hover:border-[#63474D]/50'
-                    }`}
+                    className={`bg-white rounded-3xl border transition-all duration-300 overflow-hidden shadow-xs ${isHighlighted
+                      ? 'border-[#63474D] ring-2 ring-[#63474D]/20 shadow-md'
+                      : 'border-[#E8DDD7] hover:border-[#63474D]/50'
+                      }`}
                   >
                     {/* Top Ticket Header Ribbon */}
                     <div className="bg-[#63474D] text-white px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">

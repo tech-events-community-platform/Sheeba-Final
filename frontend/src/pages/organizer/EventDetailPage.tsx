@@ -21,10 +21,12 @@ import {
   HelpCircle,
   Edit,
   Trash2,
+  Globe,
   Check,
 } from 'lucide-react';
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 import { EditEventModal } from '../../components/organizer/EditEventModal';
+import { ReviewsSection } from '../../components/reviews/ReviewsSection';
 import { getCalendarTile } from '../../utils/date';
 import { manualAttendeeFormSchema, awardBadgeFormSchema, validateForm } from '../../schemas';
 
@@ -106,6 +108,23 @@ export const EventDetailPage: React.FC = () => {
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const [togglingPublicize, setTogglingPublicize] = useState(false);
+
+  const handleTogglePublicize = async () => {
+    if (!event) return;
+    setTogglingPublicize(true);
+    try {
+      const nextStatus = !event.isPublicized;
+      const updated = await api.events.update(event.id, { isPublicized: nextStatus });
+      setEvent((prev) => (prev ? { ...prev, isPublicized: nextStatus } : updated));
+    } catch (err: any) {
+      console.error('Failed to toggle publicize status:', err);
+      alert(err.message || 'Failed to update discovery status.');
+    } finally {
+      setTogglingPublicize(false);
+    }
   };
 
   // Manual Attendee Creation (Walk-in check-in)
@@ -605,13 +624,12 @@ export const EventDetailPage: React.FC = () => {
               </span>
               <span className="text-gray-300">•</span>
               <span
-                className={`font-semibold uppercase text-[11px] tracking-wider ${
-                  timeState === 'ongoing'
-                    ? 'text-amber-700 font-bold'
-                    : timeState === 'upcoming'
+                className={`font-semibold uppercase text-[11px] tracking-wider ${timeState === 'ongoing'
+                  ? 'text-amber-700 font-bold'
+                  : timeState === 'upcoming'
                     ? 'text-emerald-700 font-bold'
                     : 'text-gray-500'
-                }`}
+                  }`}
               >
                 {timeState === 'ongoing' ? 'Ongoing Today' : timeState === 'upcoming' ? 'Upcoming' : 'Past Event'}
               </span>
@@ -744,6 +762,38 @@ export const EventDetailPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Sheeba Community Discovery Toggle */}
+        <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <span className="text-[10px] uppercase font-bold text-[#756366] block">
+              Sheeba Community Discovery
+            </span>
+            <p className="text-xs text-[#2D1F23] font-medium">
+              {event.isPublicized
+                ? 'Publicized in Sheeba Discovery (Attendees can discover and register from community feed)'
+                : 'Direct Share Link Only (Private: only people with your direct URL can register)'}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={togglingPublicize}
+            onClick={handleTogglePublicize}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${event.isPublicized
+              ? 'bg-[#EAF4EF] text-[#2A7B5F] hover:bg-[#d8ece1] border border-[#2A7B5F]/30'
+              : 'bg-gray-100 text-[#63474D] hover:bg-gray-200 border border-gray-200'
+              }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>
+              {togglingPublicize
+                ? 'Updating...'
+                : event.isPublicized
+                  ? 'Publicized in Discovery (Click to make Private)'
+                  : 'Publicize in Sheeba'}
+            </span>
+          </button>
+        </div>
+
         {/* Registration Form Questions Summary & Quick Access */}
         <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-0.5">
@@ -752,9 +802,8 @@ export const EventDetailPage: React.FC = () => {
             </span>
             <p className="text-xs text-[#2D1F23] font-medium">
               {event.customQuestions && event.customQuestions.length > 0
-                ? `${event.customQuestions.length} custom question${
-                    event.customQuestions.length === 1 ? '' : 's'
-                  } active on the public registration link`
+                ? `${event.customQuestions.length} custom question${event.customQuestions.length === 1 ? '' : 's'
+                } active on the public registration link`
                 : 'No custom questions set (Attendees only provide basic info)'}
             </p>
           </div>
@@ -788,17 +837,27 @@ export const EventDetailPage: React.FC = () => {
             />
           </div>
 
-          <Button
-            onClick={() => {
-              setManualUserError(null);
-              setIsAddUserModalOpen(true);
-            }}
-            variant="primary"
-            size="sm"
-            className="shrink-0"
-          >
-            Add User Manually
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link to={`/organizer/badges/${event.id}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<Award className="w-3.5 h-3.5 text-[#63474D]" />}
+              >
+                Bulk Approve Badges
+              </Button>
+            </Link>
+            <Button
+              onClick={() => {
+                setManualUserError(null);
+                setIsAddUserModalOpen(true);
+              }}
+              variant="primary"
+              size="sm"
+            >
+              Add User Manually
+            </Button>
+          </div>
         </div>
 
         {/* Bulk Action Bar for Attended Badges */}
@@ -991,23 +1050,21 @@ export const EventDetailPage: React.FC = () => {
                 key={tab.id}
                 type="button"
                 onClick={() => setApprovalTab(tab.id as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  approvalTab === tab.id
-                    ? 'bg-[#63474D] text-white shadow-2xs'
-                    : tab.highlight
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${approvalTab === tab.id
+                  ? 'bg-[#63474D] text-white shadow-2xs'
+                  : tab.highlight
                     ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
                     : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
-                }`}
+                  }`}
               >
                 <span>{tab.label}</span>
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                    approvalTab === tab.id
-                      ? 'bg-white/20 text-white'
-                      : tab.highlight
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] ${approvalTab === tab.id
+                    ? 'bg-white/20 text-white'
+                    : tab.highlight
                       ? 'bg-amber-200 text-amber-900'
                       : 'bg-black/5 text-[#756366]'
-                  }`}
+                    }`}
                 >
                   {tab.count}
                 </span>
@@ -1063,8 +1120,8 @@ export const EventDetailPage: React.FC = () => {
             {roster.length === 0
               ? 'No registrations received yet.'
               : approvalTab === 'pending'
-              ? 'No pending applications to review.'
-              : 'No registrants match your search filter.'}
+                ? 'No pending applications to review.'
+                : 'No registrants match your search filter.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1241,6 +1298,15 @@ export const EventDetailPage: React.FC = () => {
         )}
       </div>
 
+      {/* Attendee Reviews & Feedback Section */}
+      <div className="pt-8 border-t border-gray-100">
+        <ReviewsSection
+          eventId={event.id}
+          eventTitle={event.title}
+          isOrganizerView={true}
+        />
+      </div>
+
       {/* Award Badge Modal (Shared action offering Participant / Winner / Speaker) */}
       {awardingAttendee && (
         <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
@@ -1278,11 +1344,10 @@ export const EventDetailPage: React.FC = () => {
                     key={b.code}
                     type="button"
                     onClick={() => setSelectedBadgeCode(b.code)}
-                    className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
-                      selectedBadgeCode === b.code
-                        ? 'border-[#63474D] bg-[#63474D]/10 text-[#63474D] font-bold shadow-xs'
-                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
+                    className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1.5 ${selectedBadgeCode === b.code
+                      ? 'border-[#63474D] bg-[#63474D]/10 text-[#63474D] font-bold shadow-xs'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
                   >
                     <span className="text-2xl">{b.icon}</span>
                     <span className="text-xs">{b.label}</span>
