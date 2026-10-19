@@ -149,8 +149,7 @@ export class EventController {
     try {
       const eventId = req.params.id as string;
       const userId = req.user?.userId || req.body.attendee?.id;
-      const answers = req.body.answers || {};
-      const paymentReference = req.body.paymentReference;
+      const { answers = {}, paymentReference, paymentMethod, screenshotUrl, screenshotBase64 } = req.body;
 
       if (!userId) {
         return res.status(401).json({ success: false, message: 'Authentication required to register.' });
@@ -161,14 +160,19 @@ export class EventController {
         userId,
         answers,
         paymentReference,
+        paymentMethod,
+        screenshotUrl,
+        screenshotBase64,
       });
 
       return sendSuccess(
         res,
         result,
         result.isPaymentRequired
-          ? 'Payment required. Redirecting to Chapa checkout.'
-          : 'Successfully registered for event. QR Ticket issued.',
+          ? 'Payment verification required to complete ticket registration.'
+          : result.isPendingApproval
+            ? 'Application submitted for organizer review.'
+            : 'Successfully registered for event. QR Ticket issued.',
         201
       );
     } catch (error) {

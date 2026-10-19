@@ -715,8 +715,11 @@ export const api = {
           saveEventsStore();
           return res.data;
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn('Backend event creation fallback:', e);
+        if (e && (e.status === 400 || e.status === 401 || e.status === 403)) {
+          throw e;
+        }
       }
 
       const newEvent: Event = {
@@ -808,6 +811,9 @@ export const api = {
       attendee: User;
       answers?: Record<string, any>;
       paymentReference?: string;
+      paymentMethod?: string;
+      screenshotUrl?: string;
+      screenshotBase64?: string;
     }): Promise<{
       ticket?: Ticket;
       isPaymentRequired: boolean;
@@ -823,6 +829,9 @@ export const api = {
             attendee: params.attendee,
             answers: params.answers,
             paymentReference: params.paymentReference,
+            paymentMethod: params.paymentMethod,
+            screenshotUrl: params.screenshotUrl,
+            screenshotBase64: params.screenshotBase64,
           }),
         });
         if (res.data) {
@@ -832,13 +841,8 @@ export const api = {
           return res.data;
         }
       } catch (err: any) {
-        if (err.status === 409 || err.statusCode === 409 || err.message?.includes('already registered')) {
-          throw new Error('You are already registered for this event.');
-        }
-        if (err.status === 400 || err.message?.includes('capacity') || err.message?.includes('closed')) {
-          throw new Error(err.message || 'Event registration failed.');
-        }
-        console.warn('Backend register fallback to local store:', err.message);
+        const errMsg = err?.response?.data?.message || err?.data?.message || err?.message || 'Event registration failed.';
+        throw new Error(errMsg);
       }
 
       const event = eventsStore.find((e) => e.id === params.eventId);

@@ -163,7 +163,8 @@ export class AdminService {
   static async approveOrganizer(userId: string) {
     const res = await query(
       `UPDATE users
-       SET approval_status = 'approved',
+       SET role = 'organizer',
+           approval_status = 'approved',
            organizer_approval_status = 'approved',
            is_organizer = TRUE,
            is_active = TRUE,

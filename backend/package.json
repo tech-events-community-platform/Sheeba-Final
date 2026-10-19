@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "db:migrate": "ts-node src/db/migrate.ts",
     "db:seed": "ts-node src/db/seed.ts",
-    "test": "ts-node src/tests/test-all.ts"
+    "test": "ts-node src/tests/test-all.ts && ts-node src/tests/test_payment_integration.ts",
+    "test:payment": "ts-node src/tests/test_payment_integration.ts"
   },
   "keywords": [],
   "author": "",

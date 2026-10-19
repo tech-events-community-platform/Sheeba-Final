@@ -63,6 +63,14 @@ export interface RegistrationQuestion {
   order?: number;
 }
 
+export interface PaymentDestination {
+  id?: string;
+  provider: string; // 'cbe', 'telebirr', 'awash', 'boa', etc.
+  accountNumber: string;
+  accountHolder?: string;
+  label?: string;
+}
+
 export interface IEvent {
   id: string;
   organizer_id: string;
@@ -84,9 +92,11 @@ export interface IEvent {
   currency: string;
   share_link_token: string;
   custom_questions: RegistrationQuestion[];
+  payment_methods?: PaymentDestination[];
   banner_url?: string | null;
   poster_image_url?: string | null;
   requires_approval?: boolean;
+  is_publicized?: boolean;
   created_at: Date;
   updated_at: Date;
   // Computed / Joined fields

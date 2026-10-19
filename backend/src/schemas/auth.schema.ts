@@ -92,8 +92,14 @@ export const resetPasswordSchema = z
 
 export const googleAuthSchema = z.object({
   credential: z.string().trim().min(1, 'Google credential token is required.'),
-  role: z.enum(['ATTENDEE', 'ORGANIZER']).optional(),
-  mode: z.enum(['login', 'signup']).optional(),
+  role: z.preprocess(
+    (val) => (typeof val === 'string' ? val.toUpperCase() : val),
+    z.enum(['ATTENDEE', 'ORGANIZER']).optional()
+  ),
+  mode: z.preprocess(
+    (val) => (val === 'signup' ? 'register' : val),
+    z.enum(['login', 'register']).default('login')
+  ),
 });
 
 export const applyOrganizerSchema = z.object({
@@ -165,7 +171,10 @@ export const sponsorRegisterSchema = z
 
 export const sponsorGoogleAuthSchema = z.object({
   credential: z.string().trim().min(1, 'Google credential token is required.'),
-  mode: z.enum(['login', 'signup']).optional(),
+  mode: z.preprocess(
+    (val) => (val === 'signup' ? 'register' : val),
+    z.enum(['login', 'register']).default('login')
+  ),
   company_name: z.string().trim().optional(),
   industry_category: z.string().trim().optional(),
   company_phone: z.string().trim().optional(),

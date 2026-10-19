@@ -100,13 +100,13 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
           <div className="space-y-1">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EAF4EF] text-[#2A7B5F] text-xs font-bold uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Publicized in Sheeba</span>
+              <span>Upcoming Events on Sheeba</span>
             </div>
             <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23]">
-              Community Event Discovery
+              Upcoming Events
             </h2>
             <p className="text-xs sm:text-sm text-[#756366] max-w-xl">
-              Explore verified tech gatherings, workshops, and hackathons hosted on Sheeba.
+              Explore verified gatherings, workshops, and summits publicized on Sheeba.
               Register in seconds and claim your verifiable attendance pass.
             </p>
           </div>
@@ -167,11 +167,11 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
           <div className="w-12 h-12 rounded-full bg-[#F5ECE8] text-[#AA767C] flex items-center justify-center mx-auto">
             <Calendar className="w-6 h-6" />
           </div>
-          <h3 className="font-serif text-lg font-bold text-[#2D1F23]">No Publicized Events Found</h3>
+          <h3 className="font-serif text-lg font-bold text-[#2D1F23]">No Upcoming Publicized Events Right Now</h3>
           <p className="text-xs text-[#756366] max-w-md mx-auto leading-relaxed">
             {searchTerm || selectedType !== 'All'
               ? 'No publicized events matched your search filter. Try clearing filters.'
-              : 'Organizers have not published events to Sheeba Discovery yet. When organizers enable "Publicize in Sheeba", their events will appear right here.'}
+              : 'There are no events publicized on the landing page yet. When organizers enable "Publicize in Sheeba", their upcoming events will appear right here.'}
           </p>
         </div>
       ) : (

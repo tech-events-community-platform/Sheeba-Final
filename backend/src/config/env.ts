@@ -10,6 +10,7 @@ export const ENV = {
   TICKET_SIGNING_SECRET: process.env.TICKET_SIGNING_SECRET || 'sheba_default_ticket_secret_change_in_prod',
   CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+  LINKS_ET_API_KEY: process.env.LINKS_ET_API_KEY || process.env.PAYMENT_VERIFICATION_API_KEY || '',
 };
 
 if (ENV.NODE_ENV === 'production') {

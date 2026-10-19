@@ -1,8 +1,9 @@
 import { query, getClient } from '../config/db';
-import { IEvent, EventType, EventStatus, UserRole, AttendeeRosterItem, RegistrationQuestion, RegistrationApprovalStatus } from '../types';
+import { IEvent, EventType, EventStatus, UserRole, AttendeeRosterItem, RegistrationQuestion, RegistrationApprovalStatus, PaymentDestination } from '../types';
 import { generateTicketToken, generateQrDataUrl, generateTicketCode, computeEventDayExpiration } from '../utils/qr.util';
 import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
+import { PaymentService } from './payment.service';
 
 export class EventService {
   static formatEvent(row: any): any {
@@ -71,6 +72,7 @@ export class EventService {
       ticketPrice,
       isPublicized: Boolean(row.is_publicized),
       currency: row.currency || 'ETB',
+      paymentMethods: typeof row.payment_methods === 'string' ? JSON.parse(row.payment_methods) : row.payment_methods || [],
       requiresApproval: Boolean(row.requires_approval),
       shareLinkToken: row.share_link_token || row.id,
       customQuestions: typeof row.custom_questions === 'string' ? JSON.parse(row.custom_questions) : row.custom_questions || [],
@@ -116,11 +118,12 @@ export class EventService {
       isPaid = false,
       ticketPrice = 0,
       isPublicized = false,
+      paymentMethods = [],
       requiresApproval = false,
       customQuestions = [],
       bannerUrl,
       posterImageUrl,
-    } = data;
+    } = data as any;
 
     const poster = posterImageUrl || bannerUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
     const timeStr = `${startTime} - ${endTime} EAT`;
@@ -131,8 +134,8 @@ export class EventService {
         organizer_id, title, description, event_type, category, event_date,
         start_time, end_time, time_str, location, venue_name, capacity,
         status, is_paid, is_publicized, ticket_price, currency, share_link_token,
-        custom_questions, banner_url, poster_image_url, requires_approval
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, $15, 'ETB', $16, $17, $18, $19, $19)
+        custom_questions, banner_url, poster_image_url, requires_approval, payment_methods
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, $15, 'ETB', $16, $17, $18, $19, $20, $21)
       RETURNING *`,
       [
         organizerId,
@@ -155,6 +158,7 @@ export class EventService {
         poster,
         poster,
         Boolean(requiresApproval),
+        JSON.stringify(paymentMethods || []),
       ]
     );
 
@@ -352,6 +356,7 @@ export class EventService {
       'poster_image_url',
       'custom_questions',
       'requires_approval',
+      'payment_methods',
     ];
 
     const inputData: any = { ...data };
@@ -385,13 +390,19 @@ export class EventService {
                             ? 'banner_url'
                             : key === 'customQuestions'
                               ? 'custom_questions'
-                              : key;
+                              : key === 'paymentMethods'
+                                ? 'payment_methods'
+                                : key === 'isPublicized'
+                                  ? 'is_publicized'
+                                  : key === 'requiresApproval'
+                                    ? 'requires_approval'
+                                    : key;
       if (allowedFields.includes(dbKey)) {
         fields.push(`${dbKey} = $${counter++}`);
         values.push(
           dbKey === 'requires_approval'
             ? Boolean(value)
-            : dbKey === 'custom_questions'
+            : dbKey === 'custom_questions' || dbKey === 'payment_methods'
               ? typeof value === 'string'
                 ? value
                 : JSON.stringify(value || [])
@@ -468,6 +479,9 @@ export class EventService {
     userId: string;
     answers?: Record<string, any>;
     paymentReference?: string;
+    paymentMethod?: string;
+    screenshotUrl?: string;
+    screenshotBase64?: string;
   }): Promise<{
     ticket: any;
     isPaymentRequired: boolean;
@@ -477,8 +491,9 @@ export class EventService {
     approvalStatus?: string;
     requiresApproval?: boolean;
     message?: string;
+    verifiedPayment?: any;
   }> {
-    const { eventId, userId, answers = {}, paymentReference } = params;
+    const { eventId, userId, answers = {}, paymentReference, paymentMethod, screenshotUrl, screenshotBase64 } = params;
 
     const event = await this.getEventById(eventId);
     if (!event) {
@@ -641,14 +656,33 @@ export class EventService {
     }
 
     // Case 3: Standard Instant Pass or Approved Attendee Settling Payment
-    // Handle Paid Event Check (Chapa ETB)
-    if (event.isPaid && !paymentReference) {
-      return {
-        ticket: null,
-        isPaymentRequired: true,
-        checkoutUrl: `https://checkout.chapa.co/checkout/payment-simulation?amount=${event.ticketPrice}&currency=ETB`,
-      };
+    // For paid events, perform authoritative Links.et bank verification
+    let verifiedPaymentInfo: any = null;
+    if (event.isPaid && event.ticketPrice > 0) {
+      if (!paymentReference && !screenshotUrl && !screenshotBase64) {
+        return {
+          ticket: null,
+          isPaymentRequired: true,
+          message: 'Payment verification is required for this paid event.',
+        };
+      }
+
+      verifiedPaymentInfo = await PaymentService.verifyPayment({
+        event: {
+          id: event.id,
+          title: event.title,
+          ticketPrice: event.ticketPrice,
+          currency: event.currency,
+          paymentMethods: event.paymentMethods,
+        },
+        paymentReference,
+        paymentMethod,
+        screenshotUrl,
+        screenshotBase64,
+      });
     }
+
+    const effectivePaymentRef = verifiedPaymentInfo?.transactionId || paymentReference || null;
 
     const client = await getClient();
     try {
@@ -661,14 +695,14 @@ export class EventService {
           `UPDATE registrations 
            SET payment_reference = $1, payment_status = 'settled', updated_at = NOW() 
            WHERE id = $2`,
-          [paymentReference || null, registrationId]
+          [effectivePaymentRef, registrationId]
         );
       } else {
         const regRes = await client.query(
           `INSERT INTO registrations (event_id, user_id, status, approval_status, answers, payment_reference, payment_status)
            VALUES ($1, $2, 'registered', 'approved', $3, $4, 'settled')
            RETURNING id`,
-          [event.id, userId, JSON.stringify(answers), paymentReference || null]
+          [event.id, userId, JSON.stringify(answers), effectivePaymentRef]
         );
         registrationId = regRes.rows[0].id;
       }
@@ -709,17 +743,29 @@ export class EventService {
         [ticketId, ticketCode, registrationId, event.id, userId, qrToken, qrDataUrl, event.isPaid, event.ticketPrice, expiresAt]
       );
 
-      // Record Chapa payment transaction if paid
+      // Record verified payment transaction into payments table
       if (event.isPaid && event.ticketPrice > 0) {
         const commission = event.ticketPrice * 0.03;
         const payout = event.ticketPrice - commission;
-        const txId = paymentReference || `TX-CHAPA-${Math.floor(100000 + Math.random() * 900000)}`;
+        const txId = verifiedPaymentInfo?.transactionId || effectivePaymentRef || `TX-${Date.now()}`;
 
         await client.query(
-          `INSERT INTO payments (transaction_id, event_id, user_id, amount, commission_amount, organizer_payout, currency, status)
-           VALUES ($1, $2, $3, $4, $5, $6, 'ETB', 'SETTLED')
-           ON CONFLICT (transaction_id) DO NOTHING`,
-          [txId, event.id, userId, event.ticketPrice, commission, payout]
+          `INSERT INTO payments (
+            transaction_id, event_id, user_id, amount, commission_amount, organizer_payout,
+            currency, status, payment_method, screenshot_url, provider_response, verified_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, 'ETB', 'SETTLED', $7, $8, $9, NOW())
+          ON CONFLICT (transaction_id) DO NOTHING`,
+          [
+            txId,
+            event.id,
+            userId,
+            verifiedPaymentInfo?.amount || event.ticketPrice,
+            commission,
+            payout,
+            verifiedPaymentInfo?.provider || paymentMethod || 'bank',
+            screenshotUrl || null,
+            JSON.stringify(verifiedPaymentInfo?.rawReceipt || {}),
+          ]
         );
       }
 
@@ -770,7 +816,11 @@ export class EventService {
         console.warn('Registration confirmation email dispatch failed:', emailErr);
       }
 
-      return { ticket: formattedTicket, isPaymentRequired: false };
+      return {
+        ticket: formattedTicket,
+        isPaymentRequired: false,
+        verifiedPayment: verifiedPaymentInfo,
+      };
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
