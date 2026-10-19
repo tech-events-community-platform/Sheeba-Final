@@ -23,6 +23,20 @@ export class CloudinaryService {
       throw new Error('Invalid or missing image file data.');
     }
 
+    // Validate format and size for base64 uploads
+    if (fileData.startsWith('data:')) {
+      const match = fileData.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/);
+      if (match) {
+        const mimeType = match[1].toLowerCase();
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/jpg'].includes(mimeType)) {
+          throw new Error('Unsupported image format. Allowed formats are JPEG, PNG, and WebP.');
+        }
+      }
+      if (fileData.length > 7 * 1024 * 1024) {
+        throw new Error('Image exceeds maximum allowable file size (5MB).');
+      }
+    }
+
     const { apiKey, apiSecret, cloudName } = parseCloudinaryUrl();
     const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
 

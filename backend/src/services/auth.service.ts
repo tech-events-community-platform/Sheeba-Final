@@ -1037,6 +1037,8 @@ export class AuthService {
         throw err;
       }
       sessionRole = 'organizer';
+    } else if (isOrganizerAccount && effOrganizerStatus === 'approved') {
+      sessionRole = 'organizer';
     } else {
       sessionRole = 'attendee';
     }

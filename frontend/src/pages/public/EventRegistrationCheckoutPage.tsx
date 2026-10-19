@@ -14,7 +14,18 @@ import {
   ShieldCheck,
   Lock,
   X,
+  Check,
+  Copy,
+  UploadCloud,
+  CreditCard,
+  Sparkles,
+  FileText,
+  CheckCircle2,
+  RefreshCw,
+  Smartphone,
 } from 'lucide-react';
+import type { PaymentDestination } from '../../types/event';
+import { fileToDataUrl, uploadToCloudinary } from '../../utils/cloudinary';
 import { getCalendarTile, isEventPassed } from '../../utils/date';
 import { validateForm } from '../../utils/validation';
 import { eventRegistrationCheckoutSchema } from '../../schemas/event.schema';
@@ -69,6 +80,61 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPendingApproval, setIsPendingApproval] = useState(false);
   const [isRejected, setIsRejected] = useState(false);
+
+  // Payment evidence and verification states
+  const [paymentOption, setPaymentOption] = useState<'reference' | 'screenshot'>('reference');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [selectedDestinationIndex, setSelectedDestinationIndex] = useState(0);
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [screenshotBase64, setScreenshotBase64] = useState<string | null>(null);
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
+  const [isUploadingScreenshot, setIsUploadingScreenshot] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [verificationStatusText, setVerificationStatusText] = useState<string | null>(null);
+
+  const handleScreenshotSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('Please select a valid image file (PNG, JPG, or WEBP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('Screenshot file size must be less than 5MB.');
+      return;
+    }
+
+    setErrorMsg(null);
+    setScreenshotFile(file);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setScreenshotPreview(dataUrl);
+      setScreenshotBase64(dataUrl);
+
+      setIsUploadingScreenshot(true);
+      try {
+        const uploadedUrl = await uploadToCloudinary(file);
+        setScreenshotUrl(uploadedUrl);
+      } catch (uploadErr) {
+        console.warn('Screenshot cloud backup failed, continuing with direct image base64:', uploadErr);
+      } finally {
+        setIsUploadingScreenshot(false);
+      }
+    } catch (err: any) {
+      setErrorMsg('Failed to process image file: ' + err.message);
+    }
+  };
+
+  const handleCopyAccount = (accountNum: string, index: number) => {
+    navigator.clipboard.writeText(accountNum);
+    setCopiedIndex(index);
+    setTimeout(() => {
+      setCopiedIndex((prev) => (prev === index ? null : prev));
+    }, 2000);
+  };
 
   const effectiveQuestions = React.useMemo(() => {
     if (!event) return [];
@@ -249,14 +315,55 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
       }
     }
 
+    if (event.isPaid && !event.requiresApproval) {
+      if (paymentOption === 'reference' && !paymentReference.trim()) {
+        setErrorMsg('Please enter your transaction reference code or bank confirmation URL.');
+        return;
+      }
+      if (paymentOption === 'screenshot' && !screenshotBase64 && !screenshotFile) {
+        setErrorMsg('Please upload a clear screenshot of your bank transfer receipt.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
+    if (event.isPaid && !event.requiresApproval) {
+      setVerificationStatusText('Verifying payment with bank network via Links.et...');
+    }
+
     try {
-      const paymentRef = event.isPaid ? `${selectedPayment}_${Date.now()}` : undefined;
+      let finalScreenshotUrl = screenshotUrl;
+      if (event.isPaid && !event.requiresApproval && paymentOption === 'screenshot' && screenshotFile && !finalScreenshotUrl) {
+        try {
+          finalScreenshotUrl = await uploadToCloudinary(screenshotFile);
+          setScreenshotUrl(finalScreenshotUrl);
+        } catch {
+          // Cloudinary backup failed; direct base64 will be verified by Links.et
+        }
+      }
+
+      const destinations: PaymentDestination[] =
+        event.paymentMethods && event.paymentMethods.length > 0 ? event.paymentMethods : [];
+      const selectedDest = destinations[selectedDestinationIndex];
+      const effectiveProvider = selectedDest?.provider || selectedPayment;
+
       const res = await api.registration.registerForEvent({
         eventId: event.id,
         attendee: attendeeToRegister,
         answers,
-        paymentReference: paymentRef,
+        paymentReference:
+          event.isPaid && !event.requiresApproval && paymentOption === 'reference'
+            ? paymentReference.trim()
+            : undefined,
+        paymentMethod: effectiveProvider,
+        screenshotUrl:
+          event.isPaid && !event.requiresApproval && paymentOption === 'screenshot'
+            ? finalScreenshotUrl || undefined
+            : undefined,
+        screenshotBase64:
+          event.isPaid && !event.requiresApproval && paymentOption === 'screenshot'
+            ? screenshotBase64 || undefined
+            : undefined,
       });
 
       if (res.ticket) {
@@ -294,6 +401,7 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
       }
     } finally {
       setIsSubmitting(false);
+      setVerificationStatusText(null);
     }
   };
 
@@ -571,14 +679,6 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
           </p>
         </div>
       </div>
-
-      {/* Error Banner */}
-      {errorMsg && (
-        <div className="p-3.5 bg-red-50/90 border border-red-200 rounded-xl text-xs text-red-800 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* User Identity Info */}
@@ -859,7 +959,7 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
 
         {/* Payment Section */}
         {event.isPaid && (event.ticketPrice || 0) > 0 && (
-          <div className="space-y-4 pt-4 border-t border-gray-300">
+          <div className="space-y-6 pt-4 border-t border-gray-300">
             {event.requiresApproval ? (
               <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-1.5">
                 <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
@@ -871,49 +971,272 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <>
-                <div>
-                  <h2 className="font-serif font-bold text-lg text-black">
-                    Payment Details
-                  </h2>
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    This is a paid event. Total admission fee: <strong className="text-black font-extrabold">{event.ticketPrice} ETB</strong>
-                  </p>
+              <div className="space-y-5">
+                {/* Header & Price Banner */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-white/70 border border-gray-200 rounded-2xl">
+                  <div>
+                    <h2 className="font-serif font-bold text-lg text-black flex items-center gap-2">
+                      <CreditCard className="w-5 h-5 text-[#63474D]" />
+                      Payment & Ticket Admission
+                    </h2>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      Send payment to the organizer's account below and submit your reference or screenshot.
+                    </p>
+                  </div>
+                  <div className="bg-[#63474D] text-white px-4 py-2 rounded-xl text-center self-start sm:self-auto shrink-0 shadow-xs">
+                    <span className="text-[10px] uppercase font-bold tracking-wider opacity-80 block">Total Due</span>
+                    <span className="text-lg font-extrabold">{event.ticketPrice} ETB</span>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-black">
-                    Select your preferred payment method:
-                  </label>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                    {[
-                      { id: 'telebirr' as const, name: 'Telebirr', desc: 'Direct USSD or App transfer' },
-                      { id: 'cbe' as const, name: 'CBE', desc: 'Commercial Bank of Ethiopia' },
-                      { id: 'awash' as const, name: 'Awash', desc: 'Awash Birr / Online Banking' },
-                    ].map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setSelectedPayment(m.id)}
-                        className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                          selectedPayment === m.id
-                            ? 'bg-[#63474D]/15 border-[#63474D] text-black shadow-sm ring-2 ring-[#63474D]/30'
-                            : 'bg-white/40 border-gray-300 text-black hover:bg-white/60'
-                        }`}
-                      >
-                        <p className="font-bold text-sm text-black">{m.name}</p>
-                        <p className="text-[11px] text-gray-600 mt-1">{m.desc}</p>
-                      </button>
-                    ))}
+                {/* Step 1: Receiving Accounts */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-black">
+                      Step 1: Transfer fee to Organizer Account
+                    </label>
+                    <span className="text-[11px] text-gray-500">Tap to select destination</span>
                   </div>
 
-                  <p className="text-[11px] text-gray-600 pt-2">
-                    Upon submission, instructions to finalize your {selectedPayment.toUpperCase()} payment will be verified for your entry pass.
-                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {((event.paymentMethods && event.paymentMethods.length > 0)
+                      ? event.paymentMethods
+                      : [
+                          {
+                            id: 'default_cbe',
+                            provider: 'cbe',
+                            accountNumber: '100098765432',
+                            accountHolder: 'Event Organizer',
+                            label: 'CBE Official Account',
+                          },
+                          {
+                            id: 'default_telebirr',
+                            provider: 'telebirr',
+                            accountNumber: '0911000000',
+                            accountHolder: 'Event Organizer',
+                            label: 'Telebirr Wallet',
+                          },
+                        ]
+                    ).map((pm, idx) => {
+                      const isSelected = selectedDestinationIndex === idx;
+                      const providerNames: Record<string, string> = {
+                        cbe: 'Commercial Bank of Ethiopia (CBE)',
+                        telebirr: 'Telebirr (Ethio Telecom)',
+                        awash: 'Awash Bank',
+                        boa: 'Bank of Abyssinia',
+                        dashen: 'Dashen Bank',
+                        zemen: 'Zemen Bank',
+                        other: 'Bank / Wallet',
+                      };
+                      return (
+                        <div
+                          key={pm.id || idx}
+                          onClick={() => setSelectedDestinationIndex(idx)}
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative ${
+                            isSelected
+                              ? 'bg-white border-[#63474D] shadow-sm ring-2 ring-[#63474D]/25'
+                              : 'bg-white/50 border-gray-200 hover:bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="inline-block px-2 py-0.5 bg-[#63474D]/10 text-[#63474D] text-[10px] font-bold rounded-md uppercase tracking-wider mb-1">
+                                {pm.provider.toUpperCase()}
+                              </span>
+                              <p className="text-xs font-bold text-black">{pm.label || providerNames[pm.provider] || pm.provider}</p>
+                              {pm.accountHolder && (
+                                <p className="text-[11px] text-gray-500 mt-0.5">Holder: {pm.accountHolder}</p>
+                              )}
+                            </div>
+
+                            {isSelected && (
+                              <span className="w-5 h-5 rounded-full bg-[#63474D] text-white flex items-center justify-center shrink-0">
+                                <Check className="w-3 h-3" />
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-center justify-between">
+                            <span className="font-mono text-xs font-bold text-black tracking-wide">
+                              {pm.accountNumber}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyAccount(pm.accountNumber, idx);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-[11px] font-semibold text-gray-700 transition cursor-pointer"
+                              title="Copy account number"
+                            >
+                              {copiedIndex === idx ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3 text-gray-500" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </>
+
+                {/* Step 2: Verification Evidence */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-black">
+                      Step 2: Submit Payment Evidence for Verification
+                    </label>
+                    <span className="text-[10px] text-gray-500 font-medium">Links.et Real-time Bank Verification</span>
+                  </div>
+
+                  {/* Option Switcher Tabs */}
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100/80 rounded-2xl border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentOption('reference')}
+                      className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        paymentOption === 'reference'
+                          ? 'bg-white text-black shadow-xs'
+                          : 'text-gray-600 hover:text-black'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4 text-[#63474D]" />
+                      <span>Option A: Reference / URL</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentOption('screenshot')}
+                      className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        paymentOption === 'screenshot'
+                          ? 'bg-white text-black shadow-xs'
+                          : 'text-gray-600 hover:text-black'
+                      }`}
+                    >
+                      <UploadCloud className="w-4 h-4 text-[#63474D]" />
+                      <span>Option B: Screenshot</span>
+                    </button>
+                  </div>
+
+                  {/* Option A Pane */}
+                  {paymentOption === 'reference' ? (
+                    <div className="p-4 bg-white/70 border border-gray-200 rounded-2xl space-y-2 animate-fade-in">
+                      <label className="block text-xs font-bold text-black">
+                        Transaction Reference Code or Bank Receipt URL <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={paymentReference}
+                        onChange={(e) => setPaymentReference(e.target.value)}
+                        placeholder="e.g. 100098765432 or https://telebirr.et/... or https://apps.cbe.com.et:2018/..."
+                        className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-xs font-mono text-black placeholder:font-sans placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                      />
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        💡 <strong>Supported formats:</strong> Telebirr 10-character transaction reference code, or full bank web confirmation URL for CBE, Telebirr, Awash, or BOA. Links.et verifies the transaction amount ({event.ticketPrice} ETB) directly with the bank ledger.
+                      </p>
+                    </div>
+                  ) : (
+                    /* Option B Pane */
+                    <div className="p-4 bg-white/70 border border-gray-200 rounded-2xl space-y-3 animate-fade-in">
+                      <label className="block text-xs font-bold text-black">
+                        Upload Payment Receipt Screenshot <span className="text-red-600">*</span>
+                      </label>
+
+                      <div className="space-y-2">
+                        <label className="border-2 border-dashed border-gray-300 hover:border-[#63474D] rounded-2xl p-4 text-center block cursor-pointer bg-white transition-colors">
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/jpg"
+                            onChange={handleScreenshotSelect}
+                            className="hidden"
+                          />
+                          <div className="flex flex-col items-center justify-center gap-1.5 py-1">
+                            <div className="w-9 h-9 rounded-full bg-[#63474D]/10 text-[#63474D] flex items-center justify-center">
+                              <UploadCloud className="w-5 h-5" />
+                            </div>
+                            <span className="text-xs font-bold text-[#63474D]">
+                              {screenshotFile ? 'Change receipt screenshot' : 'Click to upload receipt screenshot'}
+                            </span>
+                            <span className="text-[10px] text-gray-500">
+                              PNG, JPG, or WEBP (Max 5MB)
+                            </span>
+                          </div>
+                        </label>
+
+                        {isUploadingScreenshot && (
+                          <div className="flex items-center gap-2 text-[11px] text-[#63474D] font-semibold py-1">
+                            <span className="w-3.5 h-3.5 border-2 border-[#63474D] border-t-transparent rounded-full animate-spin" />
+                            <span>Optimizing image and preparing verification payload...</span>
+                          </div>
+                        )}
+
+                        {screenshotPreview && (
+                          <div className="p-3 bg-white rounded-xl border border-gray-200 space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-semibold text-black truncate max-w-xs">
+                                📎 {screenshotFile?.name || 'receipt_screenshot'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setScreenshotFile(null);
+                                  setScreenshotPreview(null);
+                                  setScreenshotBase64(null);
+                                  setScreenshotUrl(null);
+                                }}
+                                className="text-red-500 hover:text-red-700 text-[11px] font-bold cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            <div className="w-full max-h-48 rounded-lg overflow-hidden border border-gray-100 flex items-center justify-center bg-gray-50">
+                              <img
+                                src={screenshotPreview}
+                                alt="Receipt Screenshot Preview"
+                                className="max-h-48 w-auto object-contain"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-[11px] text-amber-900 leading-relaxed">
+                          🛡️ <strong>Automated OCR & Bank Validation:</strong> Links.et scans this receipt image to extract the banking reference token and validates the transaction with the bank network. Unconfirmed or manipulated screenshots are rejected automatically.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
+          </div>
+        )}
+
+        {/* Real-time Verification Loading Banner */}
+        {verificationStatusText && (
+          <div className="p-4 bg-[#63474D]/10 border border-[#63474D]/30 rounded-2xl flex items-center gap-3 animate-pulse">
+            <RefreshCw className="w-5 h-5 text-[#63474D] animate-spin shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-[#63474D]">{verificationStatusText}</p>
+              <p className="text-[11px] text-gray-600 mt-0.5">
+                Connecting with bank infrastructure. Please do not close or navigate away from this page.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Error Banner right above submit action */}
+        {errorMsg && (
+          <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-800 flex items-center gap-2.5 shadow-2xs animate-fade-in">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+            <span className="font-semibold leading-relaxed">{errorMsg}</span>
           </div>
         )}
 
@@ -924,9 +1247,16 @@ export const EventRegistrationCheckoutPage: React.FC = () => {
             variant="primary"
             size="lg"
             isLoading={isSubmitting}
-            className="px-8 py-3 text-xs font-bold rounded-xl shadow-md cursor-pointer"
+            disabled={isSubmitting}
+            className="px-8 py-3 text-xs font-bold rounded-xl shadow-md cursor-pointer min-w-[200px]"
           >
-            {event.requiresApproval ? 'Submit Application for Approval' : 'Submit Registration'}
+            {isSubmitting
+              ? 'Verifying with Bank Network...'
+              : event.requiresApproval
+              ? 'Submit Application for Approval'
+              : event.isPaid && (event.ticketPrice || 0) > 0
+              ? `Verify & Complete Registration (${event.ticketPrice} ETB)`
+              : 'Submit Free Registration'}
           </Button>
 
           {event.requiresApproval && (

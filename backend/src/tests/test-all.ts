@@ -597,7 +597,7 @@ const runTests = async () => {
         title: 'Addis AI & Cloud Summit 2026',
         description: 'Deep dive into LLMs and Cloud Native architecture in Ethiopia.',
         type: 'workshop',
-        date: '2026-10-15',
+        date: '2026-12-15',
         startTime: '09:00 AM',
         endTime: '05:00 PM',
         location: 'Skylight Hotel, Addis Ababa',

@@ -16,6 +16,14 @@ export interface RegistrationQuestion {
   order: number;
 }
 
+export interface PaymentDestination {
+  id?: string;
+  provider: string; // 'cbe', 'telebirr', 'awash', 'boa', etc.
+  accountNumber: string;
+  accountHolder?: string;
+  label?: string;
+}
+
 export interface Event {
   id: string;
   organizerId: string;
@@ -40,6 +48,7 @@ export interface Event {
   isPublicized?: boolean;
   ticketPrice: number; // In ETB
   currency: 'ETB';
+  paymentMethods?: PaymentDestination[];
   requiresApproval?: boolean;
   shareLinkToken: string;
   customQuestions: RegistrationQuestion[];

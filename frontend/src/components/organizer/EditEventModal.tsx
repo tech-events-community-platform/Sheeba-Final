@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Event, EventType } from '../../types/event';
+import type { Event, EventType, PaymentDestination } from '../../types/event';
 import { api } from '../../services/api';
 import { Button } from '../ui/Button';
 import {
@@ -15,6 +15,10 @@ import {
   CheckCircle2,
   AlertCircle,
   Tag,
+  Globe,
+  Sparkles,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import {
   uploadToCloudinary,
@@ -52,6 +56,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     isPaid: false,
     ticketPrice: 0,
     requiresApproval: false,
+    isPublicized: false,
     posterImageUrl: '',
   });
 
@@ -66,6 +71,34 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentDestination[]>([]);
+
+  const handleAddPaymentMethod = () => {
+    setPaymentMethods((prev) => [
+      ...prev,
+      {
+        id: `pm_${Date.now()}`,
+        provider: 'cbe',
+        accountNumber: '',
+        accountHolder: '',
+        label: '',
+      },
+    ]);
+  };
+
+  const handleRemovePaymentMethod = (index: number) => {
+    setPaymentMethods((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleUpdatePaymentMethod = (
+    index: number,
+    field: keyof PaymentDestination,
+    value: string
+  ) => {
+    setPaymentMethods((prev) =>
+      prev.map((pm, idx) => (idx === index ? { ...pm, [field]: value } : pm))
+    );
+  };
 
   useEffect(() => {
     if (event && isOpen) {
@@ -88,8 +121,23 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         isPaid: Boolean(event.isPaid),
         ticketPrice: event.ticketPrice || 0,
         requiresApproval: Boolean(event.requiresApproval),
+        isPublicized: Boolean(event.isPublicized),
         posterImageUrl: event.posterImageUrl || event.bannerUrl || '',
       });
+
+      setPaymentMethods(
+        event.paymentMethods && event.paymentMethods.length > 0
+          ? event.paymentMethods
+          : [
+              {
+                id: `pm_1`,
+                provider: 'cbe',
+                accountNumber: '100098765432',
+                accountHolder: 'Event Organizer',
+                label: 'CBE Official Account',
+              },
+            ]
+      );
 
       setBannerSource('upload');
       setErrorMsg(null);
@@ -136,7 +184,21 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const validation = validateForm(editEventSchema, formData);
+    const activePaymentMethods = formData.isPaid
+      ? paymentMethods.filter((pm) => pm.accountNumber && pm.accountNumber.trim().length > 0)
+      : [];
+
+    if (formData.isPaid && activePaymentMethods.length === 0) {
+      setErrorMsg('Paid events require at least one payment receiving method (e.g. CBE, Telebirr) with a valid account number.');
+      return;
+    }
+
+    const validationPayload = {
+      ...formData,
+      paymentMethods: activePaymentMethods,
+    };
+
+    const validation = validateForm(editEventSchema, validationPayload);
     if (!validation.success) {
       setErrorMsg(validation.error);
       return;
@@ -160,7 +222,9 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         capacity: Number(formData.capacity) || 100,
         isPaid: Boolean(formData.isPaid),
         ticketPrice: formData.isPaid ? Number(formData.ticketPrice) || 0 : 0,
+        paymentMethods: activePaymentMethods,
         requiresApproval: Boolean(formData.requiresApproval),
+        isPublicized: Boolean(formData.isPublicized),
         posterImageUrl: formData.posterImageUrl.trim(),
         bannerUrl: formData.posterImageUrl.trim(),
       };
@@ -214,20 +278,6 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Status Alerts */}
-        {errorMsg && (
-          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-center gap-2 shrink-0">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-        {successMsg && (
-          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 shrink-0">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-            <span>{successMsg}</span>
-          </div>
-        )}
 
         {/* Scrollable Form Body */}
         <form id="edit-event-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto pr-1.5 space-y-5">
@@ -432,14 +482,120 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                 <label className="block text-xs font-bold text-[#2D1F23]">
                   Ticket Price (ETB) <span className="text-red-600">*</span>
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={formData.ticketPrice}
-                  onChange={(e) => setFormData({ ...formData, ticketPrice: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-medium text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="1000000"
+                    step="any"
+                    required
+                    value={formData.ticketPrice || ''}
+                    onChange={(e) => setFormData({ ...formData, ticketPrice: Number(e.target.value) })}
+                    placeholder="250"
+                    className="w-full px-3.5 py-2.5 pr-12 bg-white border border-gray-200 rounded-xl text-xs font-medium text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                  <span className="absolute right-3 top-2.5 text-xs font-bold text-gray-500">ETB</span>
+                </div>
+              </div>
+            )}
+
+            {formData.isPaid && (
+              <div className="sm:col-span-3 space-y-3 pt-3 border-t border-gray-200/80 animate-fade-in">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23]">
+                      Receiving Payment Destinations *
+                    </label>
+                    <p className="text-[11px] text-gray-500">
+                      Configure bank/wallet accounts where attendees send admission fees.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddPaymentMethod}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#63474D] text-white hover:bg-[#4E373C] text-xs font-semibold rounded-xl transition cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Destination</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  {paymentMethods.map((pm, idx) => (
+                    <div
+                      key={pm.id || idx}
+                      className="p-3 bg-white rounded-xl border border-gray-200 shadow-2xs space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[#63474D] uppercase tracking-wider">
+                          Method #{idx + 1}
+                        </span>
+                        {paymentMethods.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePaymentMethod(idx)}
+                            className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-[#2D1F23] mb-0.5">Provider</label>
+                          <select
+                            value={pm.provider}
+                            onChange={(e) => handleUpdatePaymentMethod(idx, 'provider', e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-[#2D1F23] focus:outline-none focus:ring-1 focus:ring-[#63474D]"
+                          >
+                            <option value="cbe">Commercial Bank of Ethiopia (CBE)</option>
+                            <option value="telebirr">Telebirr (Ethio Telecom)</option>
+                            <option value="awash">Awash Bank</option>
+                            <option value="boa">Bank of Abyssinia (BOA)</option>
+                            <option value="dashen">Dashen Bank</option>
+                            <option value="zemen">Zemen Bank</option>
+                            <option value="other">Other Bank / Wallet</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-[#2D1F23] mb-0.5">Account / Phone *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder={pm.provider === 'telebirr' ? 'e.g. 09876543221' : 'e.g. 100098765432'}
+                            value={pm.accountNumber}
+                            onChange={(e) => handleUpdatePaymentMethod(idx, 'accountNumber', e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono text-[#2D1F23] focus:outline-none focus:ring-1 focus:ring-[#63474D]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-[#2D1F23] mb-0.5">Account Holder Name</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Event Organizer Team"
+                            value={pm.accountHolder || ''}
+                            onChange={(e) => handleUpdatePaymentMethod(idx, 'accountHolder', e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-[#2D1F23] focus:outline-none focus:ring-1 focus:ring-[#63474D]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-[#2D1F23] mb-0.5">Label (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. CBE Primary"
+                            value={pm.label || ''}
+                            onChange={(e) => handleUpdatePaymentMethod(idx, 'label', e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-[#2D1F23] focus:outline-none focus:ring-1 focus:ring-[#63474D]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -459,6 +615,37 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                 />
                 <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#63474D]"></div>
               </label>
+            </div>
+
+            {/* Publicize in Sheeba Landing Page Discovery */}
+            <div className="pt-3 border-t border-gray-200/80 space-y-2">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <span className="text-xs font-bold text-[#2D1F23] flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-[#2A7B5F]" />
+                    Publicize in Sheeba (Landing Page)
+                  </span>
+                  <span className="text-[11px] text-[#756366] block mt-0.5 leading-relaxed">
+                    Feature this event under the Landing Page's <strong>Upcoming Events</strong> section. When turned off, the event is private and accessible only via direct share link.
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5 select-none">
+                  <input
+                    type="checkbox"
+                    checked={formData.isPublicized}
+                    onChange={(e) => setFormData({ ...formData, isPublicized: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2A7B5F]"></div>
+                </label>
+              </div>
+
+              {formData.isPublicized && (
+                <div className="p-2.5 bg-[#EAF4EF] border border-[#2A7B5F]/20 rounded-xl flex items-center gap-2 text-[11px] text-[#2A7B5F] font-medium animate-fade-in">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  <span>Active: Event is published and discoverable on Sheeba Landing Page Upcoming Events.</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -571,34 +758,50 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         </form>
 
         {/* Modal Footer */}
-        <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="cursor-pointer"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="edit-event-form"
-            variant="primary"
-            size="sm"
-            disabled={isSubmitting}
-            className="px-6 cursor-pointer"
-          >
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Updating...</span>
-              </span>
-            ) : (
-              'Save Changes'
-            )}
-          </Button>
+        <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+          {errorMsg ? (
+            <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-center gap-2 flex-1 animate-fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>{errorMsg}</span>
+            </div>
+          ) : successMsg ? (
+            <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 flex-1 animate-fade-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{successMsg}</span>
+            </div>
+          ) : (
+            <div className="hidden sm:block flex-1" />
+          )}
+
+          <div className="flex items-center justify-end gap-3 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="edit-event-form"
+              variant="primary"
+              size="sm"
+              disabled={isSubmitting}
+              className="px-6 cursor-pointer"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Updating...</span>
+                </span>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 

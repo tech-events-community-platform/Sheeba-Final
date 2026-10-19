@@ -49,6 +49,41 @@ export const registrationQuestionSchema = z
   });
 
 /**
+ * Strict schema for individual receiving payment destinations (e.g. CBE, Telebirr)
+ */
+export const paymentDestinationSchema = z
+  .object({
+    id: z.string().optional(),
+    provider: z.string().trim().min(1, 'Payment provider is required.').max(50),
+    accountNumber: z.string().trim().min(1, 'Account or receiving phone number is required.').max(100),
+    accountHolder: z.string().trim().max(100).optional(),
+    label: z.string().trim().max(100).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const p = data.provider.toLowerCase();
+    const acc = data.accountNumber.trim().replace(/\s+/g, '');
+    if (p.includes('telebirr')) {
+      const validPhone = /^(09|07)\d{8}$|^(\+?251)(9|7)\d{8}$/.test(acc);
+      if (!validPhone) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Telebirr number must be a valid 10-digit Ethiopian phone number (e.g. 0987654321, 07...) or 251...',
+          path: ['accountNumber'],
+        });
+      }
+    } else if (p.includes('cbe') && !p.includes('birr')) {
+      const validCbe = /^\d{10,16}$/.test(acc);
+      if (!validCbe) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'CBE account number should be 10-16 numeric digits (e.g. 100098765432).',
+          path: ['accountNumber'],
+        });
+      }
+    }
+  });
+
+/**
  * Event creation schema for POST /api/events
  */
 export const createEventSchema = z
@@ -70,18 +105,20 @@ export const createEventSchema = z
     is_paid: z.boolean().optional(),
     isPublicized: z.boolean().optional().default(false),
     is_publicized: z.boolean().optional(),
-    ticketPrice: z.coerce.number().min(0, 'Ticket price cannot be negative.').optional().default(0),
+    ticketPrice: z.coerce.number().min(0, 'Ticket price cannot be negative.').max(1000000, 'Ticket price exceeds safe limit of 1,000,000 ETB.').optional().default(0),
     ticket_price: z.coerce.number().optional(),
     currency: z.string().trim().optional().default('ETB'),
+    paymentMethods: z.array(paymentDestinationSchema).optional().default([]),
+    payment_methods: z.array(paymentDestinationSchema).optional(),
     requiresApproval: z.boolean().optional().default(false),
     requires_approval: z.boolean().optional(),
     customQuestions: z.array(registrationQuestionSchema).optional().default([]),
     custom_questions: z.array(registrationQuestionSchema).optional(),
     includeDefaultQuestions: z.boolean().optional().default(true),
-    bannerUrl: z.string().trim().url('Invalid banner URL.').or(z.literal('')).optional(),
-    posterImageUrl: z.string().trim().url('Invalid poster image URL.').or(z.literal('')).optional(),
-    poster_image_url: z.string().trim().url('Invalid poster image URL.').or(z.literal('')).optional(),
-    banner_url: z.string().trim().url('Invalid banner URL.').or(z.literal('')).optional(),
+    bannerUrl: z.string().trim().optional(),
+    posterImageUrl: z.string().trim().optional(),
+    poster_image_url: z.string().trim().optional(),
+    banner_url: z.string().trim().optional(),
   })
   .transform((data) => {
     const rawDate = data.date || data.event_date || '';
@@ -92,6 +129,7 @@ export const createEventSchema = z
     const banner = data.posterImageUrl || data.poster_image_url || data.bannerUrl || data.banner_url || '';
     const venue = data.venueName || data.venue_name || data.location;
     const questions = data.customQuestions.length > 0 ? data.customQuestions : (data.custom_questions || []);
+    const paymentDestinations = data.paymentMethods.length > 0 ? data.paymentMethods : (data.payment_methods || []);
 
     return {
       ...data,
@@ -100,6 +138,7 @@ export const createEventSchema = z
       isPaid,
       isPublicized,
       ticketPrice: isPaid ? ticketPrice : 0,
+      paymentMethods: isPaid ? paymentDestinations : [],
       requiresApproval,
       requires_approval: requiresApproval,
       bannerUrl: banner || undefined,
@@ -117,12 +156,37 @@ export const createEventSchema = z
       });
     }
 
-    if (data.isPaid && (!data.ticketPrice || data.ticketPrice <= 0)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Paid events must specify a ticket price greater than 0 ETB.',
-        path: ['ticketPrice'],
-      });
+    if (data.isPaid) {
+      if (!data.ticketPrice || data.ticketPrice <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Paid events must specify a ticket price greater than 0 ETB.',
+          path: ['ticketPrice'],
+        });
+      }
+
+      if (!data.paymentMethods || data.paymentMethods.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Paid events require at least one configured receiving payment destination (e.g. CBE or Telebirr).',
+          path: ['paymentMethods'],
+        });
+      } else {
+        // Prevent duplicate payment methods for the same provider and account
+        const seen = new Set<string>();
+        for (const dest of data.paymentMethods) {
+          const key = `${dest.provider.toLowerCase()}_${dest.accountNumber.trim().replace(/\s+/g, '')}`;
+          if (seen.has(key)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Duplicate payment account for provider ${dest.provider}: ${dest.accountNumber}.`,
+              path: ['paymentMethods'],
+            });
+            break;
+          }
+          seen.add(key);
+        }
+      }
     }
   });
 
@@ -157,6 +221,8 @@ export const updateEventSchema = z
     requiresApproval: z.boolean().optional(),
     requires_approval: z.boolean().optional(),
     currency: z.string().trim().optional(),
+    paymentMethods: z.array(paymentDestinationSchema).optional(),
+    payment_methods: z.array(paymentDestinationSchema).optional(),
     customQuestions: z.array(registrationQuestionSchema).optional(),
     custom_questions: z.array(registrationQuestionSchema).optional(),
     bannerUrl: z.string().trim().optional(),
@@ -183,6 +249,31 @@ export const updateEventSchema = z
         path: ['ticketPrice'],
       });
     }
+
+    const pMethods = data.paymentMethods ?? data.payment_methods;
+    if (isPaid === true && pMethods !== undefined) {
+      if (pMethods.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Paid events require at least one configured receiving payment destination (e.g. CBE or Telebirr).',
+          path: ['paymentMethods'],
+        });
+      } else {
+        const seen = new Set<string>();
+        for (const dest of pMethods) {
+          const key = `${dest.provider.toLowerCase()}_${dest.accountNumber.trim().replace(/\s+/g, '')}`;
+          if (seen.has(key)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Duplicate payment account for provider ${dest.provider}: ${dest.accountNumber}.`,
+              path: ['paymentMethods'],
+            });
+            break;
+          }
+          seen.add(key);
+        }
+      }
+    }
   });
 
 /**
@@ -208,6 +299,9 @@ export const eventQuerySchema = z.object({
 export const registerEventSchema = z.object({
   answers: z.record(z.string(), z.any()).optional().default({}),
   paymentReference: z.string().trim().optional(),
+  paymentMethod: z.string().trim().optional(),
+  screenshotUrl: z.string().trim().optional(),
+  screenshotBase64: z.string().optional(),
   attendee: z
     .object({
       id: z.string().optional(),
