@@ -35,6 +35,7 @@ router.use('/reports', reportRoutes);
 router.use('/admin', adminRoutes);
 router.use('/search', searchRoutes);
 router.use('/sponsorships', sponsorshipRoutes);
+router.use('/sponsorship', sponsorshipRoutes);
 router.use('/contact', contactRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/reviews', reviewRoutes);

@@ -3,6 +3,7 @@ import type { Ticket } from '../types/ticket';
 import type { BadgeAward, BadgeCode, SponsorReportData, AttendeeRosterItem } from '../types/attendance';
 import type { User, UserRole, ProfileVisibility } from '../types/user';
 import type { EventReviewItem, EventReviewsSummary } from '../types/review';
+import type { SponsorRecommendationsResponse, SponsorPreferences } from '../types/matching';
 import { getEndOfEventDay } from '../utils/date';
 
 /**
@@ -609,6 +610,42 @@ export const api = {
       const res = await requestApi(`/sponsorships/deals/${dealId}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
+      });
+      return res.data;
+    },
+
+    // AI-Powered Sponsor-Event Matching & Recommendations
+    getRecommendations: async (params?: {
+      limit?: number;
+      objective?: string;
+      category?: string;
+      location?: string;
+    }): Promise<SponsorRecommendationsResponse> => {
+      const queryParts: string[] = [];
+      if (params?.limit) queryParts.push(`limit=${encodeURIComponent(params.limit)}`);
+      if (params?.objective) queryParts.push(`objective=${encodeURIComponent(params.objective)}`);
+      if (params?.category) queryParts.push(`category=${encodeURIComponent(params.category)}`);
+      if (params?.location) queryParts.push(`location=${encodeURIComponent(params.location)}`);
+
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/sponsorships/recommendations${queryStr}`);
+      return res.data;
+    },
+
+    getPreferences: async (): Promise<{
+      preferences: SponsorPreferences;
+      companyName: string;
+      industryCategory: string;
+      isCustomized: boolean;
+    }> => {
+      const res = await requestApi('/sponsorships/preferences');
+      return res.data;
+    },
+
+    updatePreferences: async (preferences: Partial<SponsorPreferences>): Promise<SponsorPreferences> => {
+      const res = await requestApi('/sponsorships/preferences', {
+        method: 'PUT',
+        body: JSON.stringify(preferences),
       });
       return res.data;
     },
