@@ -1,4 +1,4 @@
-export type UserRole = 'ATTENDEE' | 'ORGANIZER' | 'ADMIN' | 'SPONSOR';
+export type UserRole = 'ATTENDEE' | 'ORGANIZER' | 'ADMIN' | 'SPONSOR' | 'EXHIBITOR';
 export type ProfileVisibility = 'public' | 'private';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type OrganizerApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected';
@@ -32,6 +32,7 @@ export interface User {
   industryCategory?: string;
   companyWebsite?: string;
   companyPhone?: string;
+  exhibitorDescription?: string;
   socials?: OrganizerSocials;
   approvalStatus?: ApprovalStatus;
   isOrganizer?: boolean;

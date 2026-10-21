@@ -1,6 +1,6 @@
 import { Request } from 'express';
 
-export type UserRole = 'attendee' | 'organizer' | 'admin' | 'sponsor';
+export type UserRole = 'attendee' | 'organizer' | 'admin' | 'sponsor' | 'exhibitor';
 export type ProfileVisibility = 'public' | 'private';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type OrganizerApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected';
@@ -28,6 +28,7 @@ export interface IUser {
   industry_category?: string | null;
   company_website?: string | null;
   company_phone?: string | null;
+  exhibitor_description?: string | null;
   google_id?: string | null;
   avatar_url?: string | null;
   visibility: ProfileVisibility;
@@ -383,4 +384,89 @@ export interface ISponsorshipDeal {
   // Joined fields
   application?: ISponsorshipApplication;
   sponsor?: IUserSafe;
+}
+
+// --- EXHIBITOR MODULE TYPES ---
+export interface IExhibitorRegistration {
+  full_name: string;
+  email: string;
+  password: string;
+  company_name: string;
+  industry_category: string;
+  company_phone: string;
+  company_website?: string;
+  exhibitor_description?: string;
+}
+
+export type ExhibitorCallStatus = 'draft' | 'open' | 'closed';
+
+export interface IExhibitorCall {
+  id: string;
+  event_id: string;
+  is_enabled: boolean;
+  status: ExhibitorCallStatus;
+  description?: string;
+  total_space_sqm: number;
+  price_per_sqm: number;
+  sheeba_cut_percent: number;
+  max_exhibitors: number;
+  specifications?: string;
+  application_deadline?: Date | string;
+  has_booth_numbers: boolean;
+  has_vendor_checkin: boolean;
+  created_at: Date;
+  updated_at: Date;
+  confirmed_vendors_count?: number;
+  total_space_allocated?: number;
+  event_title?: string;
+  event_date?: Date;
+  event_location?: string;
+}
+
+export type VendorSource = 'applied' | 'manual' | 'sponsorship';
+export type VendorStatus = 'pending' | 'accepted_awaiting_payment' | 'confirmed' | 'rejected' | 'cancelled';
+export type VendorPaymentStatus = 'unpaid' | 'paid' | 'refunded';
+
+export interface IEventVendor {
+  id: string;
+  event_id: string;
+  exhibitor_call_id?: string;
+  user_id?: string;
+  source: VendorSource;
+  business_name: string;
+  category?: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone?: string;
+  showcase_description?: string;
+  special_requirements?: string;
+  space_sqm: number;
+  organizer_price_per_sqm: number;
+  sheeba_cut_percent: number;
+  total_organizer_amount: number;
+  total_cut_amount: number;
+  total_final_amount: number;
+  booth_number?: string;
+  status: VendorStatus;
+  rejection_reason?: string;
+  payment_reference?: string;
+  payment_status: VendorPaymentStatus;
+  paid_at?: Date | string;
+  logo_url?: string;
+  website_url?: string;
+  created_at: Date;
+  updated_at: Date;
+  event_title?: string;
+  event_date?: Date;
+  event_location?: string;
+}
+
+export interface IExhibitorBoothVisitor {
+  id: string;
+  vendor_id: string;
+  visitor_name: string;
+  visitor_email?: string;
+  visitor_phone?: string;
+  notes?: string;
+  created_at: Date;
 }
