@@ -22,9 +22,11 @@ import {
   Edit,
   Trash2,
   Check,
+  Store,
 } from 'lucide-react';
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 import { EditEventModal } from '../../components/organizer/EditEventModal';
+import { EventExhibitorsTab } from '../../components/organizer/EventExhibitorsTab';
 import { getCalendarTile } from '../../utils/date';
 import { manualAttendeeFormSchema, awardBadgeFormSchema, validateForm } from '../../schemas';
 
@@ -41,6 +43,7 @@ export const EventDetailPage: React.FC = () => {
   // Search queries for both independent lists (Section 3)
   const [registeredSearch, setRegisteredSearch] = useState('');
   const [attendedSearch, setAttendedSearch] = useState('');
+  const [activeMainTab, setActiveMainTab] = useState<'attendees' | 'exhibitors'>('attendees');
 
   // Delete attendee confirmation toast state
   const [deleteConfirmToast, setDeleteConfirmToast] = useState<AttendeeRosterItem | null>(null);
@@ -770,7 +773,38 @@ export const EventDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Section: Attended List (Unboxed) */}
+      {/* Event Management Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-gray-200/80 pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('attendees')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeMainTab === 'attendees'
+              ? 'bg-[#63474D] text-white shadow-2xs'
+              : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          <span>Attendees & Passes ({roster.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('exhibitors')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeMainTab === 'exhibitors'
+              ? 'bg-[#63474D] text-white shadow-2xs'
+              : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
+          }`}
+        >
+          <Store className="w-4 h-4" />
+          <span>Exhibitors & Booths</span>
+        </button>
+      </div>
+
+      {activeMainTab === 'attendees' && (
+        <div className="space-y-8 animate-fade-in">
+          {/* Section: Attended List (Unboxed) */}
       <div className="space-y-4 pt-8 border-t border-gray-100">
         {/* Attended List Header: Heading, Search Bar in Middle, Add User Manually on Right */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1240,6 +1274,14 @@ export const EventDetailPage: React.FC = () => {
           </div>
         )}
       </div>
+
+        </div>
+      )}
+
+      {/* Exhibitors Tab Section */}
+      {activeMainTab === 'exhibitors' && event && (
+        <EventExhibitorsTab eventId={event.id} eventTitle={event.title} />
+      )}
 
       {/* Award Badge Modal (Shared action offering Participant / Winner / Speaker) */}
       {awardingAttendee && (
