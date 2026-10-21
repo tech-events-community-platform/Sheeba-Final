@@ -41,6 +41,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS industry_category VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company_website VARCHAR(255);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company_phone VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sponsor_preferences JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('attendee', 'organizer', 'admin', 'sponsor', 'ATTENDEE', 'ORGANIZER', 'ADMIN', 'SPONSOR'));
 

@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { SponsorshipController } from '../controllers/sponsorship.controller';
+import { MatchingController } from '../controllers/matching.controller';
 import { authenticate, optionalAuthenticate } from '../middlewares/auth.middleware';
+import { authorizeRoles } from '../middlewares/role.middleware';
 import { validateBody, validateQuery, validateParams } from '../middlewares/validate.middleware';
 import { idParamSchema } from '../schemas/common.schema';
 import {
@@ -10,6 +12,10 @@ import {
   sponsorDealsQuerySchema,
   updateDealSchema,
 } from '../schemas/sponsorship.schema';
+import {
+  updateSponsorPreferencesSchema,
+  sponsorRecommendationsQuerySchema,
+} from '../schemas/matching.schema';
 
 const router = Router();
 
@@ -70,6 +76,30 @@ router.patch(
   validateParams(idParamSchema),
   validateBody(updateDealSchema),
   SponsorshipController.updateDeal
+);
+
+// AI-Powered Sponsor-Event Matching & Recommendations
+router.get(
+  ['/recommendations', '/matching/recommendations'],
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateQuery(sponsorRecommendationsQuerySchema),
+  MatchingController.getRecommendations
+);
+
+router.get(
+  ['/preferences', '/matching/preferences'],
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  MatchingController.getPreferences
+);
+
+router.put(
+  ['/preferences', '/matching/preferences'],
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateBody(updateSponsorPreferencesSchema),
+  MatchingController.updatePreferences
 );
 
 export default router;

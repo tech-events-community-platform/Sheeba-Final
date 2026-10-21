@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { SponsorRecommendationsSection } from './SponsorRecommendationsSection';
+
 export const SponsorDashboardPage: React.FC = () => {
   const { user } = useAuth();
 
@@ -43,7 +45,7 @@ export const SponsorDashboardPage: React.FC = () => {
             </h1>
 
             <p className="text-sm text-white/85 max-w-2xl leading-relaxed font-light">
-              Connect your brand with Ethiopia&apos;s fastest-growing developer communities. Your approved sponsor account grants you direct visibility into genuine attendee turnout and verified tech credentials.
+              Connect your brand with Ethiopia&apos;s fastest-growing developer communities. Your approved sponsor account grants you direct visibility into genuine attendee turnout, verified tech credentials, and AI-curated event opportunities.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 text-xs text-white/80 pt-1">
@@ -74,7 +76,7 @@ export const SponsorDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Overview Metrics Cards (Placeholder Structure) */}
+      {/* 2. Overview Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           {
@@ -130,27 +132,8 @@ export const SponsorDashboardPage: React.FC = () => {
         })}
       </div>
 
-      {/* 3. Placeholder Content Area */}
-      <div className="bg-white border border-[#E8DDD7] rounded-3xl p-8 sm:p-12 text-center space-y-4 shadow-xs">
-        <div className="w-16 h-16 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center mx-auto">
-          <Building2 className="w-8 h-8" />
-        </div>
-        <div className="max-w-md mx-auto space-y-2">
-          <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
-            Sponsorship Workspace Ready
-          </h3>
-          <p className="text-xs text-gray-500 leading-relaxed">
-            Your corporate sponsor profile is active. You can now browse single-day tech events, connect directly with organizing teams, and sponsor genuine developer communities in Ethiopia.
-          </p>
-        </div>
-        <div className="pt-3">
-          <Link to="/sponsor/explore">
-            <Button size="sm" variant="primary" icon={<ArrowRight className="w-4 h-4" />}>
-              Browse Pitches Seeking Sponsors
-            </Button>
-          </Link>
-        </div>
-      </div>
+      {/* 3. AI-Powered Event Recommendations Section */}
+      <SponsorRecommendationsSection />
     </div>
   );
 };
