@@ -26,7 +26,7 @@ export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
-  const isAuthPage = ['/login', '/register', '/verify-otp', '/pending-approval', '/sponsor/auth', '/sponsor/forgot-password'].includes(location.pathname);
+  const isAuthPage = ['/login', '/register', '/verify-otp', '/pending-approval', '/sponsor/auth', '/sponsor/forgot-password', '/exhibitor/auth'].includes(location.pathname);
   const isExternalRegistration =
     location.pathname.startsWith('/e/') ||
     (location.pathname.startsWith('/events/') && location.pathname.includes('/register'));
@@ -70,6 +70,8 @@ export default function Header() {
     if (!user) return '/app';
     if (user.role === 'ADMIN') return '/admin';
     if (user.role === 'ORGANIZER') return '/organizer';
+    if (user.role === 'SPONSOR') return '/sponsor';
+    if (user.role === 'EXHIBITOR') return '/exhibitor';
     return '/app';
   };
 
@@ -85,10 +87,12 @@ export default function Header() {
         { name: 'Features', href: '#features', isInternal: true },
         { name: 'How It Works', href: '#how-it-works', isInternal: true },
         { name: 'Live Simulator', href: '#simulator', isInternal: true },
+        { name: 'Exhibitors', href: '/exhibitor', isInternal: false },
         { name: 'Contact Us', href: '#contact', isInternal: true },
       ]
     : [
         { name: 'Home', href: '/', isInternal: false },
+        { name: 'Exhibitors', href: '/exhibitor', isInternal: false },
         { name: 'Contact Us', href: '/contact', isInternal: false },
       ];
 

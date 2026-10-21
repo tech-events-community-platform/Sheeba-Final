@@ -19,6 +19,13 @@ router.get(
   ExhibitorController.getPublicEventExhibitors
 );
 
+// Exhibitor: Explore events with open booth calls
+router.get(
+  '/explore',
+  optionalAuthenticate,
+  ExhibitorController.exploreOpenCalls
+);
+
 // Organizer: Get exhibitor call config & stats
 router.get(
   '/events/:eventId/call',

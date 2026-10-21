@@ -1890,6 +1890,17 @@ export const api = {
         return [];
       }
     },
+
+    exploreOpenCalls: async (params?: { category?: string; search?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.category) qs.append('category', params.category);
+      if (params?.search) qs.append('search', params.search);
+      const queryStr = qs.toString() ? `?${qs.toString()}` : '';
+      const res = await requestApi<{ success: boolean; data: any[] }>(
+        `/exhibitors/explore${queryStr}`
+      );
+      return res.data || [];
+    },
   },
 
   contact: {

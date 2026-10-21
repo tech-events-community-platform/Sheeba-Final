@@ -132,5 +132,18 @@ export class ExhibitorController {
       next(error);
     }
   }
+
+  /**
+   * Exhibitor: Explore events with open booth calls
+   */
+  static async exploreOpenCalls(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { category, search } = req.query as { category?: string; search?: string };
+      const calls = await ExhibitorService.exploreOpenCalls({ category, search });
+      sendSuccess(res, calls, 'Open exhibitor calls retrieved.');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 

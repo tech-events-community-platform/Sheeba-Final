@@ -426,5 +426,93 @@ export class ExhibitorService {
       source: row.source,
     }));
   }
+
+  /**
+   * Exhibitor: Explore all events with open exhibitor calls
+   */
+  static async exploreOpenCalls(filters?: { category?: string; search?: string }): Promise<any[]> {
+    let sql = `
+      SELECT 
+        ec.id as exhibitor_call_id,
+        ec.event_id,
+        ec.status as call_status,
+        ec.total_space_sqm,
+        ec.price_per_sqm,
+        ec.sheeba_cut_percent,
+        ec.max_exhibitors,
+        ec.specifications,
+        ec.application_deadline,
+        ec.description as space_description,
+        e.title as event_title,
+        e.description as event_description,
+        e.category as event_category,
+        e.event_type,
+        e.event_date,
+        e.location as event_location,
+        e.venue_name,
+        e.banner_url,
+        e.poster_image_url,
+        u.organization as organizer_organization,
+        u.full_name as organizer_name,
+        COALESCE(SUM(v.space_sqm) FILTER (WHERE v.status = 'confirmed'), 0)::float as space_allocated,
+        COUNT(v.id) FILTER (WHERE v.status = 'confirmed')::int as confirmed_vendors_count
+      FROM exhibitor_calls ec
+      JOIN events e ON e.id = ec.event_id
+      JOIN users u ON u.id = e.organizer_id
+      LEFT JOIN event_vendors v ON v.event_id = e.id
+      WHERE ec.is_enabled = TRUE AND ec.status = 'open'
+    `;
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (filters?.category && filters.category !== 'all') {
+      sql += ` AND e.category ILIKE $${paramIndex}`;
+      params.push(`%${filters.category}%`);
+      paramIndex++;
+    }
+
+    if (filters?.search && filters.search.trim()) {
+      sql += ` AND (e.title ILIKE $${paramIndex} OR e.location ILIKE $${paramIndex} OR ec.specifications ILIKE $${paramIndex})`;
+      params.push(`%${filters.search.trim()}%`);
+      paramIndex++;
+    }
+
+    sql += ` GROUP BY ec.id, e.id, u.id ORDER BY e.event_date ASC`;
+
+    const res = await query(sql, params);
+    return res.rows.map((row) => {
+      const basePrice = parseFloat(row.price_per_sqm) || 0;
+      const cutPercent = parseFloat(row.sheeba_cut_percent) || 30;
+      const finalPricePerSqm = basePrice * (1 + cutPercent / 100);
+      const totalSpace = parseFloat(row.total_space_sqm) || 0;
+      const spaceAllocated = parseFloat(row.space_allocated) || 0;
+      const spaceRemaining = Math.max(0, totalSpace - spaceAllocated);
+
+      return {
+        id: row.exhibitor_call_id,
+        eventId: row.event_id,
+        eventTitle: row.event_title,
+        eventDescription: row.event_description,
+        eventCategory: row.event_category,
+        eventType: row.event_type,
+        eventDate: row.event_date,
+        eventLocation: row.event_location,
+        venueName: row.venue_name,
+        bannerUrl: row.banner_url || row.poster_image_url,
+        organizerOrganization: row.organizer_organization || row.organizer_name,
+        totalSpaceSqm: totalSpace,
+        spaceAllocated,
+        spaceRemaining,
+        maxExhibitors: parseInt(row.max_exhibitors, 10) || 10,
+        confirmedVendorsCount: parseInt(row.confirmed_vendors_count, 10) || 0,
+        specifications: row.specifications,
+        applicationDeadline: row.application_deadline,
+        spaceDescription: row.space_description,
+        finalPricePerSqm: Math.round(finalPricePerSqm),
+        pricePerSqm: basePrice,
+        sheebaCutPercent: cutPercent,
+      };
+    });
+  }
 }
 
