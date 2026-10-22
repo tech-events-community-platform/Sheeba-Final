@@ -34,6 +34,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS is_organizer BOOLEAN NOT NULL DEFAULT
 ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_approval_status VARCHAR(50) NOT NULL DEFAULT 'none';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_bio TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_socials JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
 UPDATE users SET is_organizer = TRUE, organizer_approval_status = approval_status WHERE role = 'organizer' AND organizer_approval_status = 'none';
 
 -- Sponsor Profile Columns & Role check update
@@ -116,6 +117,9 @@ ALTER TABLE registrations ADD CONSTRAINT registrations_approval_status_check CHE
 ALTER TABLE registrations ADD COLUMN IF NOT EXISTS answers JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(255);
 ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_status VARCHAR(50) NOT NULL DEFAULT 'settled';
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS notification_status VARCHAR(50) DEFAULT 'pending';
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS notification_sent_at TIMESTAMPTZ;
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS notification_error TEXT;
 ALTER TABLE registrations DROP CONSTRAINT IF EXISTS unique_event_user_registration;
 ALTER TABLE registrations ADD CONSTRAINT unique_event_user_registration UNIQUE (event_id, user_id);
 
@@ -353,6 +357,23 @@ CREATE TABLE IF NOT EXISTS event_reviews (
 CREATE INDEX IF NOT EXISTS idx_event_reviews_event_id ON event_reviews(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_reviews_user_id ON event_reviews(user_id);
 
+-- Notification Outbox Table (Durable transactional queue for background email delivery)
+CREATE TABLE IF NOT EXISTS notification_outbox (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    registration_id UUID REFERENCES registrations(id) ON DELETE CASCADE,
+    recipient_email VARCHAR(255) NOT NULL,
+    recipient_name VARCHAR(255),
+    job_type VARCHAR(50) NOT NULL,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'retry')),
+    attempts INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 5,
+    next_run_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_error TEXT,
+    locked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-
-
+CREATE INDEX IF NOT EXISTS idx_notification_outbox_poll ON notification_outbox(status, next_run_at);
+CREATE INDEX IF NOT EXISTS idx_notification_outbox_reg_id ON notification_outbox(registration_id);

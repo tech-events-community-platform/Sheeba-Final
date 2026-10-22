@@ -38,6 +38,7 @@ export interface User {
   organizerApprovalStatus?: OrganizerApprovalStatus;
   roles?: UserRole[];
   isActive?: boolean;
+  mustChangePassword?: boolean;
   stats?: AttendeeStats;
 }
 

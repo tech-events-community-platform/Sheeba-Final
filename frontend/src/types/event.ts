@@ -4,7 +4,19 @@ export type EventType = 'hackathon' | 'workshop' | 'meetup' | 'summit' | 'other'
 
 export type EventStatus = 'open' | 'closed' | 'canceled' | 'postponed' | 'completed';
 
-export type QuestionType = 'text' | 'choice' | 'multi_choice';
+export type QuestionType =
+  | 'text'
+  | 'choice'
+  | 'multi_choice'
+  | 'select'
+  | 'radio'
+  | 'checkbox'
+  | 'dropdown'
+  | 'date'
+  | 'email'
+  | 'phone'
+  | 'file'
+  | 'upload';
 
 export interface RegistrationQuestion {
   id: string;

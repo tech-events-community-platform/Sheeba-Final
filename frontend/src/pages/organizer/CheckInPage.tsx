@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { validateForm } from '../../utils/validation';
 import { manualAttendeeFormSchema, checkinNoteFormSchema } from '../../schemas/checkin.schema';
+import { ManualAddAttendeeModal } from '../../components/organizer/ManualAddAttendeeModal';
 
 
 export const CheckInPage: React.FC = () => {
@@ -43,7 +44,7 @@ export const CheckInPage: React.FC = () => {
   // Processing state for individual attendees
   const [actionInProgressId, setActionInProgressId] = useState<string | null>(null);
   const [lastActionToast, setLastActionToast] = useState<{
-    type: 'checkin' | 'undo';
+    type: 'checkin' | 'undo' | 'registered';
     name: string;
     attendeeId: string;
   } | null>(null);
@@ -224,7 +225,7 @@ export const CheckInPage: React.FC = () => {
       });
 
       setLastActionToast({
-        type: 'checkin',
+        type: 'registered',
         name: manualForm.name,
         attendeeId: 'manual',
       });
@@ -379,7 +380,9 @@ export const CheckInPage: React.FC = () => {
         <div
           className={`p-4 rounded-2xl border text-xs font-semibold flex items-center justify-between shadow-2xs animate-fade-in ${lastActionToast.type === 'checkin'
             ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-            : 'bg-amber-50 border-amber-200 text-amber-800'
+            : lastActionToast.type === 'registered'
+              ? 'bg-purple-50 border-purple-200 text-purple-800'
+              : 'bg-amber-50 border-amber-200 text-amber-800'
             }`}
         >
           <div className="flex items-center gap-2">
@@ -387,7 +390,9 @@ export const CheckInPage: React.FC = () => {
             <span>
               {lastActionToast.type === 'checkin'
                 ? `✓ Marked "${lastActionToast.name}" Attended for event date (${currentEvent?.date || 'Today'}) & issued verified badge.`
-                : `↩ Reverted check-in for "${lastActionToast.name}".`}
+                : lastActionToast.type === 'registered'
+                  ? `✓ Registered "${lastActionToast.name}". Click "Mark Attended" or scan QR code to admit.`
+                  : `↩ Reverted check-in for "${lastActionToast.name}".`}
             </span>
           </div>
           <button
@@ -518,109 +523,23 @@ export const CheckInPage: React.FC = () => {
         )}
       </div>
 
-      {/* Manual Add User Modal (Walk-in door check-in) */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
-          <div
-            onClick={() => !isSubmittingManual && setIsAddModalOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-          />
-
-          <div className="relative bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-gray-100 z-10 space-y-5 animate-fade-in">
-            <div className="flex items-start justify-between pb-3 border-b border-gray-100">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
-                  Walk-in Door Registration
-                </span>
-                <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
-                  Add User Manually
-                </h3>
-                <p className="text-xs text-gray-500">
-                  {currentEvent?.title} • Instantly registers and marks attendee as Attended
-                </p>
-              </div>
-            </div>
-
-            {manualError && (
-              <div className="p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-2xl text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>{manualError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAddManualAttendee} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <UserIcon className="w-3.5 h-3.5 text-[#63474D]" />
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Liya Kebede"
-                  value={manualForm.name}
-                  onChange={(e) => setManualForm({ ...manualForm, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="e.g. liya@example.com"
-                  value={manualForm.email}
-                  onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain" />
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  placeholder="e.g. +251 91 111 2233"
-                  value={manualForm.phone}
-                  onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                />
-              </div>
-
-              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-[11px] text-emerald-900 flex items-start gap-2">
-                <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0 mt-0.5" />
-                <span>
-                  Adding this attendee will immediately create their ticket and grant their verified <strong>Attended</strong> badge.
-                </span>
-              </div>
-
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  disabled={isSubmittingManual}
-                  className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingManual}
-                  className="px-4 py-2 rounded-xl bg-[#63474D] hover:bg-[#523a3f] text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>{isSubmittingManual ? 'Adding...' : 'Add & Mark Attended'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Enhanced Manual Add Attendee Modal */}
+      {isAddModalOpen && currentEvent && (
+        <ManualAddAttendeeModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          event={currentEvent}
+          onSuccess={(msg) => {
+            setLastActionToast({
+              type: 'registered',
+              name: 'Attendee',
+              attendeeId: 'manual',
+            });
+            if (selectedEventId) {
+              loadRoster(selectedEventId);
+            }
+          }}
+        />
       )}
 
       {/* Note Prompt Modal on Mark Attended */}

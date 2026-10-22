@@ -12,9 +12,12 @@ export class TicketService {
       : null;
     const isExpired = expiresAtDate ? now.getTime() > expiresAtDate.getTime() : false;
 
+    const isPaymentPending = row.payment_status === 'unsettled';
     const approvalStatus = row.approval_status || (row.qr_token ? 'approved' : 'pending');
     let computedStatus = row.status || (approvalStatus === 'pending' ? 'Pending Approval' : 'Valid');
-    if (approvalStatus === 'pending') {
+    if (isPaymentPending) {
+      computedStatus = 'Pending Payment';
+    } else if (approvalStatus === 'pending') {
       computedStatus = 'Pending Approval';
     } else if (approvalStatus === 'rejected') {
       computedStatus = 'Rejected';
@@ -28,10 +31,12 @@ export class TicketService {
       computedStatus = 'Valid';
     }
 
+    const isEligibleForActiveQr = !isPaymentPending && approvalStatus === 'approved' && row.status !== 'CANCELLED';
+
     return {
       id: row.ticket_code || row.ticket_raw_id || row.id || row.registration_id,
       rawId: row.ticket_raw_id || row.id,
-      ticketCode: row.ticket_code || (approvalStatus === 'pending' ? 'PENDING' : 'SHB-8921'),
+      ticketCode: isEligibleForActiveQr ? (row.ticket_code || 'SHB-8921') : (isPaymentPending ? 'PENDING_PAYMENT' : 'PENDING'),
       registrationId: row.registration_id,
       eventId: row.event_id,
       eventTitle: row.event_title || 'Tech Event',
@@ -44,12 +49,13 @@ export class TicketService {
       attendeeId: row.user_id,
       attendeeName: row.attendee_name || row.full_name,
       attendeeEmail: row.attendee_email || row.email,
-      qrToken: row.qr_token || null,
-      qrDataUrl: row.qr_code_data_url || null,
+      qrToken: isEligibleForActiveQr ? (row.qr_token || null) : null,
+      qrDataUrl: isEligibleForActiveQr ? (row.qr_code_data_url || null) : null,
       status: computedStatus,
       rawStatus: row.status,
       approvalStatus,
-      isPending: approvalStatus === 'pending',
+      paymentStatus: row.payment_status,
+      isPending: isPaymentPending || approvalStatus === 'pending',
       isExpired,
       isPaid: Boolean(row.is_paid),
       ticketPrice: parseFloat(row.ticket_price || '0'),
@@ -194,4 +200,37 @@ export class TicketService {
 
     return this.formatTicket(row);
   }
+
+  static async getTicketQrImageBuffer(ticketCode: string): Promise<Buffer | null> {
+    const cleanCode = (ticketCode || '').trim();
+    if (!cleanCode) return null;
+
+    const sql = `
+      SELECT t.ticket_code, t.qr_code_data_url, t.status, r.payment_status, r.approval_status
+      FROM tickets t
+      JOIN registrations r ON t.registration_id = r.id
+      WHERE UPPER(t.ticket_code) = UPPER($1) OR t.id::text = $1
+    `;
+
+    const result = await query(sql, [cleanCode]);
+    if (!result.rowCount || result.rowCount === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    const isPaymentPending = row.payment_status === 'unsettled';
+    const isApproved = row.approval_status === 'approved' || (!row.approval_status && row.qr_token);
+    const isCancelled = row.status === 'CANCELLED';
+
+    // Strict ticket eligibility check: Must be approved, paid/settled, non-cancelled, and have a valid QR code
+    if (isPaymentPending || !isApproved || isCancelled || !row.qr_code_data_url) {
+      const err: any = new Error('Ticket is not eligible for active QR code delivery.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    const base64Data = row.qr_code_data_url.replace(/^data:image\/[a-z]+;base64,/, '');
+    return Buffer.from(base64Data, 'base64');
+  }
 }
+

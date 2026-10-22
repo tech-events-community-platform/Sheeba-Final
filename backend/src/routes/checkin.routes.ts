@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { CheckinController } from '../controllers/checkin.controller';
 import { authenticate, optionalAuthenticate } from '../middlewares/auth.middleware';
 import { authorizeRoles } from '../middlewares/role.middleware';
@@ -12,9 +13,21 @@ import {
   markAttendedSchema,
   undoCheckInSchema,
   manualAttendeeSchema,
+  resendManualNotificationSchema,
 } from '../schemas/checkin.schema';
 
 const router = Router();
+
+const resendNotificationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute window
+  max: 10, // Max 10 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'Too many notification resend requests. Please slow down and try again shortly.',
+  },
+});
 
 // Public / Semi-Public ticket verification (scanned by camera or browser)
 router.get(
@@ -84,6 +97,15 @@ router.post(
   authorizeRoles('organizer', 'admin'),
   validateBody(manualAttendeeSchema),
   CheckinController.addManualAttendee
+);
+
+router.post(
+  '/resend-manual-notification',
+  resendNotificationLimiter,
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateBody(resendManualNotificationSchema),
+  CheckinController.resendManualNotification
 );
 
 export default router;

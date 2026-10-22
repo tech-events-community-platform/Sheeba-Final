@@ -48,6 +48,8 @@ export interface AttendeeRosterItem {
   approvalStatus?: 'registered' | 'pending' | 'approved' | 'rejected';
   reviewedAt?: string | null;
   rejectionReason?: string | null;
+  notificationStatus?: 'pending' | 'sent' | 'failed' | 'retry';
+  notificationError?: string | null;
 }
 
 export interface SponsorReportData {

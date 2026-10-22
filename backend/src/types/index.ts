@@ -38,6 +38,7 @@ export interface IUser {
   organizer_approval_status?: OrganizerApprovalStatus;
   organizer_bio?: string | null;
   organizer_socials?: Record<string, string> | null;
+  must_change_password?: boolean;
   created_at: Date;
   updated_at: Date;
   // Computed stats
@@ -222,6 +223,8 @@ export interface AttendeeRosterItem {
   approvalStatus?: RegistrationApprovalStatus;
   reviewedAt?: string | null;
   rejectionReason?: string | null;
+  notificationStatus?: 'pending' | 'sent' | 'failed' | 'retry';
+  notificationError?: string | null;
 }
 
 
@@ -296,6 +299,7 @@ export interface IJwtPayload {
   email: string;
   role: UserRole;
   fullName: string;
+  mustChangePassword?: boolean;
 }
 
 export interface IQrTicketPayload {

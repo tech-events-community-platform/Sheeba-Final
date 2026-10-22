@@ -21,6 +21,9 @@ export interface VerifyPaymentResult {
 export class PaymentService {
   private static BASE_URL = 'https://links.et';
 
+  public static testMockVerifier: ((params: any) => Promise<any>) | null = null;
+  public static testMockScreenshotVerifier: ((params: any) => Promise<any>) | null = null;
+
   private static getApiKey(): string {
     let key = (
       process.env.LINKS_ET_API_KEY ||
@@ -206,6 +209,26 @@ export class PaymentService {
     paymentMethod?: string;
     waitMs?: number;
   }): Promise<{ ok: boolean; providerKey?: string; receipt?: any; error?: any; httpStatus?: number }> {
+    // CRITICAL SECURITY SAFEGUARD: Never make real outbound payment calls during automated tests
+    if (process.env.NODE_ENV === 'test') {
+      if (PaymentService.testMockVerifier) {
+        return PaymentService.testMockVerifier(params);
+      }
+      return {
+        ok: true,
+        httpStatus: 200,
+        providerKey: params.paymentMethod || 'cbe',
+        receipt: {
+          reference: params.reference || `TX_TEST_${Date.now()}`,
+          status: 'COMPLETED',
+          amount: 250,
+          currency: 'ETB',
+          creditedAccount: '100098765432',
+          paidAt: new Date().toISOString(),
+        },
+      };
+    }
+
     const apiKey = this.getApiKey();
     if (!apiKey) {
       throw new Error('Links.et API key is not configured in backend environment (LINKS_ET_API_KEY).');
@@ -280,6 +303,26 @@ export class PaymentService {
     imageBase64: string;
     waitMs?: number;
   }): Promise<{ ok: boolean; providerKey?: string; receipt?: any; error?: any; httpStatus?: number; reason?: string }> {
+    // CRITICAL SECURITY SAFEGUARD: Never make real outbound payment calls during automated tests
+    if (process.env.NODE_ENV === 'test') {
+      if (PaymentService.testMockScreenshotVerifier) {
+        return PaymentService.testMockScreenshotVerifier(params);
+      }
+      return {
+        ok: true,
+        httpStatus: 200,
+        providerKey: 'cbe',
+        receipt: {
+          reference: `TX_SCREENSHOT_TEST_${Date.now()}`,
+          status: 'COMPLETED',
+          amount: 250,
+          currency: 'ETB',
+          creditedAccount: '100098765432',
+          paidAt: new Date().toISOString(),
+        },
+      };
+    }
+
     const apiKey = this.getApiKey();
     if (!apiKey) {
       throw new Error('Links.et API key is not configured in backend environment (LINKS_ET_API_KEY).');

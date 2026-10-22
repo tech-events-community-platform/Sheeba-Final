@@ -1133,24 +1133,42 @@ export const api = {
       name: string;
       email: string;
       phone?: string;
-    }): Promise<{ success: boolean; message: string; rosterItem?: AttendeeRosterItem }> => {
+      answers?: Record<string, any>;
+      paymentReference?: string;
+      paymentMethod?: string;
+      screenshotUrl?: string;
+      screenshotBase64?: string;
+      paymentStatus?: string;
+    }): Promise<{ success: boolean; message: string; rosterItem?: AttendeeRosterItem; notificationStatus?: string }> => {
       try {
-        const res = await requestApi('/checkin/manual-attendee', {
+        const res = await requestApi<any>('/checkin/manual-attendee', {
           method: 'POST',
           body: JSON.stringify(params),
         });
-        if (res.data) {
-          return {
-            success: true,
-            message: res.message || 'Attendee registered successfully and QR pass emailed.',
-            rosterItem: res.data.rosterItem,
-          };
-        }
+        return {
+          success: true,
+          message: res.message || 'Attendee registered successfully.',
+          rosterItem: res.data?.rosterItem,
+          notificationStatus: res.data?.notificationStatus,
+        };
       } catch (err: any) {
         console.warn('Backend manual-attendee error:', err);
         throw err;
       }
-      return { success: true, message: 'Attendee added successfully.' };
+    },
+
+    resendManualNotification: async (params: {
+      eventId: string;
+      registrationId: string;
+    }): Promise<{ success: boolean; message: string }> => {
+      const res = await requestApi<any>('/checkin/resend-manual-notification', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      });
+      return {
+        success: true,
+        message: res.message || 'Notification resent successfully.',
+      };
     },
 
     undo: async (params: {

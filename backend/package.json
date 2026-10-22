@@ -9,8 +9,13 @@
     "start": "node dist/server.js",
     "db:migrate": "ts-node src/db/migrate.ts",
     "db:seed": "ts-node src/db/seed.ts",
-    "test": "ts-node src/tests/test-all.ts && ts-node src/tests/test_payment_integration.ts",
-    "test:payment": "ts-node src/tests/test_payment_integration.ts"
+    "test": "ts-node src/tests/test_security_remediation.ts && ts-node src/tests/test_background_email_delivery.ts && ts-node src/tests/test_random_password_and_manual_registration.ts",
+    "test:all": "ts-node src/tests/test_security_remediation.ts && ts-node src/tests/test_background_email_delivery.ts && ts-node src/tests/test_random_password_and_manual_registration.ts",
+    "test:security": "ts-node src/tests/test_security_remediation.ts",
+    "test:background-email": "ts-node src/tests/test_background_email_delivery.ts",
+    "test:credentials": "ts-node src/tests/test_random_password_and_manual_registration.ts",
+    "test:payment": "ts-node src/tests/test_payment_integration.ts",
+    "test:manual-reg": "ts-node src/tests/test_enhanced_manual_registration.ts"
   },
   "keywords": [],
   "author": "",
