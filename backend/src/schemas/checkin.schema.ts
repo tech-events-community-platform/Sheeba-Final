@@ -123,6 +123,17 @@ export const manualAttendeeSchema = z.object({
   name: z.string().trim().min(1, 'Attendee name is required.'),
   email: z.string().trim().email('Please provide a valid email address.'),
   phone: z.string().trim().optional(),
+  answers: z.record(z.string(), z.any()).optional().default({}),
+  paymentReference: z.string().trim().optional(),
+  paymentMethod: z.string().trim().optional(),
+  screenshotUrl: z.string().trim().optional(),
+  screenshotBase64: z.string().trim().optional(),
+  paymentStatus: z.enum(['settled', 'unsettled', 'pending']).optional(),
+});
+
+export const resendManualNotificationSchema = z.object({
+  eventId: z.string().trim().min(1, 'Event ID is required.'),
+  registrationId: z.string().trim().min(1, 'Registration ID is required.'),
 });
 
 export type VerifyTicketQueryInput = z.infer<typeof verifyTicketQuerySchema>;
@@ -133,3 +144,4 @@ export type LookupAttendeeInput = z.infer<typeof lookupAttendeeSchema>;
 export type MarkAttendedInput = z.infer<typeof markAttendedSchema>;
 export type UndoCheckInInput = z.infer<typeof undoCheckInSchema>;
 export type ManualAttendeeInput = z.infer<typeof manualAttendeeSchema>;
+export type ResendManualNotificationInput = z.infer<typeof resendManualNotificationSchema>;

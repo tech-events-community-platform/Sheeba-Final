@@ -31,25 +31,36 @@ export const fileToDataUrl = (file: File): Promise<string> => {
  * @param file The file object from <input type="file" />
  * @returns The secure HTTPS Cloudinary URL of the uploaded image
  */
-export const uploadToCloudinary = async (file: File): Promise<string> => {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('Please select a valid image file (PNG, JPG, WEBP, or SVG).');
+export const uploadToCloudinary = async (
+  file: File,
+  options?: { allowPdf?: boolean; folder?: string }
+): Promise<string> => {
+  const allowPdf = options?.allowPdf ?? false;
+  const isImage = file.type.startsWith('image/');
+  const isPdf = file.type === 'application/pdf';
+
+  if (!isImage && (!allowPdf || !isPdf)) {
+    throw new Error(
+      allowPdf
+        ? 'Please select a valid image file (PNG, JPG, WEBP) or PDF document.'
+        : 'Please select a valid image file (PNG, JPG, WEBP, or SVG).'
+    );
   }
 
   const maxBytes = 10 * 1024 * 1024;
   if (file.size > maxBytes) {
-    throw new Error('Image size exceeds 10MB limit. Please choose a smaller image.');
+    throw new Error('File size exceeds 10MB limit. Please choose a smaller file.');
   }
 
   const dataUrl = await fileToDataUrl(file);
 
   const response = await requestApi<{ success: boolean; data?: { url: string; secureUrl: string }; error?: string }>('/upload/image', {
     method: 'POST',
-    body: JSON.stringify({ file: dataUrl, folder: 'sheeba_event_posters' }),
+    body: JSON.stringify({ file: dataUrl, folder: options?.folder || 'sheeba_event_posters' }),
   });
 
   if (!response || !response.data?.secureUrl) {
-    throw new Error(response?.error || 'Backend failed to upload image to Cloudinary.');
+    throw new Error(response?.error || 'Backend failed to upload file to Cloudinary.');
   }
 
   return response.data.secureUrl;

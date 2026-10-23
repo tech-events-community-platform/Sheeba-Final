@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { getClient, query } from '../config/db';
 import {
   generateTicketToken,
@@ -11,6 +13,10 @@ import { BadgeService } from './badge.service';
 import { EventService } from './event.service';
 import { CacheService } from './cache.service';
 import { EmailService } from './email.service';
+import { PaymentService } from './payment.service';
+import { NotificationQueueService } from './notificationQueue.service';
+import { generateRandomInitialPassword, encryptCredential } from '../utils/credential.util';
+import { getFrontendUrl } from '../config/env';
 
 function extractCleanTokenOrCode(input: string): string {
   const raw = (input || '').trim();
@@ -804,8 +810,27 @@ export class CheckinService {
     email: string;
     phone?: string;
     userRole?: UserRole;
+    answers?: Record<string, any>;
+    paymentReference?: string;
+    paymentMethod?: string;
+    screenshotUrl?: string;
+    screenshotBase64?: string;
+    paymentStatus?: string;
   }) {
-    const { eventId, organizerId, name, email, phone, userRole } = params;
+    const regStartTime = Date.now();
+    const {
+      eventId,
+      organizerId,
+      name,
+      email,
+      phone,
+      userRole,
+      answers = {},
+      paymentReference,
+      paymentMethod,
+      screenshotUrl,
+      screenshotBase64,
+    } = params;
 
     const event = await EventService.getEventById(eventId);
     if (!event) {
@@ -818,6 +843,27 @@ export class CheckinService {
     if (event.organizerId !== organizerId && userRole && userRole !== 'admin') {
       const err: any = new Error('Unauthorized. You are not the organizer of this event.');
       err.statusCode = 403;
+      throw err;
+    }
+
+    const eventDate = event.rawDate || event.date;
+    const expiresAt = computeEventDayExpiration(eventDate);
+    if (new Date().getTime() > expiresAt.getTime() || event.isPassed || event.status === 'completed' || event.status === 'closed') {
+      const err: any = new Error('This event has already passed. Registration is closed.');
+      err.statusCode = 400;
+      err.code = 'EVENT_PASSED';
+      throw err;
+    }
+
+    if (event.status !== 'open' && event.status !== 'published') {
+      const err: any = new Error('Registration for this event is closed.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (event.registeredCount >= event.capacity || event.isFull) {
+      const err: any = new Error('Event has reached maximum capacity.');
+      err.statusCode = 400;
       throw err;
     }
 
@@ -836,96 +882,260 @@ export class CheckinService {
       throw err;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      const err: any = new Error('Invalid email address format.');
+      err.statusCode = 400;
+      err.code = 'INVALID_EMAIL';
+      throw err;
+    }
+
+    // Dynamic registration answers validation against event.customQuestions
+    const customQuestions: any[] = Array.isArray(event.customQuestions) ? event.customQuestions : [];
+    const submittedAnswers: Record<string, any> = { ...(answers || {}) };
+
+    if (cleanPhone && !submittedAnswers.Phone && !submittedAnswers.phone) {
+      submittedAnswers.Phone = cleanPhone;
+    }
+
+    for (const q of customQuestions) {
+      const qVal = submittedAnswers[q.id];
+      const isFilled =
+        typeof qVal === 'string'
+          ? qVal.trim().length > 0
+          : Array.isArray(qVal)
+            ? qVal.length > 0
+            : qVal !== undefined && qVal !== null && qVal !== '';
+
+      if (q.isRequired && !isFilled) {
+        const err: any = new Error(`Please answer required question: "${q.questionText}"`);
+        err.statusCode = 400;
+        err.code = 'VALIDATION_ERROR';
+        throw err;
+      }
+
+      if (isFilled) {
+        const qType = (q.type || 'text').toLowerCase();
+        if (['choice', 'select', 'radio', 'dropdown'].includes(qType) && q.options && q.options.length > 0) {
+          const validSet = new Set(q.options.map((opt: string) => opt.trim()));
+          if (typeof qVal === 'string' && !validSet.has(qVal.trim())) {
+            const err: any = new Error(`Invalid selection for question: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'VALIDATION_ERROR';
+            throw err;
+          }
+        } else if (['multi_choice', 'checkbox'].includes(qType) && q.options && q.options.length > 0) {
+          const validSet = new Set(q.options.map((opt: string) => opt.trim()));
+          const selectedList = Array.isArray(qVal)
+            ? qVal
+            : typeof qVal === 'string'
+              ? qVal.split(',').map((s: string) => s.trim()).filter(Boolean)
+              : [];
+          const hasInvalid = selectedList.some((item: string) => !validSet.has(item.trim()));
+          if (hasInvalid) {
+            const err: any = new Error(`Invalid options selected for question: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'VALIDATION_ERROR';
+            throw err;
+          }
+        } else if (qType === 'email' && typeof qVal === 'string') {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(qVal.trim())) {
+            const err: any = new Error(`Please enter a valid email address for: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'VALIDATION_ERROR';
+            throw err;
+          }
+        } else if (qType === 'date' && typeof qVal === 'string') {
+          const d = new Date(qVal);
+          if (isNaN(d.getTime())) {
+            const err: any = new Error(`Please enter a valid date for: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'VALIDATION_ERROR';
+            throw err;
+          }
+        } else if (['file', 'upload'].includes(qType)) {
+          if (typeof qVal !== 'string' || !qVal.trim()) {
+            const err: any = new Error(`Please provide a valid file upload for: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'INVALID_FILE_UPLOAD';
+            throw err;
+          }
+
+          let parsedUrl: URL;
+          try {
+            parsedUrl = new URL(qVal.trim());
+          } catch {
+            const err: any = new Error(`Invalid URL format for uploaded file: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'INVALID_FILE_URL';
+            throw err;
+          }
+
+          if (parsedUrl.protocol !== 'https:') {
+            const err: any = new Error(`File upload URL must use secure HTTPS protocol for question: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'INSECURE_UPLOAD_URL';
+            throw err;
+          }
+
+          if (parsedUrl.hostname !== 'res.cloudinary.com') {
+            const err: any = new Error(`Untrusted file source. Uploads must be hosted on Cloudinary for question: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'UNAUTHORIZED_UPLOAD_HOST';
+            throw err;
+          }
+
+          const pathname = parsedUrl.pathname.toLowerCase();
+          if (!pathname.includes('/upload/')) {
+            const err: any = new Error(`Invalid Cloudinary resource path for uploaded file: "${q.questionText}".`);
+            err.statusCode = 400;
+            err.code = 'INVALID_UPLOAD_PATH';
+            throw err;
+          }
+
+          const isPdfAllowed =
+            (q.options && q.options.some((opt: string) => opt.toLowerCase().includes('pdf'))) ||
+            q.questionText.toLowerCase().includes('resume') ||
+            q.questionText.toLowerCase().includes('cv') ||
+            q.questionText.toLowerCase().includes('document') ||
+            q.questionText.toLowerCase().includes('pdf');
+
+          const cleanPath = pathname.split('?')[0];
+          const extMatch = cleanPath.match(/\.([a-z0-9]+)$/i);
+          const ext = extMatch ? extMatch[1].toLowerCase() : '';
+
+          const allowedImageExts = ['jpg', 'jpeg', 'png', 'webp', 'svg'];
+          const allowedExts = isPdfAllowed ? [...allowedImageExts, 'pdf'] : allowedImageExts;
+
+          if (ext && !allowedExts.includes(ext)) {
+            const err: any = new Error(
+              `Unsupported file format (.${ext}) for question "${q.questionText}". Allowed formats: ${allowedExts.map((e) => e.toUpperCase()).join(', ')}.`
+            );
+            err.statusCode = 400;
+            err.code = 'UNSUPPORTED_FILE_TYPE';
+            throw err;
+          }
+
+          if (pathname.includes('/raw/upload/') && ext !== 'pdf') {
+            const err: any = new Error(`Unsupported raw file format for question "${q.questionText}". Only PDF documents are allowed.`);
+            err.statusCode = 400;
+            err.code = 'UNSUPPORTED_FILE_TYPE';
+            throw err;
+          }
+        }
+      }
+    }
+
     const client = await getClient();
     let isExistingUser = false;
     let issuedTicketCode = '';
     let issuedQrDataUrl = '';
+    let encryptedInitialPassword: any = null;
 
     try {
       await client.query('BEGIN');
 
-      // 1. Find or create user
+      // 1. Identify or create user account
       let userId: string;
       const userLookup = await client.query('SELECT id, full_name, phone FROM users WHERE email = $1', [cleanEmail]);
       if (userLookup.rowCount && userLookup.rowCount > 0) {
+        // Scenario A: Existing Sheeba Account (never modify password or must_change_password)
         isExistingUser = true;
         userId = userLookup.rows[0].id;
         if (cleanPhone && !userLookup.rows[0].phone) {
           await client.query('UPDATE users SET phone = $1, updated_at = NOW() WHERE id = $2', [cleanPhone, userId]);
         }
       } else {
+        // Scenario B: New Sheeba Account (strong random initial password)
         isExistingUser = false;
-        const dummyHash = '$2b$10$wT0o3q6/11fI0vL9fD9f1.xJ4Vb2c9P5lQ6kZ3eX4kL9wR4y7zT6e';
+        const initialPassword = generateRandomInitialPassword(12);
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(initialPassword, salt);
+
         const userInsert = await client.query(
-          `INSERT INTO users (email, password_hash, full_name, role, phone, visibility, approval_status)
-           VALUES ($1, $2, $3, 'attendee', $4, 'public', 'approved')
+          `INSERT INTO users (email, password_hash, full_name, role, phone, visibility, approval_status, must_change_password)
+           VALUES ($1, $2, $3, 'attendee', $4, 'public', 'approved', TRUE)
            RETURNING id`,
-          [cleanEmail, dummyHash, cleanName, cleanPhone]
+          [cleanEmail, passwordHash, cleanName, cleanPhone]
         );
         userId = userInsert.rows[0].id;
+
+        // Encrypt the initial password using AES-256-GCM for short-lived delivery in outbox
+        encryptedInitialPassword = encryptCredential(initialPassword);
       }
 
-      // 2. Find or create registration
-      let registrationId: string;
+      // 2. Duplicate registration check: do not create duplicate registration or ticket!
       const regLookup = await client.query(
-        `SELECT id FROM registrations WHERE event_id = $1 AND user_id = $2`,
+        `SELECT id, approval_status, payment_status FROM registrations WHERE event_id = $1 AND user_id = $2`,
         [realEventId, userId]
       );
       if (regLookup.rowCount && regLookup.rowCount > 0) {
-        registrationId = regLookup.rows[0].id;
-        await client.query(
-          `UPDATE registrations SET status = 'registered', updated_at = NOW() WHERE id = $1`,
-          [registrationId]
-        );
-      } else {
-        const regInsert = await client.query(
-          `INSERT INTO registrations (event_id, user_id, status, answers)
-           VALUES ($1, $2, 'registered', $3)
-           RETURNING id`,
-          [realEventId, userId, JSON.stringify({ Phone: cleanPhone || 'N/A', AddedBy: 'Organizer Manual Registration' })]
-        );
-        registrationId = regInsert.rows[0].id;
+        const err: any = new Error('This attendee is already registered for this event.');
+        err.statusCode = 409;
+        err.code = 'ALREADY_REGISTERED';
+        throw err;
       }
 
-      // 3. Find or create ISSUED ticket (Do NOT mark as CHECKED_IN, do NOT create check_in or badge)
-      const eventDate = event.rawDate || event.date;
-      const ticketCode = generateTicketCode(eventDate);
-      const expiresAt = computeEventDayExpiration(eventDate);
+      // 3. Payment verification for paid vs free events
+      let isPaymentSettled = true;
+      let effectivePaymentRef = paymentReference || null;
+      let verifiedPaymentInfo: any = null;
 
-      const ticketLookup = await client.query(
-        `SELECT id, ticket_code, qr_token, qr_code_data_url, status FROM tickets WHERE event_id = $1 AND user_id = $2`,
-        [realEventId, userId]
-      );
-
-      if (ticketLookup.rowCount && ticketLookup.rowCount > 0) {
-        const existingTicket = ticketLookup.rows[0];
-        issuedTicketCode = existingTicket.ticket_code || ticketCode;
-
-        let qrDataUrl = existingTicket.qr_code_data_url;
-        if (!qrDataUrl) {
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-          const verifyUrl = `${frontendUrl}/verify-ticket?token=${encodeURIComponent(existingTicket.qr_token)}&code=${encodeURIComponent(issuedTicketCode)}`;
-          const qrPayload = [
-            `SHEEBA VERIFIED PASS`,
-            `Attendee: ${cleanName}`,
-            `Email: ${cleanEmail}`,
-            `Event: ${event.title}`,
-            `Code: ${issuedTicketCode}`,
-            `Status: Valid`,
-            `Verify: ${verifyUrl}`,
-          ].join('\n');
-          qrDataUrl = await generateQrDataUrl(qrPayload);
+      if (event.isPaid && event.ticketPrice > 0) {
+        if (paymentReference || screenshotUrl || screenshotBase64) {
+          // Verify via Links.et authoritative service (strict verification: unverified proof is never treated as paid)
+          verifiedPaymentInfo = await PaymentService.verifyPayment({
+            event: {
+              id: realEventId,
+              title: event.title,
+              ticketPrice: event.ticketPrice,
+              currency: event.currency,
+              paymentMethods: event.paymentMethods,
+            },
+            paymentReference,
+            paymentMethod,
+            screenshotUrl,
+            screenshotBase64,
+          });
+          isPaymentSettled = true;
+          effectivePaymentRef = verifiedPaymentInfo?.transactionId || paymentReference || null;
+        } else if (params.paymentStatus === 'settled') {
+          // Explicit authorization check: only the event's organizer or an admin may mark offline payment as settled
+          const isAuthorizedOrganizer = event.organizerId === organizerId || userRole === 'admin';
+          if (!isAuthorizedOrganizer) {
+            const err: any = new Error('Unauthorized: Only the verified event organizer or administrator may manually mark offline payments as settled.');
+            err.statusCode = 403;
+            err.code = 'UNAUTHORIZED_OFFLINE_SETTLEMENT';
+            throw err;
+          }
+          isPaymentSettled = true;
+        } else {
+          // Unsettled / Pending payment
+          isPaymentSettled = false;
         }
-        issuedQrDataUrl = qrDataUrl;
+      }
 
-        await client.query(
-          `UPDATE tickets SET status = 'ISSUED', checked_in_at = NULL, checked_in_by = NULL, updated_at = NOW() WHERE id = $1`,
-          [existingTicket.id]
-        );
-      } else {
-        const ticketId = (await client.query('SELECT gen_random_uuid() AS id')).rows[0].id;
-        const qrToken = generateTicketToken(ticketId, realEventId, eventDate);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const regApprovalStatus = event.requiresApproval ? 'pending' : 'approved';
+      const regPaymentStatus = isPaymentSettled ? 'settled' : 'unsettled';
+
+      // 4. Create registration record
+      const regInsert = await client.query(
+        `INSERT INTO registrations (event_id, user_id, status, approval_status, answers, payment_reference, payment_status, notification_status)
+         VALUES ($1, $2, 'registered', $3, $4, $5, $6, 'pending')
+         RETURNING id`,
+        [realEventId, userId, regApprovalStatus, JSON.stringify(submittedAnswers), effectivePaymentRef, regPaymentStatus]
+      );
+      const registrationId = regInsert.rows[0].id;
+
+      // 5. Generate and activate QR ticket only when permitted by payment & approval rules
+      let ticketId: string | null = null;
+      if (isPaymentSettled && regApprovalStatus === 'approved') {
+        const ticketCode = generateTicketCode(eventDate);
+        const newTicketId: string = (await client.query('SELECT gen_random_uuid() AS id')).rows[0].id;
+        ticketId = newTicketId;
+        const qrToken = generateTicketToken(newTicketId, realEventId, eventDate);
+        const frontendUrl = getFrontendUrl();
         const verifyUrl = `${frontendUrl}/verify-ticket?token=${encodeURIComponent(qrToken)}&code=${encodeURIComponent(ticketCode)}`;
         const qrPayload = [
           `SHEEBA VERIFIED PASS`,
@@ -947,44 +1157,254 @@ export class CheckinService {
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'ISSUED', $8, $9, 'ETB', $10)`,
           [ticketId, ticketCode, registrationId, realEventId, userId, qrToken, issuedQrDataUrl, event.isPaid, event.ticketPrice, expiresAt]
         );
+
+        // Record settled transaction in payments table if paid event with auditable settlement metadata
+        if (event.isPaid && event.ticketPrice > 0) {
+          const commission = event.ticketPrice * 0.03;
+          const payout = event.ticketPrice - commission;
+          const txId = verifiedPaymentInfo?.transactionId || effectivePaymentRef || `MANUAL-${crypto.randomUUID()}`;
+
+          const providerAuditResponse = verifiedPaymentInfo?.rawReceipt || {
+            settlement_type: 'manual_offline',
+            settled_by_user_id: organizerId,
+            settled_by_role: userRole || 'organizer',
+            settlement_method: paymentMethod || 'cash_offline',
+            settled_at: new Date().toISOString(),
+            reason: 'Authorized manual offline settlement by event organizer at registration',
+          };
+
+          await client.query(
+            `INSERT INTO payments (
+              transaction_id, event_id, user_id, amount, commission_amount, organizer_payout,
+              currency, status, payment_method, screenshot_url, provider_response, verified_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, 'ETB', 'SETTLED', $7, $8, $9, NOW())
+            ON CONFLICT (transaction_id) DO NOTHING`,
+            [
+              txId,
+              realEventId,
+              userId,
+              verifiedPaymentInfo?.amount || event.ticketPrice,
+              commission,
+              payout,
+              verifiedPaymentInfo?.provider || paymentMethod || 'manual_offline',
+              screenshotUrl || null,
+              JSON.stringify(providerAuditResponse),
+            ]
+          );
+        }
       }
+
+      // 5b. Persist durable background notification job within the SAME transaction
+      const jobPayload = isExistingUser
+        ? {
+            toEmail: cleanEmail,
+            fullName: cleanName,
+            eventTitle: event.title,
+            ticketCode: issuedTicketCode || undefined,
+            qrDataUrl: issuedQrDataUrl || undefined,
+            isPaymentPending: !isPaymentSettled,
+            eventId: realEventId,
+          }
+        : {
+            toEmail: cleanEmail,
+            fullName: cleanName,
+            eventTitle: event.title,
+            encryptedInitialPassword,
+            ticketCode: issuedTicketCode || undefined,
+            qrDataUrl: issuedQrDataUrl || undefined,
+            isPaymentPending: !isPaymentSettled,
+            eventId: realEventId,
+          };
+
+      await NotificationQueueService.enqueueJob(client, {
+        registrationId,
+        recipientEmail: cleanEmail,
+        recipientName: cleanName,
+        jobType: isExistingUser ? 'manual_registration_existing_user' : 'manual_registration_new_user',
+        payload: jobPayload,
+      });
 
       await client.query('COMMIT');
 
-      // Invalidate event cache, roster, and reports
+      const regDurationMs = Date.now() - regStartTime;
+      console.log(`[CheckinService] ⚡ Manual registration committed in ${regDurationMs}ms (Registration ID: ${registrationId}).`);
+
+      // Trigger asynchronous background email delivery immediately after commit without blocking
+      NotificationQueueService.triggerAsyncProcessing();
+
+      // Invalidate caches
       CacheService.delPrefix(`event:${realEventId}`);
       CacheService.del(`report:${realEventId}`);
       CacheService.delPrefix('events:list');
 
-      // 4. Dispatch Email with QR code and link
+      let updatedAttendee: any = null;
       try {
-        await EmailService.sendManualRegistrationTicketEmail({
-          toEmail: cleanEmail,
-          fullName: cleanName,
-          eventTitle: event.title,
-          date: event.date,
-          time: event.time,
-          location: event.location,
-          ticketCode: issuedTicketCode,
-          qrDataUrl: issuedQrDataUrl,
-          isExistingUser,
-        });
-      } catch (emailErr) {
-        console.warn('Manual registration ticket email dispatch warning:', emailErr);
+        updatedAttendee = await this.lookupAttendee(realEventId, userId);
+      } catch {
+        updatedAttendee = {
+          id: userId,
+          attendeeId: userId,
+          registrationId,
+          name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
+          status: 'registered',
+          paymentStatus: regPaymentStatus,
+          answers: submittedAnswers,
+          notificationStatus: 'pending',
+        };
       }
 
-      const updatedAttendee = await this.lookupAttendee(realEventId, userId);
+      const successNotice = isExistingUser
+        ? `Successfully registered "${cleanName}"! Registration confirmed; invitation email queued.`
+        : `Successfully registered "${cleanName}"! Registration confirmed; account setup email queued.`;
 
       return {
         success: true,
-        message: `Successfully registered ${cleanName}! Ticket and QR pass emailed to ${cleanEmail}.`,
+        message: successNotice,
+        isExistingUser,
+        isPaymentSettled,
+        notificationStatus: 'pending',
+        registrationId,
         rosterItem: updatedAttendee,
       };
-    } catch (err) {
+    } catch (err: any) {
       await client.query('ROLLBACK');
+      if (err.code === '23505' && String(err.detail || '').includes('unique_event_user_registration')) {
+        const conflictErr: any = new Error('This attendee is already registered for this event.');
+        conflictErr.statusCode = 409;
+        conflictErr.code = 'ALREADY_REGISTERED';
+        throw conflictErr;
+      }
       throw err;
     } finally {
       client.release();
     }
   }
+
+  /**
+   * Resend manual registration email notification to an attendee
+   */
+  static async resendManualNotification(params: {
+    eventId: string;
+    registrationId: string;
+    organizerId: string;
+    userRole?: UserRole;
+  }): Promise<{ success: boolean; message: string }> {
+    const { eventId, registrationId, organizerId, userRole } = params;
+
+    const event = await EventService.getEventById(eventId);
+    if (!event) {
+      const err: any = new Error('Event not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (event.organizerId !== organizerId && userRole && userRole !== 'admin') {
+      const err: any = new Error('Unauthorized. You are not the organizer of this event.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // Enforce server-side 2-minute cooldown per registration atomically (prevents concurrent race conditions)
+    const cooldownRes = await query(
+      `UPDATE registrations 
+       SET notification_sent_at = NOW() 
+       WHERE id = $1 AND (notification_sent_at IS NULL OR notification_sent_at < NOW() - INTERVAL '2 minutes')
+       RETURNING id, notification_sent_at`,
+      [registrationId]
+    );
+
+    if (!cooldownRes.rowCount || cooldownRes.rowCount === 0) {
+      const err: any = new Error('Notification resend cooldown active. Please wait 2 minutes between notification attempts for this registration.');
+      err.statusCode = 429;
+      err.code = 'RESEND_COOLDOWN_ACTIVE';
+      throw err;
+    }
+
+    const regRes = await query(
+      `SELECT r.id, r.event_id, r.user_id, r.payment_status, r.approval_status,
+              u.email, u.full_name, u.password_hash, u.google_id, u.must_change_password,
+              t.ticket_code, t.qr_code_data_url
+       FROM registrations r
+       JOIN users u ON r.user_id = u.id
+       LEFT JOIN tickets t ON t.registration_id = r.id
+       WHERE r.id = $1 AND r.event_id = $2`,
+      [registrationId, event.id]
+    );
+
+    if (!regRes.rowCount || regRes.rowCount === 0) {
+      const err: any = new Error('Registration record not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const reg = regRes.rows[0];
+    const isPaymentSettled = reg.payment_status === 'settled';
+
+    // Account state check: determine if attendee still requires initial password onboarding
+    const isNewUserNeedingSetup = Boolean(reg.must_change_password);
+
+    let jobPayload: Record<string, any>;
+    let jobType: 'manual_registration_new_user' | 'manual_registration_existing_user';
+
+    if (isNewUserNeedingSetup) {
+      jobType = 'manual_registration_new_user';
+      // Generate a fresh cryptographically secure random initial password
+      const freshInitialPassword = generateRandomInitialPassword(12);
+      const salt = await bcrypt.genSalt(10);
+      const newHash = await bcrypt.hash(freshInitialPassword, salt);
+
+      await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [newHash, reg.user_id]);
+      const encryptedInitialPassword = encryptCredential(freshInitialPassword);
+
+      jobPayload = {
+        toEmail: reg.email,
+        fullName: reg.full_name,
+        eventTitle: event.title,
+        encryptedInitialPassword,
+        ticketCode: reg.ticket_code || undefined,
+        qrDataUrl: reg.qr_code_data_url || undefined,
+        isPaymentPending: !isPaymentSettled,
+        eventId: event.id,
+      };
+    } else {
+      jobType = 'manual_registration_existing_user';
+      jobPayload = {
+        toEmail: reg.email,
+        fullName: reg.full_name,
+        eventTitle: event.title,
+        ticketCode: reg.ticket_code || undefined,
+        qrDataUrl: reg.qr_code_data_url || undefined,
+        isPaymentPending: !isPaymentSettled,
+        eventId: event.id,
+      };
+    }
+
+    await query(
+      `UPDATE registrations 
+       SET notification_status = 'pending', notification_error = NULL 
+       WHERE id = $1`,
+      [registrationId]
+    );
+
+    await NotificationQueueService.enqueueJob(
+      { query },
+      {
+        registrationId,
+        recipientEmail: reg.email,
+        recipientName: reg.full_name,
+        jobType,
+        payload: jobPayload,
+      }
+    );
+
+    NotificationQueueService.triggerAsyncProcessing();
+
+    return {
+      success: true,
+      message: `Registration notification queued for delivery to ${reg.email}.`,
+    };
+  }
 }
+

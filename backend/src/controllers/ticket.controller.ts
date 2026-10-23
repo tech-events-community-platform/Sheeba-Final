@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { TicketService } from '../services/ticket.service';
 import { sendSuccess } from '../utils/apiResponse';
 import { AuthRequest } from '../types';
@@ -44,4 +44,28 @@ export class TicketController {
       next(error);
     }
   }
+
+  static async getTicketQrImage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const ticketCode = req.params.ticketCode as string;
+      if (!ticketCode) {
+        return res.status(400).json({ success: false, message: 'Ticket code is required.' });
+      }
+
+      const qrBuffer = await TicketService.getTicketQrImageBuffer(ticketCode);
+      if (!qrBuffer) {
+        return res.status(404).json({ success: false, message: 'Ticket not found.' });
+      }
+
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(qrBuffer);
+    } catch (error: any) {
+      if (error?.statusCode) {
+        return res.status(error.statusCode).json({ success: false, message: error.message });
+      }
+      next(error);
+    }
+  }
 }
+

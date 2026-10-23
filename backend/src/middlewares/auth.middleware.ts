@@ -20,6 +20,28 @@ export const authenticate = (
   try {
     const decoded = verifyAuthToken(token);
     req.user = decoded;
+
+    if (decoded.mustChangePassword) {
+      const url = (req.originalUrl || (req.baseUrl ? req.baseUrl + req.path : req.path) || '').toLowerCase();
+      const isAllowedEndpoint =
+        url.endsWith('/change-password') ||
+        url.endsWith('/logout') ||
+        url.endsWith('/me') ||
+        url.includes('/auth/change-password') ||
+        url.includes('/auth/logout') ||
+        url.includes('/auth/me');
+
+      if (!isAllowedEndpoint) {
+        sendError(
+          res,
+          'Password change required. You must change your temporary initial password before accessing the application.',
+          403,
+          'PASSWORD_CHANGE_REQUIRED'
+        );
+        return;
+      }
+    }
+
     next();
   } catch (error: any) {
     if (error.name === 'TokenExpiredError') {

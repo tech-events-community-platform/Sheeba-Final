@@ -41,6 +41,7 @@ export class AuthService {
       approvalStatus: user.approval_status || (user.role?.toLowerCase() === 'organizer' ? 'pending' : 'approved'),
       isOrganizer,
       organizerApprovalStatus,
+      mustChangePassword: Boolean(user.must_change_password),
       roles,
       stats: stats || {
         meetupsCount: 0,
@@ -374,7 +375,7 @@ export class AuthService {
     const { email, password, role } = data;
 
     const result = await query<IUser>(
-      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, created_at, updated_at
+      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, created_at, updated_at
        FROM users WHERE LOWER(email) = LOWER($1)`,
       [email]
     );
@@ -506,11 +507,13 @@ export class AuthService {
     }
 
     const stats = await this.computeUserStats(rawUser.id);
+    const mustChangePassword = Boolean(rawUser.must_change_password);
     const token = signAuthToken({
       userId: rawUser.id,
       email: rawUser.email,
       role: sessionRole,
       fullName: rawUser.full_name,
+      mustChangePassword,
     });
 
     const user = this.formatUserResponse(rawUser, stats);
@@ -520,7 +523,7 @@ export class AuthService {
 
   static async getCurrentUser(userId: string): Promise<any> {
     const result = await query<IUser>(
-      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, created_at, updated_at
+      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, created_at, updated_at
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -882,20 +885,37 @@ export class AuthService {
       };
     }
 
-    // 2. Legacy Token-based reset
+    // 2. Token-based reset / password setup
     if (token) {
-      const tokenRes = await query(
-        'SELECT user_id, expires_at FROM password_reset_tokens WHERE token = $1',
-        [token]
+      const cleanToken = token.trim();
+      const tokenHash = crypto.createHash('sha256').update(cleanToken).digest('hex');
+
+      // Look up by SHA-256 hash first
+      let tokenRes = await query(
+        'SELECT id, user_id, expires_at FROM password_reset_tokens WHERE token = $1',
+        [tokenHash]
       );
 
-      if (!tokenRes.rowCount || tokenRes.rowCount === 0) {
+      let matchedRecord = tokenRes.rowCount && tokenRes.rowCount > 0 ? tokenRes.rows[0] : null;
+
+      // Safe backward compatibility: check for existing unexpired legacy plaintext token
+      if (!matchedRecord) {
+        const legacyRes = await query(
+          'SELECT id, user_id, expires_at FROM password_reset_tokens WHERE token = $1',
+          [cleanToken]
+        );
+        if (legacyRes.rowCount && legacyRes.rowCount > 0) {
+          matchedRecord = legacyRes.rows[0];
+        }
+      }
+
+      if (!matchedRecord) {
         const err: any = new Error('Invalid or expired password reset token.');
         err.statusCode = 400;
         throw err;
       }
 
-      const { user_id, expires_at } = tokenRes.rows[0];
+      const { id: tokenId, user_id, expires_at } = matchedRecord;
       if (new Date() > new Date(expires_at)) {
         const err: any = new Error('Password reset token has expired.');
         err.statusCode = 400;
@@ -904,11 +924,11 @@ export class AuthService {
 
       const passwordHash = await bcrypt.hash(newPassword, 10);
       await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, user_id]);
-      await query('DELETE FROM password_reset_tokens WHERE token = $1', [token]);
+      await query('DELETE FROM password_reset_tokens WHERE id = $1', [tokenId]);
 
       return {
         success: true,
-        message: 'Password has been reset successfully. You may now log in.',
+        message: 'Password has been set successfully. You may now log in.',
       };
     }
 
@@ -1436,7 +1456,7 @@ export class AuthService {
     userId: string,
     currentPassword: string,
     newPassword: string
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<{ success: boolean; message: string; token?: string; user?: any }> {
     if (!newPassword || newPassword.length < 6) {
       const err: any = new Error('New password must be at least 6 characters long.');
       err.statusCode = 400;
@@ -1468,7 +1488,7 @@ export class AuthService {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(newPassword, salt);
 
-    await query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [
+    await query('UPDATE users SET password_hash = $1, must_change_password = FALSE, updated_at = NOW() WHERE id = $2', [
       passwordHash,
       user.id,
     ]);
@@ -1480,9 +1500,28 @@ export class AuthService {
       console.warn('[AuthService] ⚠️ Failed to dispatch password changed confirmation email:', emailErr);
     }
 
+    const updatedUserRes = await query<IUser>(
+      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, created_at, updated_at
+       FROM users WHERE id = $1`,
+      [user.id]
+    );
+    const updatedRaw = updatedUserRes.rows[0];
+    const stats = await this.computeUserStats(user.id);
+    const userFormatted = this.formatUserResponse(updatedRaw, stats);
+
+    const token = signAuthToken({
+      userId: user.id,
+      email: user.email,
+      role: (userFormatted.role?.toLowerCase() || 'attendee') as any,
+      fullName: user.full_name,
+      mustChangePassword: false,
+    });
+
     return {
       success: true,
       message: 'Password changed successfully. A confirmation email has been sent.',
+      token,
+      user: userFormatted,
     };
   }
 }

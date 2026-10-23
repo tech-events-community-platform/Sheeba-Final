@@ -116,6 +116,10 @@ export const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
+      if (user.mustChangePassword) {
+        navigate('/app/change-password', { replace: true });
+        return;
+      }
       if (redirectTarget) {
         navigate(redirectTarget, { replace: true });
       } else if (user.role === 'ORGANIZER') {
@@ -146,6 +150,10 @@ export const LoginPage: React.FC = () => {
         }
 
         const loggedUser = await login(email.trim(), password, loginRole);
+        if (loggedUser.mustChangePassword) {
+          navigate('/app/change-password');
+          return;
+        }
         if (redirectTarget) {
           navigate(redirectTarget);
         } else if (loggedUser.role === 'ORGANIZER') {

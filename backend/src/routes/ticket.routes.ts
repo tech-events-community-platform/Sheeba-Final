@@ -8,7 +8,9 @@ import { eventIdOrTokenParamSchema } from '../schemas/ticket.schema';
 const router = Router();
 
 router.get('/', authenticate, TicketController.getMyTickets);
+router.get('/qr/:ticketCode/image', TicketController.getTicketQrImage);
 router.get('/:eventId', authenticate, validateParams(eventIdOrTokenParamSchema), TicketController.getTicket);
 router.get('/id/:id', authenticate, validateParams(idParamSchema), TicketController.getTicketById);
+
 
 export default router;

@@ -4,6 +4,7 @@ import { generateTicketToken, generateQrDataUrl, generateTicketCode, computeEven
 import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
 import { PaymentService } from './payment.service';
+import { getFrontendUrl } from '../config/env';
 
 export class EventService {
   static formatEvent(row: any): any {
@@ -569,6 +570,78 @@ export class EventService {
           }
         }
       }
+
+      // Validate file/upload questions
+      if (isFilled && ['file', 'upload'].includes(q.type || '')) {
+        if (typeof qVal !== 'string' || !qVal.trim()) {
+          const err: any = new Error(`Please provide a valid file upload for: "${q.questionText}".`);
+          err.statusCode = 400;
+          err.code = 'INVALID_FILE_UPLOAD';
+          throw err;
+        }
+
+        let parsedUrl: URL;
+        try {
+          parsedUrl = new URL(qVal.trim());
+        } catch {
+          const err: any = new Error(`Invalid URL format for uploaded file: "${q.questionText}".`);
+          err.statusCode = 400;
+          err.code = 'INVALID_FILE_URL';
+          throw err;
+        }
+
+        if (parsedUrl.protocol !== 'https:') {
+          const err: any = new Error(`File upload URL must use secure HTTPS protocol for question: "${q.questionText}".`);
+          err.statusCode = 400;
+          err.code = 'INSECURE_UPLOAD_URL';
+          throw err;
+        }
+
+        if (parsedUrl.hostname !== 'res.cloudinary.com') {
+          const err: any = new Error(`Untrusted file source. Uploads must be hosted on Cloudinary for question: "${q.questionText}".`);
+          err.statusCode = 400;
+          err.code = 'UNAUTHORIZED_UPLOAD_HOST';
+          throw err;
+        }
+
+        const pathname = parsedUrl.pathname.toLowerCase();
+        if (!pathname.includes('/upload/')) {
+          const err: any = new Error(`Invalid Cloudinary resource path for uploaded file: "${q.questionText}".`);
+          err.statusCode = 400;
+          err.code = 'INVALID_UPLOAD_PATH';
+          throw err;
+        }
+
+        const isPdfAllowed =
+          (q.options && q.options.some((opt: string) => opt.toLowerCase().includes('pdf'))) ||
+          q.questionText.toLowerCase().includes('resume') ||
+          q.questionText.toLowerCase().includes('cv') ||
+          q.questionText.toLowerCase().includes('document') ||
+          q.questionText.toLowerCase().includes('pdf');
+
+        const cleanPath = pathname.split('?')[0];
+        const extMatch = cleanPath.match(/\.([a-z0-9]+)$/i);
+        const ext = extMatch ? extMatch[1].toLowerCase() : '';
+
+        const allowedImageExts = ['jpg', 'jpeg', 'png', 'webp', 'svg'];
+        const allowedExts = isPdfAllowed ? [...allowedImageExts, 'pdf'] : allowedImageExts;
+
+        if (ext && !allowedExts.includes(ext)) {
+          const err: any = new Error(
+            `Unsupported file format (.${ext}) for question "${q.questionText}". Allowed formats: ${allowedExts.map((e) => e.toUpperCase()).join(', ')}.`
+          );
+          err.statusCode = 400;
+          err.code = 'UNSUPPORTED_FILE_TYPE';
+          throw err;
+        }
+
+        if (pathname.includes('/raw/upload/') && ext !== 'pdf') {
+          const err: any = new Error(`Unsupported raw file format for question "${q.questionText}". Only PDF documents are allowed.`);
+          err.statusCode = 400;
+          err.code = 'UNSUPPORTED_FILE_TYPE';
+          throw err;
+        }
+      }
     }
 
     // Reject duplicate registration or handle pending/rejected/payment completion
@@ -718,7 +791,7 @@ export class EventService {
       const attendeeName = attendeeUser.full_name || 'Attendee';
       const attendeeEmail = attendeeUser.email || '';
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = getFrontendUrl();
       const verifyUrl = `${frontendUrl}/verify-ticket?token=${encodeURIComponent(qrToken)}&code=${encodeURIComponent(ticketCode)}`;
       const qrPayload = [
         `SHEEBA VERIFIED PASS`,
@@ -854,6 +927,8 @@ export class EventService {
         r.id AS roster_id,
         r.id AS registration_id,
         r.approval_status,
+        r.notification_status,
+        r.notification_error,
         u.id AS attendee_id,
         u.full_name AS name,
         u.email,
@@ -906,6 +981,8 @@ export class EventService {
           : undefined,
         badges: row.badges || [],
         answers: typeof row.answers === 'string' ? JSON.parse(row.answers) : row.answers || {},
+        notificationStatus: row.notification_status || 'pending',
+        notificationError: row.notification_error || null,
       };
     });
 
@@ -990,7 +1067,7 @@ export class EventService {
           const expiresAt = computeEventDayExpiration(eventDate);
           const qrToken = generateTicketToken(ticketId, event.id, eventDate);
 
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const frontendUrl = getFrontendUrl();
           const verifyUrl = `${frontendUrl}/verify-ticket?token=${encodeURIComponent(qrToken)}&code=${encodeURIComponent(ticketCode)}`;
           const qrPayload = [
             `SHEEBA VERIFIED PASS`,
@@ -1047,7 +1124,7 @@ export class EventService {
       // Dispatch Email Notification
       try {
         if (attendeeUser.email) {
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+          const frontendUrl = getFrontendUrl();
           const ticketUrl = `${frontendUrl}/e/${event.shareLinkToken || event.id}/checkout`;
           const isPendingPayment = Boolean(event.isPaid && event.ticketPrice > 0 && reg.payment_status !== 'settled');
 

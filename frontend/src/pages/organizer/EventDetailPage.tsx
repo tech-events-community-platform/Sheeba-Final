@@ -23,9 +23,12 @@ import {
   Trash2,
   Globe,
   Check,
+  UserCheck,
+  Mail,
 } from 'lucide-react';
 import { EditEventQuestionsModal } from '../../components/organizer/EditEventQuestionsModal';
 import { EditEventModal } from '../../components/organizer/EditEventModal';
+import { ManualAddAttendeeModal } from '../../components/organizer/ManualAddAttendeeModal';
 import { ReviewsSection } from '../../components/reviews/ReviewsSection';
 import { getCalendarTile } from '../../utils/date';
 import { manualAttendeeFormSchema, awardBadgeFormSchema, validateForm } from '../../schemas';
@@ -127,6 +130,27 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
+  // Resend registration notification state & handler
+  const [resendingEmailId, setResendingEmailId] = useState<string | null>(null);
+
+  const handleResendEmail = async (att: AttendeeRosterItem) => {
+    const regId = att.registrationId || att.id;
+    if (!event || !regId) return;
+    setResendingEmailId(regId);
+    try {
+      const res = await api.checkIn.resendManualNotification({
+        eventId: event.id,
+        registrationId: regId,
+      });
+      setAwardSuccessMsg(res.message || `Notification email resent to ${att.email}!`);
+      setTimeout(() => setAwardSuccessMsg(null), 5000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to resend email notification.');
+    } finally {
+      setResendingEmailId(null);
+    }
+  };
+
   // Manual Attendee Creation (Walk-in check-in)
   const handleAddManualAttendee = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +182,30 @@ export const EventDetailPage: React.FC = () => {
       setManualUserError(err.message || 'Failed to add attendee.');
     } finally {
       setIsSubmittingManualUser(false);
+    }
+  };
+
+  // Admit / Check-in attendee manually from Registered list
+  const [admittingAttendeeId, setAdmittingAttendeeId] = useState<string | null>(null);
+
+  const handleAdmitAttendee = async (attendee: AttendeeRosterItem) => {
+    if (!event) return;
+    const attendeeId = attendee.attendeeId || attendee.id;
+    setAdmittingAttendeeId(attendeeId);
+    try {
+      await api.checkIn.markAttended({
+        eventId: event.id,
+        attendeeId,
+      });
+
+      setApprovalActionMsg(`✓ "${attendee.name}" has been admitted and marked as attended!`);
+      setTimeout(() => setApprovalActionMsg(null), 5000);
+      await fetchEventData();
+    } catch (err: any) {
+      console.error('Failed to admit attendee:', err);
+      alert(err.message || 'Failed to admit attendee.');
+    } finally {
+      setAdmittingAttendeeId(null);
     }
   };
 
@@ -821,7 +869,7 @@ export const EventDetailPage: React.FC = () => {
 
       {/* Section: Attended List (Unboxed) */}
       <div className="space-y-4 pt-8 border-t border-gray-100">
-        {/* Attended List Header: Heading, Search Bar in Middle, Add User Manually on Right */}
+        {/* Attended List Header: Heading, Search Bar in Middle, Badge Action on Right */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <h2 className="font-serif font-bold text-xl text-[#2D1F23] shrink-0">
             Attended List ({attendedList.length})
@@ -847,16 +895,6 @@ export const EventDetailPage: React.FC = () => {
                 Bulk Approve Badges
               </Button>
             </Link>
-            <Button
-              onClick={() => {
-                setManualUserError(null);
-                setIsAddUserModalOpen(true);
-              }}
-              variant="primary"
-              size="sm"
-            >
-              Add User Manually
-            </Button>
           </div>
         </div>
 
@@ -1162,7 +1200,25 @@ export const EventDetailPage: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-2">
                         <p className="font-bold text-[#2D1F23]">{att.name}</p>
-                        <p className="text-[11px] text-gray-500">{att.email}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-[11px] text-gray-500">{att.email}</p>
+                          {att.notificationStatus === 'failed' && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded"
+                              title={att.notificationError || 'Email delivery failed'}
+                            >
+                              Email failed
+                            </span>
+                          )}
+                          {att.notificationStatus === 'pending' && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[9px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded"
+                              title="Email delivery in background queue"
+                            >
+                              Email queued
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3.5 px-2 text-gray-600 font-mono text-[11px]">
                         {att.registrationDate}
@@ -1278,15 +1334,44 @@ export const EventDetailPage: React.FC = () => {
                             </button>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirmToast(att)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                            title={`Remove ${att.name} from event`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Remove</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            {isCheckedIn ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Admitted</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleAdmitAttendee(att)}
+                                disabled={admittingAttendeeId === (att.attendeeId || att.id)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                                title={`Admit ${att.name} to event and mark as attended`}
+                              >
+                                <UserCheck className="w-3.5 h-3.5" />
+                                <span>{admittingAttendeeId === (att.attendeeId || att.id) ? 'Admitting...' : 'Admit'}</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleResendEmail(att)}
+                              disabled={resendingEmailId === (att.registrationId || att.id)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:text-[#63474D] hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                              title={`Resend registration email to ${att.email}`}
+                            >
+                              <Mail className="w-3.5 h-3.5 text-[#63474D]" />
+                              <span>{resendingEmailId === (att.registrationId || att.id) ? 'Sending...' : 'Resend Email'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmToast(att)}
+                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                              title={`Remove ${att.name} from event`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Remove</span>
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -1379,110 +1464,18 @@ export const EventDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Manual Add User Modal (Name, Email, Phone -> Automatically Marked as Attended) */}
-      {isAddUserModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
-          <div
-            onClick={() => !isSubmittingManualUser && setIsAddUserModalOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-          />
-
-          <div className="relative bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-gray-100 z-10 space-y-5 animate-fade-in">
-            <div className="flex items-start justify-between pb-3 border-b border-gray-100">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
-                  Manual Registration
-                </span>
-                <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
-                  Register Attendee Manually
-                </h3>
-                <p className="text-xs text-gray-500">
-                  {event.title} • Registers attendee, issues QR ticket & emails account link
-                </p>
-              </div>
-            </div>
-
-            {manualUserError && (
-              <div className="p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-2xl text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                <span>{manualUserError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAddManualAttendee} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-[#63474D]" />
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Abebe Bikila"
-                  value={manualForm.name}
-                  onChange={(e) => setManualForm({ ...manualForm, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="e.g. abebe@example.com"
-                  value={manualForm.email}
-                  onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain" />
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  placeholder="e.g. +251 91 234 5678"
-                  value={manualForm.phone}
-                  onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                />
-              </div>
-
-              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-[11px] text-emerald-900 flex items-start gap-2">
-                <img src="/tick.webp" alt="Success" className="w-4 h-4 object-contain shrink-0 mt-0.5" />
-                <span>
-                  Registering this attendee will generate their official ticket and email them a QR pass with an account link. They will appear under your <strong>Registered List</strong> until checked in at the door.
-                </span>
-              </div>
-
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAddUserModalOpen(false)}
-                  disabled={isSubmittingManualUser}
-                  className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <Button
-                  type="submit"
-                  isLoading={isSubmittingManualUser}
-                  variant="primary"
-                  size="sm"
-                  icon={<UserPlus className="w-4 h-4" />}
-                >
-                  Register Attendee
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Enhanced Manual Add Attendee Modal */}
+      {isAddUserModalOpen && event && (
+        <ManualAddAttendeeModal
+          isOpen={isAddUserModalOpen}
+          onClose={() => setIsAddUserModalOpen(false)}
+          event={event}
+          onSuccess={(msg) => {
+            setAwardSuccessMsg(msg);
+            setTimeout(() => setAwardSuccessMsg(null), 5000);
+            fetchEventData();
+          }}
+        />
       )}
 
       {/* Registration Answers Modal */}

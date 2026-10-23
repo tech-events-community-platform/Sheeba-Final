@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import {
@@ -25,11 +25,14 @@ import {
 export const ForgotPasswordPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
-  const initialEmail = (location.state as any)?.email || '';
+  const tokenFromUrl = searchParams.get('token') || '';
+  const emailFromUrl = searchParams.get('email') || (location.state as any)?.email || '';
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [email, setEmail] = useState<string>(initialEmail);
+  const [step, setStep] = useState<1 | 2 | 3>(tokenFromUrl ? 3 : 1);
+  const [resetToken, setResetToken] = useState<string>(tokenFromUrl);
+  const [email, setEmail] = useState<string>(emailFromUrl);
   const [otp, setOtp] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
@@ -167,22 +170,27 @@ export const ForgotPasswordPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const res = await api.auth.resetPasswordWithOtp({
-        email: email.trim(),
-        otp: otp.trim(),
-        newPassword,
-      });
+      if (resetToken) {
+        const res = await api.auth.resetPassword(resetToken, newPassword);
+        setSuccessMsg(res.message || 'Your password has been set successfully! Redirecting to sign in...');
+      } else {
+        const res = await api.auth.resetPasswordWithOtp({
+          email: email.trim(),
+          otp: otp.trim(),
+          newPassword,
+        });
+        setSuccessMsg(res.message || 'Your password has been changed successfully! Redirecting to sign in...');
+      }
 
-      setSuccessMsg(res.message || 'Your password has been changed successfully! Redirecting to sign in...');
       setTimeout(() => {
         navigate('/login', {
           state: {
-            successMessage: 'Your password has been changed successfully. You may now sign in with your new password.',
+            successMessage: 'Your password has been set successfully. You may now sign in with your password to view your event details and QR code.',
           },
         });
       }, 1500);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to reset password. Please try again.');
+      setErrorMsg(err.message || 'Failed to set password. The link may have expired or is invalid.');
     } finally {
       setIsLoading(false);
     }
@@ -202,14 +210,22 @@ export const ForgotPasswordPage: React.FC = () => {
           )}
         </div>
         <h1 className="font-serif text-2xl font-extrabold text-[#2D1F23] tracking-tight">
-          {step === 1 && 'Reset Your Password'}
-          {step === 2 && 'Enter Verification Code'}
-          {step === 3 && 'Set New Password'}
+          {resetToken && step === 3
+            ? 'Set Your Password'
+            : step === 1
+            ? 'Reset Your Password'
+            : step === 2
+            ? 'Enter Verification Code'
+            : 'Set New Password'}
         </h1>
         <p className="text-xs text-[#756366] max-w-xs mx-auto leading-relaxed">
-          {step === 1 && 'Enter your account email to receive a 6-digit verification code.'}
-          {step === 2 && `Enter the 6-digit code dispatched to ${email}.`}
-          {step === 3 && 'Choose a strong new password for your Sheeba account.'}
+          {resetToken && step === 3
+            ? 'Choose a secure password for your Sheeba account to access your event details and QR ticket.'
+            : step === 1
+            ? 'Enter your account email to receive a 6-digit verification code.'
+            : step === 2
+            ? `Enter the 6-digit code dispatched to ${email}.`
+            : 'Choose a strong new password for your Sheeba account.'}
         </p>
       </div>
 

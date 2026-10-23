@@ -19,6 +19,12 @@ export const questionTypeEnum = z.enum([
   'select',
   'radio',
   'checkbox',
+  'dropdown',
+  'date',
+  'email',
+  'phone',
+  'file',
+  'upload',
 ]);
 
 /**
@@ -35,7 +41,7 @@ export const registrationQuestionSchema = z
     eventId: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    const isChoiceType = ['choice', 'multi_choice', 'select', 'radio', 'checkbox'].includes(data.type);
+    const isChoiceType = ['choice', 'multi_choice', 'select', 'radio', 'checkbox', 'dropdown'].includes(data.type);
     if (isChoiceType) {
       const validOptions = (data.options || []).filter((opt) => opt.trim().length > 0);
       if (validOptions.length === 0) {

@@ -2,6 +2,7 @@ import app from './app';
 import { ENV } from './config/env';
 import pool from './config/db';
 import { runMigrations } from './db/migrate';
+import { NotificationQueueService } from './services/notificationQueue.service';
 
 const startServer = async () => {
   try {
@@ -33,9 +34,13 @@ const startServer = async () => {
       console.log(`📡 Health Check: http://localhost:${ENV.PORT}/api/health`);
     });
 
+    // Start background email queue worker
+    NotificationQueueService.startQueueWorker(15000);
+
     // Graceful Shutdown
     const shutdown = async () => {
       console.log('Shutting down Sheba Backend gracefully...');
+      NotificationQueueService.stopQueueWorker();
       server.close(async () => {
         await pool.end();
         console.log('PostgreSQL pool closed. Process terminated.');

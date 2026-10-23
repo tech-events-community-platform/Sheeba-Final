@@ -1,6 +1,19 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+/**
+ * Returns the authoritative frontend base URL for links in emails and QR tokens.
+ * Defaults to 'https://sheebanet.com' in production, or 'http://localhost:5173' for local development.
+ */
+export function getFrontendUrl(): string {
+  const explicit = (process.env.FRONTEND_URL || '').trim();
+  if (explicit) {
+    return explicit.replace(/\/+$/, '');
+  }
+  const isProd = process.env.NODE_ENV === 'production';
+  return isProd ? 'https://sheebanet.com' : 'http://localhost:5173';
+}
+
 export const ENV = {
   PORT: process.env.PORT || '5000',
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -11,6 +24,9 @@ export const ENV = {
   CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   LINKS_ET_API_KEY: process.env.LINKS_ET_API_KEY || process.env.PAYMENT_VERIFICATION_API_KEY || '',
+  get FRONTEND_URL(): string {
+    return getFrontendUrl();
+  },
 };
 
 if (ENV.NODE_ENV === 'production') {

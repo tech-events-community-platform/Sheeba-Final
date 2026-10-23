@@ -16,8 +16,10 @@ import {
 } from 'lucide-react';
 
 export const ChangePasswordPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
+
+  const isForcedChange = Boolean(user?.mustChangePassword);
 
   // Determine back navigation path based on user role
   const getSettingsPath = () => {
@@ -79,16 +81,24 @@ export const ChangePasswordPage: React.FC = () => {
 
       setSuccessMsg(
         res.message ||
-          'Your password has been changed successfully! A confirmation email has been sent. Returning to settings...'
+          'Your password has been changed successfully! Redirecting...'
       );
 
+      if (refreshUser) {
+        await refreshUser();
+      }
+
       setTimeout(() => {
-        navigate(settingsPath, {
-          state: {
-            successMessage:
-              'Your password has been changed successfully. A confirmation email has been sent to your address.',
-          },
-        });
+        if (isForcedChange) {
+          navigate('/app', { replace: true });
+        } else {
+          navigate(settingsPath, {
+            state: {
+              successMessage:
+                'Your password has been changed successfully. A confirmation email has been sent to your address.',
+            },
+          });
+        }
       }, 1500);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to change password. Please verify your current password.');
@@ -99,16 +109,33 @@ export const ChangePasswordPage: React.FC = () => {
 
   return (
     <div className="w-full max-w-xl mx-auto px-4 py-8 space-y-6">
-      {/* Back button */}
-      <div>
-        <Link
-          to={settingsPath}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#63474D] hover:underline"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Settings</span>
-        </Link>
-      </div>
+      {/* Back button (hidden during mandatory onboarding change) */}
+      {!isForcedChange && (
+        <div>
+          <Link
+            to={settingsPath}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#63474D] hover:underline"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Settings</span>
+          </Link>
+        </div>
+      )}
+
+      {/* Mandatory Password Change Alert Banner */}
+      {isForcedChange && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 shadow-xs animate-fade-in">
+          <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1 text-xs leading-relaxed">
+            <p className="font-bold text-sm text-amber-950">
+              Action Required: Set Your Permanent Password
+            </p>
+            <p className="text-amber-800">
+              Welcome to Sheeba! For your account security, you must replace your temporary initial password with a permanent, secure password before accessing your event passes and community dashboard.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="space-y-1">
@@ -116,7 +143,7 @@ export const ChangePasswordPage: React.FC = () => {
           <KeyRound className="w-5 h-5" />
         </div>
         <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23] tracking-tight">
-          Change Password
+          {isForcedChange ? 'Set Your New Password' : 'Change Password'}
         </h1>
         <p className="text-xs sm:text-sm text-[#756366] leading-relaxed">
           Update your account password below. Once changed, a confirmation email will be delivered to{' '}

@@ -111,7 +111,18 @@ export class CheckinController {
 
   static async addManualAttendee(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { eventId, name, email, phone } = req.body;
+      const {
+        eventId,
+        name,
+        email,
+        phone,
+        answers,
+        paymentReference,
+        paymentMethod,
+        screenshotUrl,
+        screenshotBase64,
+        paymentStatus,
+      } = req.body;
       const organizerId = req.user!.userId;
       const userRole = req.user!.role;
 
@@ -121,6 +132,31 @@ export class CheckinController {
         name,
         email,
         phone,
+        userRole,
+        answers,
+        paymentReference,
+        paymentMethod,
+        screenshotUrl,
+        screenshotBase64,
+        paymentStatus,
+      });
+
+      return sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async resendManualNotification(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { eventId, registrationId } = req.body;
+      const organizerId = req.user!.userId;
+      const userRole = req.user!.role;
+
+      const result = await CheckinService.resendManualNotification({
+        eventId,
+        registrationId,
+        organizerId,
         userRole,
       });
 
