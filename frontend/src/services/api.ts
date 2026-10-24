@@ -4,6 +4,7 @@ import type { BadgeAward, BadgeCode, SponsorReportData, AttendeeRosterItem } fro
 import type { User, UserRole, ProfileVisibility } from '../types/user';
 import type { EventReviewItem, EventReviewsSummary } from '../types/review';
 import type { SponsorRecommendationsResponse, SponsorPreferences } from '../types/matching';
+import type { IExhibitorCall, IEventVendor, IExhibitorCallUpsertPayload, IManualVendorPayload } from '../types/exhibitor';
 import { getEndOfEventDay } from '../utils/date';
 
 /**
@@ -1896,6 +1897,104 @@ export const api = {
       } catch {
         return [];
       }
+    },
+  },
+
+  exhibitors: {
+    getCall: async (eventId: string) => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorCall & { stats: { confirmedCount: number; totalSpaceAllocated: number; totalSpaceRemaining: number } } }>(
+        `/exhibitors/events/${eventId}/call`
+      );
+      return res.data;
+    },
+
+    saveCall: async (eventId: string, payload: IExhibitorCallUpsertPayload) => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorCall }>(
+        `/exhibitors/events/${eventId}/call`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    getVendors: async (eventId: string, params?: { search?: string; source?: string; status?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.search) qs.append('search', params.search);
+      if (params?.source) qs.append('source', params.source);
+      if (params?.status) qs.append('status', params.status);
+      const queryStr = qs.toString() ? `?${qs.toString()}` : '';
+      const res = await requestApi<{ success: boolean; data: { vendors: IEventVendor[]; totalCount: number; confirmedCount: number; pendingCount: number } }>(
+        `/exhibitors/events/${eventId}/vendors${queryStr}`
+      );
+      return res.data;
+    },
+
+    addManualVendor: async (eventId: string, payload: IManualVendorPayload) => {
+      const res = await requestApi<{ success: boolean; data: IEventVendor }>(
+        `/exhibitors/events/${eventId}/vendors`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    updateVendor: async (eventId: string, vendorId: string, payload: Partial<IManualVendorPayload & { status: string; rejectionReason: string }>) => {
+      const res = await requestApi<{ success: boolean; data: IEventVendor }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    deleteVendor: async (eventId: string, vendorId: string) => {
+      const res = await requestApi<{ success: boolean }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      return res;
+    },
+
+    getPublicExhibitors: async (eventId: string) => {
+      try {
+        const res = await requestApi<{
+          success: boolean; data: Array<{
+            id: string;
+            businessName: string;
+            category: string | null;
+            showcaseDescription: string | null;
+            spaceSqm: number;
+            boothNumber: string | null;
+            logoUrl: string | null;
+            websiteUrl: string | null;
+            source: string;
+          }>
+        }>(
+          `/exhibitors/events/${eventId}/public`
+        );
+        return res.data || [];
+      } catch {
+        return [];
+      }
+    },
+
+    exploreOpenCalls: async (params?: { category?: string; search?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.category) qs.append('category', params.category);
+      if (params?.search) qs.append('search', params.search);
+      const queryStr = qs.toString() ? `?${qs.toString()}` : '';
+      const res = await requestApi<{ success: boolean; data: any[] }>(
+        `/exhibitors/explore${queryStr}`
+      );
+      return res.data || [];
     },
   },
 

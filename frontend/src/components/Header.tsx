@@ -26,7 +26,7 @@ export default function Header() {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
-  const isAuthPage = ['/login', '/register', '/verify-otp', '/pending-approval', '/sponsor/auth', '/sponsor/forgot-password'].includes(location.pathname);
+  const isAuthPage = ['/login', '/register', '/verify-otp', '/pending-approval', '/sponsor/auth', '/sponsor/forgot-password', '/exhibitor/auth'].includes(location.pathname);
   const isExternalRegistration =
     location.pathname.startsWith('/e/') ||
     (location.pathname.startsWith('/events/') && location.pathname.includes('/register'));
@@ -70,6 +70,8 @@ export default function Header() {
     if (!user) return '/app';
     if (user.role === 'ADMIN') return '/admin';
     if (user.role === 'ORGANIZER') return '/organizer';
+    if (user.role === 'SPONSOR') return '/sponsor';
+    if (user.role === 'EXHIBITOR') return '/exhibitor';
     return '/app';
   };
 
@@ -82,17 +84,17 @@ export default function Header() {
 
   const publicNavLinks = isHome
     ? [
-        { name: 'Features', href: '#features', isInternal: true },
-        { name: 'Explore Events', href: '#explore-events', isInternal: true },
-        { name: 'How It Works', href: '#how-it-works', isInternal: true },
-        { name: 'Live Simulator', href: '#simulator', isInternal: true },
-        { name: 'Contact Us', href: '#contact', isInternal: true },
-      ]
+      { name: 'Features', href: '#features', isInternal: true },
+      { name: 'Explore Events', href: '#explore-events', isInternal: true },
+      { name: 'How It Works', href: '#how-it-works', isInternal: true },
+      { name: 'Live Simulator', href: '#simulator', isInternal: true },
+      { name: 'Exhibitors', href: '/exhibitor', isInternal: false },
+      { name: 'Contact Us', href: '#contact', isInternal: true },
+    ]
     : [
-        { name: 'Home', href: '/', isInternal: false },
-        { name: 'Explore Events', href: '/#explore-events', isInternal: false },
-        { name: 'Contact Us', href: '/contact', isInternal: false },
-      ];
+      { name: 'Home', href: '/', isInternal: false },
+      { name: 'Contact Us', href: '/contact', isInternal: false },
+    ];
 
   const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
 
@@ -100,13 +102,12 @@ export default function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-6 lg:px-8 pt-2.5 sm:pt-3.5 pointer-events-none transition-all duration-300">
       {/* Top Navbar Row: Floating Circular Pill */}
       <div
-        className={`pointer-events-auto mx-auto max-w-7xl rounded-full transition-all duration-300 px-4 sm:px-7 py-2 sm:py-2.5 relative z-30 ${
-          isExternalRegistration
+        className={`pointer-events-auto mx-auto max-w-7xl rounded-full transition-all duration-300 px-4 sm:px-7 py-2 sm:py-2.5 relative z-30 ${isExternalRegistration
             ? 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg shadow-black/5'
             : scrolled
-            ? 'bg-white/15 backdrop-blur-xl border border-white/25 shadow-lg shadow-black/5'
-            : 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-md shadow-black/5'
-        }`}
+              ? 'bg-white/15 backdrop-blur-xl border border-white/25 shadow-lg shadow-black/5'
+              : 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-md shadow-black/5'
+          }`}
       >
         <div className="flex items-center justify-between gap-4">
           {/* Brand Logo */}
@@ -118,16 +119,14 @@ export default function Header() {
             />
             <div className="flex flex-col">
               <span
-                className={`font-serif text-xl sm:text-2xl font-bold tracking-tight transition-colors leading-none ${
-                  isExternalRegistration ? 'text-white' : 'text-[#2D1F23] group-hover:text-[#63474D]'
-                }`}
+                className={`font-serif text-xl sm:text-2xl font-bold tracking-tight transition-colors leading-none ${isExternalRegistration ? 'text-white' : 'text-[#2D1F23] group-hover:text-[#63474D]'
+                  }`}
               >
                 Sheeba
               </span>
               <span
-                className={`text-[8px] uppercase font-bold tracking-widest mt-0.5 ${
-                  isExternalRegistration ? 'text-white/80' : 'text-[#AA767C]'
-                }`}
+                className={`text-[8px] uppercase font-bold tracking-widest mt-0.5 ${isExternalRegistration ? 'text-white/80' : 'text-[#AA767C]'
+                  }`}
               >
                 Event Infrastructure
               </span>
@@ -167,11 +166,10 @@ export default function Header() {
                 <button
                   type="button"
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className={`flex items-center gap-1.5 rounded-full transition-all cursor-pointer ${
-                    isExternalRegistration
+                  className={`flex items-center gap-1.5 rounded-full transition-all cursor-pointer ${isExternalRegistration
                       ? 'p-1.5 bg-white/20 border border-white/40 hover:bg-white/30'
                       : 'p-1.5 bg-white/60 border border-[#E8DDD7] hover:border-[#63474D]/40 hover:shadow-xs'
-                  }`}
+                    }`}
                 >
                   <img
                     src={user.avatarUrl || defaultAvatar}
@@ -182,9 +180,8 @@ export default function Header() {
                     }}
                   />
                   <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                      isExternalRegistration ? 'text-white' : 'text-gray-500'
-                    }`}
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${isExternalRegistration ? 'text-white' : 'text-gray-500'
+                      }`}
                   />
                 </button>
 
@@ -242,11 +239,10 @@ export default function Header() {
               <div className="flex items-center gap-2.5">
                 <Link
                   to={isExternalRegistration ? `/login?redirect=${encodeURIComponent(location.pathname + location.search)}` : "/login"}
-                  className={`inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                    isExternalRegistration
+                  className={`inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${isExternalRegistration
                       ? 'text-white hover:text-white/80 hover:bg-white/10'
                       : 'text-gray-700 hover:text-[#63474D] hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   Log In
                 </Link>
@@ -296,11 +292,10 @@ export default function Header() {
               <>
                 <Link
                   to="/app"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    location.pathname === '/app'
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${location.pathname === '/app'
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <LayoutDashboard className="w-3.5 h-3.5" />
                   <span>📊 Dashboard</span>
@@ -308,11 +303,10 @@ export default function Header() {
 
                 <Link
                   to="/app/events"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/app/events') || isTabActive('/app/ticket')
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${isTabActive('/app/events') || isTabActive('/app/ticket')
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <Ticket className="w-3.5 h-3.5" />
                   <span>🎟️ My Tickets & Passes</span>
@@ -320,11 +314,10 @@ export default function Header() {
 
                 <Link
                   to="/app/record"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/app/record')
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${isTabActive('/app/record')
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <Award className="w-3.5 h-3.5" />
                   <span>🏆 My Badges & Records</span>
@@ -332,11 +325,10 @@ export default function Header() {
 
                 <Link
                   to="/app/profile"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/app/profile') && location.pathname !== '/app/profile/attendance'
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${isTabActive('/app/profile') && location.pathname !== '/app/profile/attendance'
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <UserIcon className="w-3.5 h-3.5" />
                   <span>👤 My Profile</span>
@@ -348,11 +340,10 @@ export default function Header() {
               <>
                 <Link
                   to="/organizer/events"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/organizer/events') && location.pathname !== '/organizer/events/create'
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${isTabActive('/organizer/events') && location.pathname !== '/organizer/events/create'
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain" />
                   <span>My Events</span>
@@ -360,11 +351,10 @@ export default function Header() {
 
                 <Link
                   to="/organizer/events/create"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/organizer/events/create')
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${isTabActive('/organizer/events/create')
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
                   <span>➕ Create Event</span>
@@ -372,11 +362,10 @@ export default function Header() {
 
                 <Link
                   to="/organizer"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    location.pathname === '/organizer'
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${location.pathname === '/organizer'
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <LayoutDashboard className="w-3.5 h-3.5" />
                   <span>📊 Organizer Studio</span>
@@ -384,11 +373,10 @@ export default function Header() {
 
                 <Link
                   to="/organizer/reports"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/organizer/reports')
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${isTabActive('/organizer/reports')
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
                   <span>📈 Reports & Badges</span>
@@ -400,11 +388,10 @@ export default function Header() {
               <>
                 <Link
                   to="/admin"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    location.pathname === '/admin'
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${location.pathname === '/admin'
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <Shield className="w-3.5 h-3.5" />
                   <span>🛡️ Admin Portal</span>
@@ -412,11 +399,10 @@ export default function Header() {
 
                 <Link
                   to="/admin/users"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/admin/users')
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${isTabActive('/admin/users')
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <UserIcon className="w-3.5 h-3.5" />
                   <span>👥 Users Management</span>
@@ -424,11 +410,10 @@ export default function Header() {
 
                 <Link
                   to="/admin/events"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isTabActive('/admin/events')
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold transition-all ${isTabActive('/admin/events')
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'text-[#63474D] hover:bg-[#63474D]/10'
-                  }`}
+                    }`}
                 >
                   <img src="/calendar.webp" alt="Calendar" className="w-3.5 h-3.5 object-contain" />
                   <span>Events Moderation</span>

@@ -32,6 +32,13 @@ import { SponsorDealsPage } from '../pages/sponsor/SponsorDealsPage';
 import { SponsorDeliverablesPage } from '../pages/sponsor/SponsorDeliverablesPage';
 import { SponsorApplicationDetailPage } from '../pages/sponsor/SponsorApplicationDetailPage';
 
+// Exhibitor Pages & Layout
+import { ExhibitorLayout } from '../layouts/ExhibitorLayout';
+import { ExhibitorAuthPage } from '../pages/exhibitor/ExhibitorAuthPage';
+import { ExhibitorExplorePage } from '../pages/exhibitor/ExhibitorExplorePage';
+import { ExhibitorBoothsPage } from '../pages/exhibitor/ExhibitorBoothsPage';
+import { ExhibitorSettingsPage } from '../pages/exhibitor/ExhibitorSettingsPage';
+
 // Attendee Pages
 import { BadgesPage as AttendeeBadgesPage } from '../pages/attendee/BadgesPage';
 import { AttendeeDashboardPage } from '../pages/attendee/DashboardPage';
@@ -86,6 +93,7 @@ export const router = createBrowserRouter([
       { path: 'tickets/verify/:token', element: <VerifyTicketPage /> },
       { path: 'sponsor/auth', element: <SponsorAuthPage /> },
       { path: 'sponsor/forgot-password', element: <SponsorForgotPasswordPage /> },
+      { path: 'exhibitor/auth', element: <ExhibitorAuthPage /> },
     ],
   },
   // Protected Attendee Routes (/app)
@@ -180,6 +188,19 @@ export const router = createBrowserRouter([
           { path: 'dashboard', element: <Navigate to="/sponsor" replace /> },
         ],
       },
+    ],
+  },
+  // Exhibitor Routes (/exhibitor)
+  {
+    path: '/exhibitor',
+    element: <ExhibitorLayout />,
+    children: [
+      { index: true, element: <ExhibitorExplorePage /> },
+      { path: 'explore', element: <ExhibitorExplorePage /> },
+      { path: 'booths', element: <ExhibitorBoothsPage /> },
+      { path: 'applications', element: <ExhibitorBoothsPage /> },
+      { path: 'settings', element: <ExhibitorSettingsPage /> },
+      { path: 'change-password', element: <ChangePasswordPage /> },
     ],
   },
   // Fallback redirect
