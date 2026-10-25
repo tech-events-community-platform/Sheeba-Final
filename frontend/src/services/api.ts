@@ -4,7 +4,20 @@ import type { BadgeAward, BadgeCode, SponsorReportData, AttendeeRosterItem } fro
 import type { User, UserRole, ProfileVisibility } from '../types/user';
 import type { EventReviewItem, EventReviewsSummary } from '../types/review';
 import type { SponsorRecommendationsResponse, SponsorPreferences } from '../types/matching';
-import type { IExhibitorCall, IEventVendor, IExhibitorCallUpsertPayload, IManualVendorPayload } from '../types/exhibitor';
+import type {
+  IExhibitorCall,
+  IEventVendor,
+  IExhibitorCallUpsertPayload,
+  IManualVendorPayload,
+  IExhibitorApplicationPayload,
+  IExhibitorBoothVisitor,
+  IBoothVisitorPayload,
+  IExhibitorBooth,
+  IBoothReceipt,
+  ISubmitBoothReceiptPayload,
+  IVerifyBoothReceiptPayload,
+  IRejectBoothReceiptPayload,
+} from '../types/exhibitor';
 import { getEndOfEventDay } from '../utils/date';
 
 /**
@@ -1996,6 +2009,127 @@ export const api = {
       );
       return res.data || [];
     },
+
+    apply: async (eventId: string, payload: IExhibitorApplicationPayload) => {
+      const res = await requestApi<{ success: boolean; data: IEventVendor; message: string }>(
+        `/exhibitors/events/${eventId}/apply`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    getMyBooths: async (): Promise<IExhibitorBooth[]> => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorBooth[] }>('/exhibitors/my-booths');
+      return res.data || [];
+    },
+
+    payForBooth: async (
+      vendorId: string,
+      payload?: {
+        paymentMethod?: string;
+        paymentReference?: string;
+        screenshotUrl?: string | null;
+        screenshotBase64?: string | null;
+        transactionId?: string;
+      }
+    ): Promise<IEventVendor> => {
+      const res = await requestApi<{ success: boolean; data: IEventVendor; message: string }>(
+        `/exhibitors/booths/${vendorId}/pay`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload || {}),
+        }
+      );
+      return res.data;
+    },
+
+    getBoothVisitors: async (vendorId: string): Promise<IExhibitorBoothVisitor[]> => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorBoothVisitor[] }>(
+        `/exhibitors/booths/${vendorId}/visitors`
+      );
+      return res.data || [];
+    },
+
+    addBoothVisitor: async (vendorId: string, payload: IBoothVisitorPayload): Promise<IExhibitorBoothVisitor> => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorBoothVisitor; message: string }>(
+        `/exhibitors/booths/${vendorId}/visitors`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    deleteBoothVisitor: async (vendorId: string, visitorId: string): Promise<void> => {
+      await requestApi<{ success: boolean; message: string }>(
+        `/exhibitors/booths/${vendorId}/visitors/${visitorId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+    },
+
+    submitBoothReceipt: async (
+      vendorId: string,
+      payload: ISubmitBoothReceiptPayload
+    ): Promise<{ message: string; payment: IBoothReceipt }> => {
+      const res = await requestApi<{ success: boolean; data: { message: string; payment: IBoothReceipt }; message: string }>(
+        `/exhibitors/booths/${vendorId}/receipt`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    getBoothReceipts: async (vendorId: string): Promise<IBoothReceipt[]> => {
+      const res = await requestApi<{ success: boolean; data: IBoothReceipt[] }>(
+        `/exhibitors/booths/${vendorId}/receipts`
+      );
+      return res.data || [];
+    },
+
+    getVendorReceipts: async (eventId: string, vendorId: string): Promise<IBoothReceipt[]> => {
+      const res = await requestApi<{ success: boolean; data: IBoothReceipt[] }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}/receipts`
+      );
+      return res.data || [];
+    },
+
+    verifyBoothReceipt: async (
+      eventId: string,
+      vendorId: string,
+      payload: IVerifyBoothReceiptPayload
+    ): Promise<{ vendor: IEventVendor; payment: IBoothReceipt }> => {
+      const res = await requestApi<{ success: boolean; data: { vendor: IEventVendor; payment: IBoothReceipt }; message: string }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}/verify-receipt`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    rejectBoothReceipt: async (
+      eventId: string,
+      vendorId: string,
+      payload: IRejectBoothReceiptPayload
+    ): Promise<{ success: boolean; message: string; payment: IBoothReceipt }> => {
+      const res = await requestApi<{ success: boolean; data: { success: boolean; message: string; payment: IBoothReceipt }; message: string }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}/reject-receipt`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
   },
 
   contact: {
@@ -2060,6 +2194,36 @@ export const api = {
         method: 'DELETE',
       });
       return true;
+    },
+  },
+
+  users: {
+    getProfile: async (): Promise<User> => {
+      const res = await requestApi<{ success: boolean; data: User }>('/users/me');
+      return res.data;
+    },
+    updateProfile: async (payload: {
+      name?: string;
+      full_name?: string;
+      phone?: string;
+      bio?: string;
+      organization?: string;
+      companyName?: string;
+      company_name?: string;
+      industryCategory?: string;
+      industry_category?: string;
+      companyPhone?: string;
+      company_phone?: string;
+      companyWebsite?: string;
+      company_website?: string;
+      avatarUrl?: string;
+      visibility?: 'public' | 'private';
+    }): Promise<User> => {
+      const res = await requestApi<{ success: boolean; data: User }>('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      return res.data;
     },
   },
 };

@@ -4,6 +4,8 @@ import {
   Menu,
   X,
   ArrowRight,
+  ArrowLeft,
+  Store,
   User as UserIcon,
   LogOut,
   LayoutDashboard,
@@ -30,6 +32,7 @@ export default function Header() {
   const isExternalRegistration =
     location.pathname.startsWith('/e/') ||
     (location.pathname.startsWith('/events/') && location.pathname.includes('/register'));
+  const isExhibitorExplore = location.pathname === '/exhibitors';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -88,11 +91,12 @@ export default function Header() {
       { name: 'Explore Events', href: '#explore-events', isInternal: true },
       { name: 'How It Works', href: '#how-it-works', isInternal: true },
       { name: 'Live Simulator', href: '#simulator', isInternal: true },
-      { name: 'Exhibitors', href: '/exhibitor', isInternal: false },
+      { name: 'Exhibitors', href: '#exhibitors', isInternal: true },
       { name: 'Contact Us', href: '#contact', isInternal: true },
     ]
     : [
       { name: 'Home', href: '/', isInternal: false },
+      { name: 'Exhibitors', href: '/#exhibitors', isInternal: false },
       { name: 'Contact Us', href: '/contact', isInternal: false },
     ];
 
@@ -109,183 +113,334 @@ export default function Header() {
               : 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-md shadow-black/5'
           }`}
       >
-        <div className="flex items-center justify-between gap-4">
-          {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-3 group shrink-0">
-            <img
-              src="/logo.webp"
-              alt="Sheeba Logo"
-              className="h-8 sm:h-10 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
-            />
-            <div className="flex flex-col">
-              <span
-                className={`font-serif text-xl sm:text-2xl font-bold tracking-tight transition-colors leading-none ${isExternalRegistration ? 'text-white' : 'text-[#2D1F23] group-hover:text-[#63474D]'
-                  }`}
-              >
-                Sheeba
-              </span>
-              <span
-                className={`text-[8px] uppercase font-bold tracking-widest mt-0.5 ${isExternalRegistration ? 'text-white/80' : 'text-[#AA767C]'
-                  }`}
-              >
-                Event Infrastructure
-              </span>
-            </div>
-          </Link>
+        {isExhibitorExplore ? (
+          <div className="flex items-center justify-between gap-3 w-full">
+            {/* Left: Back button returning to exhibitor section of landing page */}
+            <Link
+              to="/#exhibitors"
+              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-semibold text-[#2D1F23] bg-white/70 hover:bg-white border border-[#E8DDD7] hover:border-[#63474D]/30 shadow-xs hover:shadow-sm transition-all duration-200 group"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-[#63474D] group-hover:-translate-x-0.5 transition-transform" />
+              <span className="hidden xs:inline sm:inline">Back to Exhibitors</span>
+              <span className="xs:hidden sm:hidden">Back</span>
+            </Link>
 
-          {/* Desktop Navigation for Logged Out Guests (Hidden on External Registration) */}
-          {!isAuthenticated && !isAuthPage && !isExternalRegistration && (
-            <nav className="hidden md:flex items-center gap-6 lg:gap-8">
-              {publicNavLinks.map((link) =>
-                link.isInternal ? (
-                  <a
-                    key={link.name}
-                    href={link.href}
-                    className="text-xs sm:text-sm font-medium text-gray-700 hover:text-[#63474D] transition-colors py-1 relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-[#63474D] hover:after:w-full after:transition-all after:duration-200"
-                  >
-                    {link.name}
-                  </a>
-                ) : (
+            {/* Center: Brand Logo */}
+            <Link to="/" className="flex items-center gap-2.5 group shrink-0">
+              <img
+                src="/logo.webp"
+                alt="Sheeba Logo"
+                className="h-7 sm:h-8 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
+              />
+              <div className="hidden sm:flex flex-col">
+                <span className="font-serif text-lg sm:text-xl font-bold tracking-tight text-[#2D1F23] leading-none">
+                  Sheeba
+                </span>
+                <span className="text-[7px] uppercase font-bold tracking-widest text-[#AA767C] mt-0.5">
+                  Event Infrastructure
+                </span>
+              </div>
+            </Link>
+
+            {/* Right: Exhibitor Auth Buttons */}
+            <div className="flex items-center gap-2">
+              {isAuthenticated && user ? (
+                <div className="flex items-center gap-2">
                   <Link
-                    key={link.name}
-                    to={link.href}
-                    className="text-xs sm:text-sm font-medium text-gray-700 hover:text-[#63474D] transition-colors py-1 relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-[#63474D] hover:after:w-full after:transition-all after:duration-200"
+                    to={user.role === 'EXHIBITOR' ? '/exhibitor' : getDashboardPath()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#63474D] text-white text-xs font-bold hover:bg-[#523a3f] shadow-xs transition-all"
                   >
-                    {link.name}
+                    <Store className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">
+                      {user.role === 'EXHIBITOR' ? 'Exhibitor Portal' : 'Dashboard'}
+                    </span>
                   </Link>
-                )
-              )}
-            </nav>
-          )}
 
-          {/* Desktop Right: Profile / Auth Actions (NO name displayed) */}
-          <div className="hidden md:flex items-center gap-3">
-            {isAuthenticated && user ? (
-              /* Logged In User Avatar Pill & Dropdown (No name displayed) */
-              <div className="relative z-50" ref={dropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className={`flex items-center gap-1.5 rounded-full transition-all cursor-pointer ${isExternalRegistration
-                      ? 'p-1.5 bg-white/20 border border-white/40 hover:bg-white/30'
-                      : 'p-1.5 bg-white/60 border border-[#E8DDD7] hover:border-[#63474D]/40 hover:shadow-xs'
+                  <div className="relative z-50" ref={dropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                      className="flex items-center gap-1 p-1 bg-white/60 border border-[#E8DDD7] rounded-full hover:border-[#63474D]/40 cursor-pointer"
+                    >
+                      <img
+                        src={user.avatarUrl || defaultAvatar}
+                        alt=""
+                        className="w-7 h-7 rounded-full object-cover border border-[#FFA686]/60 shadow-xs"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = defaultAvatar;
+                        }}
+                      />
+                      <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                    </button>
+
+                    {userDropdownOpen && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#E8DDD7] py-2 z-50 animate-fade-in">
+                        <div className="px-4 py-2 border-b border-[#E8DDD7]/60">
+                          <p className="text-xs font-bold text-[#2D1F23] truncate">{user.name}</p>
+                          <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
+                        </div>
+                        <div className="py-1">
+                          <Link
+                            to="/exhibitor"
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-[#FAF7F5] hover:text-[#63474D] transition-colors"
+                          >
+                            <Store className="w-4 h-4 text-[#AA767C]" />
+                            <span>Exhibitor Portal</span>
+                          </Link>
+                        </div>
+                        <div className="pt-1 border-t border-[#E8DDD7]/60">
+                          <button
+                            type="button"
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer text-left"
+                          >
+                            <LogOut className="w-4 h-4 text-red-500" />
+                            <span>Sign Out</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Link
+                    to="/exhibitor/auth?returnTo=/exhibitors"
+                    className="inline-flex items-center px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold text-gray-700 hover:text-[#63474D] hover:bg-black/5 transition-colors"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    to="/exhibitor/auth?mode=register&returnTo=/exhibitors"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-1.5 rounded-xl bg-[#63474D] text-white text-xs font-bold hover:bg-[#523a3f] shadow-xs hover:shadow-sm transition-all duration-200"
+                  >
+                    <span>Sign Up</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-white" />
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-4">
+            {/* Brand Logo */}
+            <Link to="/" className="flex items-center gap-3 group shrink-0">
+              <img
+                src="/logo.webp"
+                alt="Sheeba Logo"
+                className="h-8 sm:h-10 w-auto object-contain group-hover:scale-105 transition-transform duration-200"
+              />
+              <div className="flex flex-col">
+                <span
+                  className={`font-serif text-xl sm:text-2xl font-bold tracking-tight transition-colors leading-none ${isExternalRegistration ? 'text-white' : 'text-[#2D1F23] group-hover:text-[#63474D]'
                     }`}
                 >
-                  <img
-                    src={user.avatarUrl || defaultAvatar}
-                    alt=""
-                    className="w-7 h-7 rounded-full object-cover border border-[#FFA686]/60 shadow-xs"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = defaultAvatar;
-                    }}
-                  />
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${isExternalRegistration ? 'text-white' : 'text-gray-500'
+                  Sheeba
+                </span>
+                <span
+                  className={`text-[8px] uppercase font-bold tracking-widest mt-0.5 ${isExternalRegistration ? 'text-white/80' : 'text-[#AA767C]'
+                    }`}
+                >
+                  Event Infrastructure
+                </span>
+              </div>
+            </Link>
+
+            {/* Desktop Navigation for Logged Out Guests (Hidden on External Registration) */}
+            {!isAuthenticated && !isAuthPage && !isExternalRegistration && (
+              <nav className="hidden md:flex items-center gap-6 lg:gap-8">
+                {publicNavLinks.map((link) =>
+                  link.isInternal ? (
+                    <a
+                      key={link.name}
+                      href={link.href}
+                      className="text-xs sm:text-sm font-medium text-gray-700 hover:text-[#63474D] transition-colors py-1 relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-[#63474D] hover:after:w-full after:transition-all after:duration-200"
+                    >
+                      {link.name}
+                    </a>
+                  ) : (
+                    <Link
+                      key={link.name}
+                      to={link.href}
+                      className="text-xs sm:text-sm font-medium text-gray-700 hover:text-[#63474D] transition-colors py-1 relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-[#63474D] hover:after:w-full after:transition-all after:duration-200"
+                    >
+                      {link.name}
+                    </Link>
+                  )
+                )}
+              </nav>
+            )}
+
+            {/* Desktop Right: Profile / Auth Actions (NO name displayed) */}
+            <div className="hidden md:flex items-center gap-3">
+              {isAuthenticated && user ? (
+                /* Logged In User Avatar Pill & Dropdown (No name displayed) */
+                <div className="relative z-50" ref={dropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    className={`flex items-center gap-1.5 rounded-full transition-all cursor-pointer ${isExternalRegistration
+                        ? 'p-1.5 bg-white/20 border border-white/40 hover:bg-white/30'
+                        : 'p-1.5 bg-white/60 border border-[#E8DDD7] hover:border-[#63474D]/40 hover:shadow-xs'
                       }`}
-                  />
-                </button>
+                  >
+                    <img
+                      src={user.avatarUrl || defaultAvatar}
+                      alt=""
+                      className="w-7 h-7 rounded-full object-cover border border-[#FFA686]/60 shadow-xs"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = defaultAvatar;
+                      }}
+                    />
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${isExternalRegistration ? 'text-white' : 'text-gray-500'
+                        }`}
+                    />
+                  </button>
 
-                {/* Profile Dropdown Menu */}
-                {userDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-[#E8DDD7] py-2 z-50 animate-fade-in">
-                    <div className="px-4 py-2.5 border-b border-[#E8DDD7]/60">
-                      <p className="text-xs font-bold text-[#2D1F23] truncate">{user.name}</p>
-                      <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
-                    </div>
+                  {/* Profile Dropdown Menu */}
+                  {userDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border border-[#E8DDD7] py-2 z-50 animate-fade-in">
+                      <div className="px-4 py-2.5 border-b border-[#E8DDD7]/60">
+                        <p className="text-xs font-bold text-[#2D1F23] truncate">{user.name}</p>
+                        <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
+                      </div>
 
-                    <div className="py-1">
-                      <Link
-                        to={getDashboardPath()}
-                        onClick={() => setUserDropdownOpen(false)}
-                        className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-[#FAF7F5] hover:text-[#63474D] transition-colors"
-                      >
-                        <LayoutDashboard className="w-4 h-4 text-[#AA767C]" />
-                        <span>Go to Dashboard</span>
-                      </Link>
-
-                      {user.role === 'ATTENDEE' && (
+                      <div className="py-1">
                         <Link
-                          to={getProfilePath()}
+                          to={getDashboardPath()}
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-[#FAF7F5] hover:text-[#63474D] transition-colors"
                         >
-                          <Award className="w-4 h-4 text-[#FFA686]" />
-                          <span>My Profile & Badges</span>
+                          <LayoutDashboard className="w-4 h-4 text-[#AA767C]" />
+                          <span>Go to Dashboard</span>
                         </Link>
+
+                        {user.role === 'ATTENDEE' && (
+                          <Link
+                            to={getProfilePath()}
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-[#FAF7F5] hover:text-[#63474D] transition-colors"
+                          >
+                            <Award className="w-4 h-4 text-[#FFA686]" />
+                            <span>My Profile & Badges</span>
+                          </Link>
+                        )}
+                      </div>
+
+                      {/* Unified Workspace Switcher: Attendee / Organizer / Exhibitor */}
+                      {(user.isOrganizer || user.hasExhibitorApplications || user.roles?.includes('EXHIBITOR')) && (
+                        <div className="py-1 border-t border-[#E8DDD7]/60">
+                          <p className="px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                            Workspaces
+                          </p>
+
+                          <Link
+                            to="/app"
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-1.5 text-xs font-medium text-gray-700 hover:bg-[#FAF7F5] hover:text-[#63474D] transition-colors"
+                          >
+                            <Ticket className="w-3.5 h-3.5 text-[#AA767C]" />
+                            <span>Attendee Workspace</span>
+                          </Link>
+
+                          {user.isOrganizer && (
+                            <Link
+                              to="/organizer"
+                              onClick={() => setUserDropdownOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-1.5 text-xs font-medium text-gray-700 hover:bg-[#FAF7F5] hover:text-[#63474D] transition-colors"
+                            >
+                              <Shield className="w-3.5 h-3.5 text-[#63474D]" />
+                              <span>Organizer Workspace</span>
+                            </Link>
+                          )}
+
+                          {(user.hasExhibitorApplications || user.roles?.includes('EXHIBITOR')) && (
+                            <Link
+                              to="/exhibitor/booths"
+                              onClick={() => setUserDropdownOpen(false)}
+                              className="flex items-center gap-2.5 px-4 py-1.5 text-xs font-medium text-gray-700 hover:bg-[#FAF7F5] hover:text-[#63474D] transition-colors"
+                            >
+                              <Store className="w-3.5 h-3.5 text-[#FFA686]" />
+                              <span>Exhibitor Workspace</span>
+                            </Link>
+                          )}
+                        </div>
                       )}
-                    </div>
 
-                    <div className="pt-1 border-t border-[#E8DDD7]/60">
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer text-left"
-                      >
-                        <LogOut className="w-4 h-4 text-red-500" />
-                        <span>Sign Out</span>
-                      </button>
+                      <div className="pt-1 border-t border-[#E8DDD7]/60">
+                        <button
+                          type="button"
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors cursor-pointer text-left"
+                        >
+                          <LogOut className="w-4 h-4 text-red-500" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ) : isAuthPage ? (
-              <Link
-                to="/"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors"
-              >
-                <span>Back to Home</span>
-              </Link>
-            ) : (
-              <div className="flex items-center gap-2.5">
+                  )}
+                </div>
+              ) : isAuthPage ? (
                 <Link
-                  to={isExternalRegistration ? `/login?redirect=${encodeURIComponent(location.pathname + location.search)}` : "/login"}
-                  className={`inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${isExternalRegistration
-                      ? 'text-white hover:text-white/80 hover:bg-white/10'
-                      : 'text-gray-700 hover:text-[#63474D] hover:bg-gray-100'
-                    }`}
+                  to="/"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors"
                 >
-                  Log In
+                  <span>Back to Home</span>
                 </Link>
-                <Link
-                  to={isExternalRegistration ? `/login?mode=signup&redirect=${encodeURIComponent(location.pathname + location.search)}` : "/login?mode=signup"}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#63474D] text-white text-xs font-bold hover:bg-[#523a3f] shadow-xs hover:shadow-sm transition-all duration-200"
-                >
-                  <span>Sign Up</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-white" />
-                </Link>
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="flex items-center gap-2.5">
+                  <Link
+                    to={isExternalRegistration ? `/login?redirect=${encodeURIComponent(location.pathname + location.search)}` : "/login"}
+                    className={`inline-flex items-center px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${isExternalRegistration
+                        ? 'text-white hover:text-white/80 hover:bg-white/10'
+                        : 'text-gray-700 hover:text-[#63474D] hover:bg-gray-100'
+                      }`}
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    to={isExternalRegistration ? `/login?mode=signup&redirect=${encodeURIComponent(location.pathname + location.search)}` : "/login?mode=signup"}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#63474D] text-white text-xs font-bold hover:bg-[#523a3f] shadow-xs hover:shadow-sm transition-all duration-200"
+                  >
+                    <span>Sign Up</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-white" />
+                  </Link>
+                </div>
+              )}
+            </div>
 
-          {/* Mobile Hamburger Toggle */}
-          <div className="flex md:hidden items-center gap-2">
-            {isAuthenticated && user ? (
+            {/* Mobile Hamburger Toggle */}
+            <div className="flex md:hidden items-center gap-2">
+              {isAuthenticated && user ? (
+                <button
+                  type="button"
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center gap-1.5 p-1 rounded-full border border-[#E8DDD7]"
+                >
+                  <img
+                    src={user.avatarUrl || defaultAvatar}
+                    alt={user.name}
+                    className="w-7 h-7 rounded-full object-cover"
+                  />
+                </button>
+              ) : null}
+
               <button
-                type="button"
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-1.5 p-1 rounded-full border border-[#E8DDD7]"
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
+                aria-label="Toggle navigation menu"
               >
-                <img
-                  src={user.avatarUrl || defaultAvatar}
-                  alt={user.name}
-                  className="w-7 h-7 rounded-full object-cover"
-                />
+                {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
-            ) : null}
-
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
-              aria-label="Toggle navigation menu"
-            >
-              {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* 1-LINE QUICK NAVIGATION SUBNAV (Visible When Logged In, Hidden on External Registration) */}
-      {isAuthenticated && user && !isExternalRegistration && (
+      {/* 1-LINE QUICK NAVIGATION SUBNAV (Visible When Logged In, Hidden on External Registration & Exhibitors Explore) */}
+      {isAuthenticated && user && !isExternalRegistration && !isExhibitorExplore && (
         <div className="pointer-events-auto mt-2 mx-auto max-w-5xl rounded-full bg-[#FAF7F5]/95 backdrop-blur-md border border-[#E8DDD7] py-1.5 px-4 sm:px-6 shadow-sm overflow-x-auto scrollbar-none relative z-10">
           <div className="max-w-7xl mx-auto flex items-center justify-start sm:justify-center gap-2 sm:gap-4 whitespace-nowrap min-w-max text-xs">
             {user.role === 'ATTENDEE' && (
@@ -425,7 +580,7 @@ export default function Header() {
       )}
 
       {/* Mobile Drawer */}
-      {isOpen && (
+      {isOpen && !isExhibitorExplore && (
         <div className="pointer-events-auto md:hidden mt-2 mx-auto max-w-lg w-full rounded-3xl bg-white/98 backdrop-blur-xl border border-gray-200 shadow-2xl px-6 py-6 transition-all duration-300 max-h-[80vh] overflow-y-auto">
           <div className="flex flex-col gap-4">
             {isAuthenticated && user ? (

@@ -7,6 +7,7 @@ import { LiveTicketSimulatorSection } from '../../components/sections/LiveTicket
 import { StrideMilestoneCard } from '../../components/sections/StrideMilestoneCard';
 import { ContactUsSection } from '../../components/sections/ContactUsSection';
 import { EventDiscoverySection } from '../../components/events/EventDiscoverySection';
+import { ExhibitorSpotlightSection } from '../../components/sections/ExhibitorSpotlightSection';
 import FadeIn from '../../components/FadeIn';
 import { ArrowRight } from 'lucide-react';
 
@@ -39,7 +40,10 @@ export const LandingPage: React.FC = () => {
         </FadeIn>
       </section>
 
-      {/* 6. CONTACT US SECTION (BREVO-POWERED INBOX DISPATCH) */}
+      {/* 6. EXHIBITORS & BOOTH MARKETPLACE SPOTLIGHT */}
+      <ExhibitorSpotlightSection />
+
+      {/* 7. CONTACT US SECTION (BREVO-POWERED INBOX DISPATCH) */}
       <ContactUsSection id="contact" />
 
       {/* 6. MINIMALISTIC CLOSING CTA */}

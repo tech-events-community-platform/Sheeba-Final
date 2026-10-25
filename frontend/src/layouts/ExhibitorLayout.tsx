@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink, useNavigate, Link, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, Link, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Header from '../components/Header';
+import { Footer } from '../components/layout/Footer';
 import {
   Store,
   Compass,
@@ -35,6 +37,27 @@ export const ExhibitorLayout: React.FC = () => {
     await logout();
     navigate('/exhibitor/auth');
   };
+
+  const isExploreRoute =
+    location.pathname === '/exhibitor/explore' || location.pathname === '/exhibitor';
+
+  // If user is not authenticated and browsing explore, render clean public layout without dashboard sidebar
+  if (!user && isExploreRoute) {
+    return (
+      <div className="min-h-screen bg-[#FAF7F5] flex flex-col font-sans">
+        <Header />
+        <main className="flex-1 pt-24 sm:pt-28 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl w-full mx-auto">
+          <Outlet />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // If user is not authenticated and trying to access protected exhibitor routes (booths, settings)
+  if (!user) {
+    return <Navigate to="/exhibitor/auth" state={{ from: location }} replace />;
+  }
 
   const navItems = [
     {

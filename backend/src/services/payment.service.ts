@@ -418,6 +418,7 @@ export class PaymentService {
       currency?: string;
       paymentMethods?: PaymentDestination[];
     };
+    expectedAmount?: number;
     paymentReference?: string;
     paymentMethod?: string;
     screenshotUrl?: string;
@@ -425,9 +426,9 @@ export class PaymentService {
   }): Promise<VerifyPaymentResult> {
     const { event, paymentReference, paymentMethod, screenshotBase64 } = params;
 
-    const expectedAmount = Number(event.ticketPrice);
+    const expectedAmount = Number(params.expectedAmount ?? event.ticketPrice);
     if (isNaN(expectedAmount) || expectedAmount <= 0) {
-      throw new Error('Event does not have a valid ticket price.');
+      throw new Error('Payment amount must be greater than 0.');
     }
 
     // Step 1: Execute verification with Links.et

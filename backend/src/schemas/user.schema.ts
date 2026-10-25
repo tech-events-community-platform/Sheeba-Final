@@ -43,15 +43,27 @@ export const updateProfileSchema = z
       .or(z.literal(''))
       .optional()
       .nullable(),
+    company_name: z.string({ message: 'Company name must be a string.' }).optional().nullable(),
+    companyName: z.string({ message: 'Company name must be a string.' }).optional().nullable(),
+    industry_category: z.string({ message: 'Industry category must be a string.' }).optional().nullable(),
+    industryCategory: z.string({ message: 'Industry category must be a string.' }).optional().nullable(),
+    company_phone: z.string({ message: 'Company phone must be a string.' }).optional().nullable(),
+    companyPhone: z.string({ message: 'Company phone must be a string.' }).optional().nullable(),
+    company_website: z.string({ message: 'Company website must be a string.' }).optional().nullable(),
+    companyWebsite: z.string({ message: 'Company website must be a string.' }).optional().nullable(),
   })
   .transform((data) => {
     return {
       full_name: data.full_name !== undefined ? data.full_name : data.name,
       phone: data.phone,
       bio: data.bio,
-      organization: data.organization,
+      organization: data.organization !== undefined ? data.organization : (data.company_name !== undefined ? data.company_name : data.companyName),
       visibility: data.visibility,
       avatar_url: data.avatar_url !== undefined ? data.avatar_url : data.avatarUrl,
+      company_name: data.company_name !== undefined ? data.company_name : data.companyName,
+      industry_category: data.industry_category !== undefined ? data.industry_category : data.industryCategory,
+      company_phone: data.company_phone !== undefined ? data.company_phone : data.companyPhone,
+      company_website: data.company_website !== undefined ? data.company_website : data.companyWebsite,
     };
   });
 

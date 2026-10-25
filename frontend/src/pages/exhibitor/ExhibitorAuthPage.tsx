@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import {
@@ -18,9 +18,21 @@ import {
 
 export const ExhibitorAuthPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const { login, register } = useAuth();
+  const initialMode = searchParams.get('mode');
+  const [isLogin, setIsLogin] = useState(initialMode !== 'register' && initialMode !== 'signup');
   const [showPassword, setShowPassword] = useState(false);
+
+  React.useEffect(() => {
+    const mode = searchParams.get('mode');
+    if (mode === 'register' || mode === 'signup') {
+      setIsLogin(false);
+    } else if (mode === 'login') {
+      setIsLogin(true);
+    }
+  }, [searchParams]);
 
   // Form fields
   const [companyName, setCompanyName] = useState('');
@@ -32,22 +44,75 @@ export const ExhibitorAuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Safely compute the post-auth return destination, preventing open redirects.
+   * Preserves applyEventId if the user arrived from an event discovery card.
+   */
+  const getSafeReturnDestination = (): string => {
+    const rawReturn = (location.state as any)?.returnTo || searchParams.get('returnTo');
+    const rawEventId = (location.state as any)?.eventId || searchParams.get('eventId');
+
+    // Only allow internal relative paths starting with '/' and not '//'
+    let targetPath = '/exhibitor';
+    if (rawReturn && typeof rawReturn === 'string' && rawReturn.startsWith('/') && !rawReturn.startsWith('//')) {
+      targetPath = rawReturn;
+    }
+
+    if (rawEventId && typeof rawEventId === 'string' && /^[a-zA-Z0-9_-]+$/.test(rawEventId)) {
+      const separator = targetPath.includes('?') ? '&' : '?';
+      return `${targetPath}${separator}applyEventId=${encodeURIComponent(rawEventId)}`;
+    }
+
+    return targetPath;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      // In demo mode for teammates: simulated exhibitor sign in or active account
-      if (login) {
-        try {
-          await login(email, password);
-        } catch {
-          // If login fails, proceed for presentation
+      if (isLogin) {
+        await login(email.trim(), password, 'exhibitor');
+        navigate(getSafeReturnDestination(), { replace: true });
+      } else {
+        if (!companyName.trim()) {
+          setError('Company / Organization name is required.');
+          return;
         }
+        if (!contactName.trim()) {
+          setError('Representative contact name is required.');
+          return;
+        }
+        if (!password || password.length < 6) {
+          setError('Password must be at least 6 characters.');
+          return;
+        }
+
+        const res = await register({
+          email: email.trim().toLowerCase(),
+          password,
+          full_name: contactName.trim(),
+          organization: companyName.trim(),
+          phone: phone.trim() || undefined,
+          role: 'EXHIBITOR',
+        });
+
+        if (res.requireOtp) {
+          sessionStorage.setItem('sheeba_pending_otp_email', email.trim().toLowerCase());
+          sessionStorage.setItem('sheeba_pending_otp_redirect', getSafeReturnDestination());
+          navigate(`/verify-otp?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+          return;
+        }
+
+        if (res.isPendingApproval) {
+          navigate('/pending-approval');
+          return;
+        }
+
+        navigate(getSafeReturnDestination(), { replace: true });
       }
-      navigate('/exhibitor');
     } catch (err: any) {
-      setError(err.message || 'Authentication failed.');
+      setError(err.message || 'Authentication failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }

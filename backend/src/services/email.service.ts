@@ -785,6 +785,98 @@ export class EmailService {
   }
 
   /**
+   * Organizer Account Approved Email
+   * Dispatched by AdminService.approveOrganizer() after the DB update succeeds.
+   */
+  static async sendOrganizerApprovalEmail(toEmail: string, fullName: string, organization: string): Promise<void> {
+    const subject = `🎉 Your Sheeba Organizer Account Has Been Approved!`;
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization &amp; Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+          <h2 style="color: #2A7B5F; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Welcome, Community Organizer!</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">Hello ${fullName},</p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Great news! Your organizer application for <strong>${organization}</strong> has been reviewed and approved by the Sheeba Administration.
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 24px 0; font-size: 14px;">
+            You can now sign in to your account and switch to the <strong>Organizer Workspace</strong> from your Account Settings to start creating events, managing attendees, and issuing verifiable credentials.
+          </p>
+
+          <div style="margin: 28px 0; text-align: center;">
+            <a href="${getFrontendUrl()}/login" style="background-color: #63474D; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block; font-size: 14px;">
+              Sign In &amp; Launch Organizer Workspace
+            </a>
+          </div>
+
+          <div style="background-color: #FFF8F6; border-left: 4px solid #FFA686; padding: 12px 16px; border-radius: 4px; margin-top: 20px;">
+            <p style="margin: 0; font-size: 12px; color: #63474D; line-height: 1.5;">
+              <strong>Next step:</strong> Sign in as an Attendee, go to <em>Settings → Organizer Credentials</em>, and click <em>Launch Organizer Workspace</em> to switch your active mode.
+            </p>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 28px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Organizer Account Rejected Email
+   * Dispatched by AdminService.rejectOrganizer() after the DB update succeeds.
+   * Informs the user their attendee access remains fully intact.
+   */
+  static async sendOrganizerRejectionEmail(toEmail: string, fullName: string, organization: string): Promise<void> {
+    const subject = `Update on Your Sheeba Organizer Application`;
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization &amp; Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+          <h2 style="color: #63474D; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Organizer Application Update</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">Hello ${fullName},</p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Thank you for your interest in organizing community events through Sheeba. After reviewing your application for <strong>${organization}</strong>, the Sheeba Administration was unable to approve it at this time.
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 24px 0; font-size: 14px;">
+            <strong>Your attendee account remains fully active.</strong> You can still register for events, collect verifiable attendance badges, and use all attendee features on the platform. You may also update your community details and re-apply from your Account Settings.
+          </p>
+
+          <div style="margin: 28px 0; text-align: center;">
+            <a href="${getFrontendUrl()}/app/settings" style="background-color: #63474D; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block; font-size: 14px;">
+              View Account Settings
+            </a>
+          </div>
+
+          <p style="color: #555; line-height: 1.6; margin: 0; font-size: 13px;">
+            If you believe this was an error or would like to provide additional information about your organization, please contact us at
+            <a href="mailto:sheebanet.events@gmail.com" style="color: #63474D; font-weight: 600;">sheebanet.events@gmail.com</a>.
+          </p>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 28px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
    * Contact Us Notification Email to Sheeba Team
    * Dispatched to the organization email (BREVO_SENDER_EMAIL) when a visitor submits the contact form.
    */

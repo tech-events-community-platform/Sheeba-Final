@@ -80,7 +80,7 @@ export const sponsorResetPasswordStep3Schema = z
 
 export const applyOrganizerSchema = z.object({
   organization: z.string().trim().min(1, 'Please provide an organization or community name.'),
-  applyPassword: z.string().min(1, 'Please enter your account password to authorize your application.'),
+  applyPassword: z.string().optional(),
   bio: z.string().trim().optional(),
   phone: z.string().trim().optional(),
   telegram: z.string().trim().optional(),
@@ -88,7 +88,7 @@ export const applyOrganizerSchema = z.object({
 });
 
 export const switchRoleSchema = z.object({
-  switchPassword: z.string().min(1, 'Please enter your account password.'),
+  switchPassword: z.string().optional(),
 });
 
 export const verifyRegistrationOtpSchema = z.object({

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import {
   Building2,
@@ -13,20 +14,54 @@ import {
 } from 'lucide-react';
 
 export const ExhibitorSettingsPage: React.FC = () => {
-  const { user } = useAuth();
-  const [companyName, setCompanyName] = useState(user?.companyName || user?.organization || 'Acme Tech Solutions');
+  const { user, refreshUser } = useAuth();
+  const [companyName, setCompanyName] = useState(user?.companyName || user?.organization || '');
   const [industryCategory, setIndustryCategory] = useState(user?.industryCategory || 'Tech & Software');
-  const [contactName, setContactName] = useState(user?.name || 'Dawit Kebede');
-  const [email, setEmail] = useState(user?.email || 'contact@acme.et');
-  const [phone, setPhone] = useState(user?.phone || '+251 91 123 4567');
-  const [website, setWebsite] = useState(user?.companyWebsite || 'https://acme.et');
-  const [bio, setBio] = useState(user?.bio || 'Leading provider of cloud infrastructure and enterprise software.');
+  const [contactName, setContactName] = useState(user?.name || '');
+  const [email] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.companyPhone || user?.phone || '');
+  const [website, setWebsite] = useState(user?.companyWebsite || '');
+  const [bio, setBio] = useState(user?.bio || '');
   const [isSaved, setIsSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    if (user) {
+      if (user.companyName || user.organization) setCompanyName(user.companyName || user.organization || '');
+      if (user.industryCategory) setIndustryCategory(user.industryCategory);
+      if (user.name) setContactName(user.name);
+      if (user.companyPhone || user.phone) setPhone(user.companyPhone || user.phone || '');
+      if (user.companyWebsite) setWebsite(user.companyWebsite);
+      if (user.bio) setBio(user.bio);
+    }
+  }, [user]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 4000);
+    setSaving(true);
+    setError(null);
+    try {
+      await api.users.updateProfile({
+        name: contactName.trim(),
+        phone: phone.trim(),
+        bio: bio.trim(),
+        companyName: companyName.trim(),
+        organization: companyName.trim(),
+        industryCategory: industryCategory.trim(),
+        companyPhone: phone.trim(),
+        companyWebsite: website.trim(),
+      });
+      if (refreshUser) {
+        await refreshUser();
+      }
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 4000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update exhibitor profile.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -48,6 +83,13 @@ export const ExhibitorSettingsPage: React.FC = () => {
         <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-semibold flex items-center gap-2">
           <Check className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>Exhibitor profile details updated successfully!</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl text-xs font-semibold flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -123,8 +165,9 @@ export const ExhibitorSettingsPage: React.FC = () => {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-9 pr-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                readOnly
+                disabled
+                className="w-full pl-9 pr-3.5 py-2.5 bg-gray-100 border border-[#E8DDD7] rounded-xl text-xs text-gray-500 cursor-not-allowed"
               />
             </div>
           </div>
@@ -158,8 +201,15 @@ export const ExhibitorSettingsPage: React.FC = () => {
         </div>
 
         <div className="pt-3 border-t border-gray-100 flex justify-end">
-          <Button type="submit" variant="primary" size="sm" icon={<Check className="w-3.5 h-3.5" />}>
-            Save Changes
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            isLoading={saving}
+            disabled={saving}
+            icon={<Check className="w-3.5 h-3.5" />}
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
           </Button>
         </div>
       </form>

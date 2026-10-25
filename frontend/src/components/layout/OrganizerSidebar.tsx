@@ -11,6 +11,7 @@ import {
   HandCoins,
   ChevronLeft,
   ChevronRight,
+  Store,
 } from 'lucide-react';
 
 export const OrganizerSidebar: React.FC = () => {
@@ -32,6 +33,7 @@ export const OrganizerSidebar: React.FC = () => {
   const navItems = [
     { label: 'Dashboard', path: '/organizer', icon: LayoutDashboard },
     { label: 'Create Event', path: '/organizer/events/create', icon: PlusCircle },
+    { label: 'Exhibitors', path: '/organizer/exhibitors', icon: Store },
     { label: 'Apply to Sponsors', path: '/organizer/apply-sponsors', icon: HandCoins },
     { label: 'Check-in', path: '/organizer/check-in', icon: QrCode },
     { label: 'Badges', path: '/organizer/badges', icon: Award },
@@ -42,6 +44,7 @@ export const OrganizerSidebar: React.FC = () => {
   const isActive = (path: string) => {
     if (path === '/organizer') return location.pathname === '/organizer';
     if (path === '/organizer/events/create') return location.pathname === '/organizer/events/create';
+    if (path === '/organizer/exhibitors') return location.pathname.startsWith('/organizer/exhibitors');
     if (path === '/organizer/apply-sponsors') return location.pathname.startsWith('/organizer/apply-sponsors');
     if (path === '/organizer/check-in') {
       return location.pathname.startsWith('/organizer/check-in') || location.pathname.includes('/scanner');

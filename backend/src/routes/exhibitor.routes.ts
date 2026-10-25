@@ -8,9 +8,75 @@ import {
   addManualVendorSchema,
   updateVendorSchema,
   vendorQuerySchema,
+  applyExhibitorSchema,
+  createVisitorSchema,
+  payBoothSchema,
+  submitBoothReceiptSchema,
+  verifyBoothReceiptSchema,
+  rejectBoothReceiptSchema,
 } from '../schemas/exhibitor.schema';
 
 const router = Router();
+
+// Exhibitor: Get authenticated exhibitor's applications & booths
+router.get(
+  '/my-booths',
+  authenticate,
+  ExhibitorController.getMyBooths
+);
+
+// Exhibitor: Pay for an accepted booth
+router.post(
+  '/booths/:vendorId/pay',
+  authenticate,
+  validateBody(payBoothSchema),
+  ExhibitorController.payForBooth
+);
+
+// Exhibitor: Submit offline bank-transfer receipt for an accepted booth
+router.post(
+  '/booths/:vendorId/receipt',
+  authenticate,
+  validateBody(submitBoothReceiptSchema),
+  ExhibitorController.submitBoothReceipt
+);
+
+// Exhibitor: Get receipt submission history for own booth booking
+router.get(
+  '/booths/:vendorId/receipts',
+  authenticate,
+  ExhibitorController.getBoothReceiptHistory
+);
+
+// Exhibitor: Lead Capture - Get visitors logged for a booth
+router.get(
+  '/booths/:vendorId/visitors',
+  authenticate,
+  ExhibitorController.getBoothVisitors
+);
+
+// Exhibitor: Lead Capture - Log a visitor who stopped by
+router.post(
+  '/booths/:vendorId/visitors',
+  authenticate,
+  validateBody(createVisitorSchema),
+  ExhibitorController.addBoothVisitor
+);
+
+// Exhibitor: Lead Capture - Delete a logged visitor
+router.delete(
+  '/booths/:vendorId/visitors/:visitorId',
+  authenticate,
+  ExhibitorController.deleteBoothVisitor
+);
+
+// Exhibitor: Apply for booth space at an open event call
+router.post(
+  '/events/:eventId/apply',
+  authenticate,
+  validateBody(applyExhibitorSchema),
+  ExhibitorController.applyForBooth
+);
 
 // Public: View confirmed exhibitors for public event page
 router.get(
@@ -78,5 +144,30 @@ router.delete(
   ExhibitorController.deleteVendor
 );
 
-export default router;
+// Organizer: View receipt history for an exhibitor booth in an event
+router.get(
+  '/events/:eventId/vendors/:vendorId/receipts',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  ExhibitorController.getVendorReceiptHistory
+);
 
+// Organizer: Verify offline bank-transfer receipt and confirm booth booking
+router.post(
+  '/events/:eventId/vendors/:vendorId/verify-receipt',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateBody(verifyBoothReceiptSchema),
+  ExhibitorController.verifyBoothReceipt
+);
+
+// Organizer: Reject invalid offline bank-transfer receipt
+router.post(
+  '/events/:eventId/vendors/:vendorId/reject-receipt',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateBody(rejectBoothReceiptSchema),
+  ExhibitorController.rejectBoothReceipt
+);
+
+export default router;

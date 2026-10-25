@@ -191,6 +191,8 @@ export interface IBadgeAward {
   issuer_name?: string;
 }
 
+export type PaymentType = 'ticket' | 'exhibitor_booth';
+
 export interface IPayment {
   id: string;
   transaction_id: string;
@@ -201,6 +203,8 @@ export interface IPayment {
   organizer_payout: number;
   currency: string;
   status: 'SETTLED' | 'FAILED' | 'PENDING' | 'REFUNDED';
+  payment_type?: PaymentType;
+  vendor_id?: string;
   created_at: Date;
   updated_at: Date;
   // Joined fields
@@ -413,6 +417,14 @@ export interface IExhibitorRegistration {
 }
 
 export type ExhibitorCallStatus = 'draft' | 'open' | 'closed';
+export type ExhibitorPricingMode = 'per_sqm' | 'fixed';
+
+export interface IExhibitorPaymentConfig {
+  destinations?: PaymentDestination[];
+  instructions?: string;
+  allowChapa?: boolean;
+  allowManual?: boolean;
+}
 
 export interface IExhibitorCall {
   id: string;
@@ -420,11 +432,15 @@ export interface IExhibitorCall {
   is_enabled: boolean;
   status: ExhibitorCallStatus;
   description?: string;
+  pricing_mode: ExhibitorPricingMode;
   total_space_sqm: number;
   price_per_sqm: number;
+  fixed_fee: number;
   sheeba_cut_percent: number;
   max_exhibitors: number;
   specifications?: string;
+  custom_questions?: RegistrationQuestion[];
+  payment_config?: IExhibitorPaymentConfig;
   application_deadline?: Date | string;
   has_booth_numbers: boolean;
   has_vendor_checkin: boolean;
@@ -435,6 +451,27 @@ export interface IExhibitorCall {
   event_title?: string;
   event_date?: Date;
   event_location?: string;
+  // Dual-key camelCase support
+  eventId?: string;
+  isEnabled?: boolean;
+  pricingMode?: ExhibitorPricingMode;
+  totalSpaceSqm?: number;
+  pricePerSqm?: number;
+  fixedFee?: number;
+  sheebaCutPercent?: number;
+  maxExhibitors?: number;
+  customQuestions?: RegistrationQuestion[];
+  paymentConfig?: IExhibitorPaymentConfig;
+  applicationDeadline?: Date | string;
+  hasBoothNumbers?: boolean;
+  hasVendorCheckin?: boolean;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  confirmedVendorsCount?: number;
+  totalSpaceAllocated?: number;
+  eventTitle?: string;
+  eventDate?: Date;
+  eventLocation?: string;
 }
 
 export type VendorSource = 'applied' | 'manual' | 'sponsorship';
@@ -454,12 +491,14 @@ export interface IEventVendor {
   contact_phone?: string;
   showcase_description?: string;
   special_requirements?: string;
+  pricing_mode?: ExhibitorPricingMode;
   space_sqm: number;
   organizer_price_per_sqm: number;
   sheeba_cut_percent: number;
   total_organizer_amount: number;
   total_cut_amount: number;
   total_final_amount: number;
+  question_answers?: Record<string, any>;
   booth_number?: string;
   status: VendorStatus;
   rejection_reason?: string;
@@ -473,6 +512,7 @@ export interface IEventVendor {
   event_title?: string;
   event_date?: Date;
   event_location?: string;
+  latestReceipt?: any;
 }
 
 export interface IExhibitorBoothVisitor {

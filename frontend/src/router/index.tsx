@@ -59,6 +59,7 @@ import { BadgesPage as OrganizerBadgesPage } from '../pages/organizer/BadgesPage
 import { ReportPage } from '../pages/organizer/ReportPage';
 import { EventListPage } from '../pages/organizer/EventListPage';
 import { ApplyToSponsorsPage } from '../pages/organizer/ApplyToSponsorsPage';
+import { OrganizerExhibitorsPage } from '../pages/organizer/OrganizerExhibitorsPage';
 
 import { ScannerPage } from '../pages/organizer/ScannerPage';
 
@@ -94,6 +95,7 @@ export const router = createBrowserRouter([
       { path: 'sponsor/auth', element: <SponsorAuthPage /> },
       { path: 'sponsor/forgot-password', element: <SponsorForgotPasswordPage /> },
       { path: 'exhibitor/auth', element: <ExhibitorAuthPage /> },
+      { path: 'exhibitors', element: <ExhibitorExplorePage /> },
     ],
   },
   // Protected Attendee Routes (/app)
@@ -142,6 +144,8 @@ export const router = createBrowserRouter([
           { path: 'badges/:id', element: <OrganizerBadgesPage /> },
           { path: 'reports', element: <ReportPage /> },
           { path: 'reports/:id', element: <ReportPage /> },
+          { path: 'exhibitors', element: <OrganizerExhibitorsPage /> },
+          { path: 'exhibitors/:id', element: <OrganizerExhibitorsPage /> },
           { path: 'apply-sponsors', element: <ApplyToSponsorsPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
           { path: 'change-password', element: <ChangePasswordPage /> },
