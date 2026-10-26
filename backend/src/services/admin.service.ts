@@ -61,7 +61,7 @@ export class AdminService {
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON u.id = t.user_id
       LEFT JOIN badge_awards b ON b.event_id = r.event_id AND b.user_id = u.id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
-      WHERE u.role = 'attendee' OR u.role IS NULL OR u.role != 'admin'
+      WHERE u.role = 'attendee' OR u.role IS NULL
       GROUP BY u.id
       ORDER BY u.created_at DESC
     `);
@@ -170,7 +170,7 @@ export class AdminService {
            is_active = TRUE,
            updated_at = NOW()
        WHERE id = $1 AND (role = 'organizer' OR is_organizer = TRUE OR organizer_approval_status IS NOT NULL)
-       RETURNING id, full_name, email, role, is_active, approval_status, organizer_approval_status`,
+       RETURNING id, full_name, email, role, organization, is_active, approval_status, organizer_approval_status`,
       [userId]
     );
 
@@ -180,7 +180,18 @@ export class AdminService {
       throw err;
     }
 
-    return res.rows[0];
+    const user = res.rows[0];
+    try {
+      await EmailService.sendOrganizerApprovalEmail(
+        user.email,
+        user.full_name,
+        user.organization || user.full_name
+      );
+    } catch (e) {
+      console.warn('Failed to dispatch organizer approval email:', e);
+    }
+
+    return user;
   }
 
   static async rejectOrganizer(userId: string) {
@@ -188,9 +199,11 @@ export class AdminService {
       `UPDATE users
        SET approval_status = 'rejected',
            organizer_approval_status = 'rejected',
+           role = 'attendee',
+           is_active = TRUE,
            updated_at = NOW()
        WHERE id = $1 AND (role = 'organizer' OR is_organizer = TRUE OR organizer_approval_status IS NOT NULL)
-       RETURNING id, full_name, email, role, is_active, approval_status, organizer_approval_status`,
+       RETURNING id, full_name, email, role, organization, is_active, approval_status, organizer_approval_status`,
       [userId]
     );
 
@@ -200,7 +213,18 @@ export class AdminService {
       throw err;
     }
 
-    return res.rows[0];
+    const user = res.rows[0];
+    try {
+      await EmailService.sendOrganizerRejectionEmail(
+        user.email,
+        user.full_name,
+        user.organization || user.full_name
+      );
+    } catch (e) {
+      console.warn('Failed to dispatch organizer rejection email:', e);
+    }
+
+    return user;
   }
 
   static async approveSponsor(userId: string) {

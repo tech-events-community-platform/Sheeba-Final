@@ -37,10 +37,10 @@ export const registerSchema = z
           message: 'Administrator accounts cannot be created via public registration.',
           path: ['role'],
         });
-      } else if (!['attendee', 'organizer', 'sponsor'].includes(norm)) {
+      } else if (!['attendee', 'organizer', 'sponsor', 'exhibitor'].includes(norm)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Role must be either ATTENDEE or ORGANIZER.',
+          message: 'Role must be ATTENDEE, ORGANIZER, SPONSOR, or EXHIBITOR.',
           path: ['role'],
         });
       }
@@ -50,7 +50,7 @@ export const registerSchema = z
 export const loginSchema = z.object({
   email: z.string().trim().email('Please provide a valid email address.'),
   password: z.string().min(6, 'Password must be at least 6 characters long.'),
-  role: z.enum(['attendee', 'organizer', 'sponsor', 'ATTENDEE', 'ORGANIZER', 'SPONSOR']).optional(),
+  role: z.enum(['attendee', 'organizer', 'sponsor', 'exhibitor', 'ATTENDEE', 'ORGANIZER', 'SPONSOR', 'EXHIBITOR']).optional(),
 });
 
 export const forgotPasswordSchema = z.object({
@@ -104,7 +104,7 @@ export const googleAuthSchema = z.object({
 
 export const applyOrganizerSchema = z.object({
   organization: z.string().trim().min(1, 'Organization / Community name is required.'),
-  password: z.string().min(1, 'Please confirm with your account password to submit your application.'),
+  password: z.string().optional(),
   bio: z.string().trim().optional(),
   phone: z.string().trim().optional(),
   socials: z.record(z.string(), z.string()).optional(),

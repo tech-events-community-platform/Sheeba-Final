@@ -15,11 +15,16 @@ export class AuthService {
       ? user.organizer_approval_status
       : (user.role?.toLowerCase() === 'organizer' ? (user.approval_status || 'pending') : 'none');
 
+    const hasExhibitorApplications = Boolean(
+      user.has_exhibitor_applications || user.role?.toLowerCase() === 'exhibitor'
+    );
+
     const roles = [
       'ATTENDEE',
       ...(isOrganizer ? ['ORGANIZER'] : []),
       ...(user.role?.toLowerCase() === 'admin' ? ['ADMIN'] : []),
       ...(isSponsor ? ['SPONSOR'] : []),
+      ...(hasExhibitorApplications ? ['EXHIBITOR'] : []),
     ];
 
     return {
@@ -41,7 +46,9 @@ export class AuthService {
       approvalStatus: user.approval_status || (user.role?.toLowerCase() === 'organizer' ? 'pending' : 'approved'),
       isOrganizer,
       organizerApprovalStatus,
+      hasExhibitorApplications,
       mustChangePassword: Boolean(user.must_change_password),
+      hasPassword: user.has_password !== undefined ? Boolean(user.has_password) : Boolean(user.password_hash),
       roles,
       stats: stats || {
         meetupsCount: 0,
@@ -189,6 +196,7 @@ export class AuthService {
         JSON.stringify({
           full_name: full_name.trim(),
           password_hash: passwordHash,
+          role: normalizedRole,
           phone: phone ? phone.trim() : null,
           bio: bio ? bio.trim() : null,
           organization: organization ? organization.trim() : null,
@@ -273,13 +281,15 @@ export class AuthService {
 
     const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(meta.full_name || 'Attendee')}&background=63474D&color=fff`;
 
+    const userRole = (meta.role || 'attendee').toLowerCase();
+
     const result = await query<IUser>(
       `INSERT INTO users (
         email, password_hash, full_name, role, phone, bio, organization,
         avatar_url, visibility, member_since, is_active, approval_status,
         is_organizer, organizer_approval_status
        )
-       VALUES (LOWER($1), $2, $3, 'attendee', $4, $5, $6, $7, 'public', 'August 2026', TRUE, 'approved', FALSE, 'none')
+       VALUES (LOWER($1), $2, $3, $8, $4, $5, $6, $7, 'public', 'August 2026', TRUE, 'approved', FALSE, 'none')
        RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, created_at, updated_at`,
       [
         cleanEmail,
@@ -289,6 +299,7 @@ export class AuthService {
         meta.bio || null,
         meta.organization || null,
         avatarUrl,
+        userRole,
       ]
     );
 
@@ -297,11 +308,11 @@ export class AuthService {
     // Clean up OTP record
     await query('DELETE FROM otp_verifications WHERE id = $1', [record.id]);
 
-    // Generate authenticated attendee session token
+    // Generate authenticated session token
     const token = signAuthToken({
       userId: rawUser.id,
       email: rawUser.email,
-      role: 'attendee',
+      role: (rawUser.role || userRole) as UserRole,
       fullName: rawUser.full_name,
     });
 
@@ -375,7 +386,9 @@ export class AuthService {
     const { email, password, role } = data;
 
     const result = await query<IUser>(
-      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, created_at, updated_at
+      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password,
+              (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
+              created_at, updated_at
        FROM users WHERE LOWER(email) = LOWER($1)`,
       [email]
     );
@@ -464,6 +477,8 @@ export class AuthService {
       sessionRole = 'admin';
     } else if (requestedRole === 'sponsor') {
       sessionRole = 'sponsor';
+    } else if (requestedRole === 'exhibitor') {
+      sessionRole = 'exhibitor';
     } else if (requestedRole === 'organizer') {
       if (!isOrganizerAccount && !isAdmin) {
         const err: any = new Error('Incorrect email or password.');
@@ -490,6 +505,8 @@ export class AuthService {
           throw err;
         }
         sessionRole = 'sponsor';
+      } else if (rawUser.role?.toLowerCase() === 'exhibitor') {
+        sessionRole = 'exhibitor';
       } else if (rawUser.role?.toLowerCase() === 'organizer') {
         if (organizerStatus !== 'approved') {
           const err: any = new Error('Your organizer application is under review by Sheeba Administration. It is typically reviewed within 1 hour.');
@@ -523,7 +540,9 @@ export class AuthService {
 
   static async getCurrentUser(userId: string): Promise<any> {
     const result = await query<IUser>(
-      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, created_at, updated_at
+      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, (password_hash IS NOT NULL) AS has_password,
+              (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
+              created_at, updated_at
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -1018,10 +1037,10 @@ export class AuthService {
       const isOrganizer = assignedRole === 'organizer';
       const approvalStatus = isOrganizer ? 'pending' : 'approved';
       const insertRes = await query(
-        `INSERT INTO users (email, full_name, role, avatar_url, google_id, approval_status, member_since, is_organizer, organizer_approval_status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO users (email, full_name, role, avatar_url, google_id, approval_status, member_since, is_organizer, organizer_approval_status, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
-        [email, fullName, assignedRole, avatarUrl, googleId, approvalStatus, 'September 2026', isOrganizer, isOrganizer ? 'pending' : 'none']
+        [email, fullName, assignedRole, avatarUrl, googleId, approvalStatus, 'September 2026', isOrganizer, isOrganizer ? 'pending' : 'none', isOrganizer ? false : true]
       );
       user = insertRes.rows[0];
 

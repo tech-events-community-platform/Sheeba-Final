@@ -32,6 +32,13 @@ import { SponsorDealsPage } from '../pages/sponsor/SponsorDealsPage';
 import { SponsorDeliverablesPage } from '../pages/sponsor/SponsorDeliverablesPage';
 import { SponsorApplicationDetailPage } from '../pages/sponsor/SponsorApplicationDetailPage';
 
+// Exhibitor Pages & Layout
+import { ExhibitorLayout } from '../layouts/ExhibitorLayout';
+import { ExhibitorAuthPage } from '../pages/exhibitor/ExhibitorAuthPage';
+import { ExhibitorExplorePage } from '../pages/exhibitor/ExhibitorExplorePage';
+import { ExhibitorBoothsPage } from '../pages/exhibitor/ExhibitorBoothsPage';
+import { ExhibitorSettingsPage } from '../pages/exhibitor/ExhibitorSettingsPage';
+
 // Attendee Pages
 import { BadgesPage as AttendeeBadgesPage } from '../pages/attendee/BadgesPage';
 import { AttendeeDashboardPage } from '../pages/attendee/DashboardPage';
@@ -52,6 +59,7 @@ import { BadgesPage as OrganizerBadgesPage } from '../pages/organizer/BadgesPage
 import { ReportPage } from '../pages/organizer/ReportPage';
 import { EventListPage } from '../pages/organizer/EventListPage';
 import { ApplyToSponsorsPage } from '../pages/organizer/ApplyToSponsorsPage';
+import { OrganizerExhibitorsPage } from '../pages/organizer/OrganizerExhibitorsPage';
 
 import { ScannerPage } from '../pages/organizer/ScannerPage';
 
@@ -86,6 +94,8 @@ export const router = createBrowserRouter([
       { path: 'tickets/verify/:token', element: <VerifyTicketPage /> },
       { path: 'sponsor/auth', element: <SponsorAuthPage /> },
       { path: 'sponsor/forgot-password', element: <SponsorForgotPasswordPage /> },
+      { path: 'exhibitor/auth', element: <ExhibitorAuthPage /> },
+      { path: 'exhibitors', element: <ExhibitorExplorePage /> },
     ],
   },
   // Protected Attendee Routes (/app)
@@ -134,6 +144,8 @@ export const router = createBrowserRouter([
           { path: 'badges/:id', element: <OrganizerBadgesPage /> },
           { path: 'reports', element: <ReportPage /> },
           { path: 'reports/:id', element: <ReportPage /> },
+          { path: 'exhibitors', element: <OrganizerExhibitorsPage /> },
+          { path: 'exhibitors/:id', element: <OrganizerExhibitorsPage /> },
           { path: 'apply-sponsors', element: <ApplyToSponsorsPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
           { path: 'change-password', element: <ChangePasswordPage /> },
@@ -180,6 +192,19 @@ export const router = createBrowserRouter([
           { path: 'dashboard', element: <Navigate to="/sponsor" replace /> },
         ],
       },
+    ],
+  },
+  // Exhibitor Routes (/exhibitor)
+  {
+    path: '/exhibitor',
+    element: <ExhibitorLayout />,
+    children: [
+      { index: true, element: <ExhibitorExplorePage /> },
+      { path: 'explore', element: <ExhibitorExplorePage /> },
+      { path: 'booths', element: <ExhibitorBoothsPage /> },
+      { path: 'applications', element: <ExhibitorBoothsPage /> },
+      { path: 'settings', element: <ExhibitorSettingsPage /> },
+      { path: 'change-password', element: <ChangePasswordPage /> },
     ],
   },
   // Fallback redirect

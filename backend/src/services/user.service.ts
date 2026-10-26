@@ -69,6 +69,10 @@ export class UserService {
       organization?: string;
       visibility?: 'public' | 'private';
       avatar_url?: string;
+      company_name?: string | null;
+      industry_category?: string | null;
+      company_phone?: string | null;
+      company_website?: string | null;
     }
   ) {
     const fields: string[] = [];
@@ -91,6 +95,22 @@ export class UserService {
       fields.push(`organization = $${counter++}`);
       values.push(data.organization);
     }
+    if (data.company_name !== undefined) {
+      fields.push(`company_name = $${counter++}`);
+      values.push(data.company_name);
+    }
+    if (data.industry_category !== undefined) {
+      fields.push(`industry_category = $${counter++}`);
+      values.push(data.industry_category);
+    }
+    if (data.company_phone !== undefined) {
+      fields.push(`company_phone = $${counter++}`);
+      values.push(data.company_phone);
+    }
+    if (data.company_website !== undefined) {
+      fields.push(`company_website = $${counter++}`);
+      values.push(data.company_website);
+    }
     if (data.visibility !== undefined) {
       fields.push(`visibility = $${counter++}`);
       values.push(data.visibility);
@@ -111,7 +131,7 @@ export class UserService {
       UPDATE users
       SET ${fields.join(', ')}
       WHERE id = $${counter}
-      RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, created_at, updated_at
+      RETURNING id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, created_at, updated_at
     `;
 
     const result = await query(queryText, values);

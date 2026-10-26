@@ -16,6 +16,7 @@ import {
   YouTubeIcon,
 } from '../../components/ui/SocialIcons';
 import { getCalendarTile, isEventPassed } from '../../utils/date';
+import { EventPublicExhibitorsSection } from '../../components/public/EventPublicExhibitorsSection';
 
 export const PublicRegisterPage: React.FC = () => {
   const { token, id } = useParams<{ token?: string; id?: string }>();
@@ -290,6 +291,9 @@ export const PublicRegisterPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Featured Exhibitors Section */}
+            <EventPublicExhibitorsSection eventId={event.id} />
           </div>
 
           {/* RIGHT COLUMN: Poster Image on Right (Positioned at red box level) + Presented By + Sticky Scrolling */}

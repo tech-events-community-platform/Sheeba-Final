@@ -4,6 +4,20 @@ import type { BadgeAward, BadgeCode, SponsorReportData, AttendeeRosterItem } fro
 import type { User, UserRole, ProfileVisibility } from '../types/user';
 import type { EventReviewItem, EventReviewsSummary } from '../types/review';
 import type { SponsorRecommendationsResponse, SponsorPreferences } from '../types/matching';
+import type {
+  IExhibitorCall,
+  IEventVendor,
+  IExhibitorCallUpsertPayload,
+  IManualVendorPayload,
+  IExhibitorApplicationPayload,
+  IExhibitorBoothVisitor,
+  IBoothVisitorPayload,
+  IExhibitorBooth,
+  IBoothReceipt,
+  ISubmitBoothReceiptPayload,
+  IVerifyBoothReceiptPayload,
+  IRejectBoothReceiptPayload,
+} from '../types/exhibitor';
 import { getEndOfEventDay } from '../utils/date';
 
 /**
@@ -1899,6 +1913,225 @@ export const api = {
     },
   },
 
+  exhibitors: {
+    getCall: async (eventId: string) => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorCall & { stats: { confirmedCount: number; totalSpaceAllocated: number; totalSpaceRemaining: number } } }>(
+        `/exhibitors/events/${eventId}/call`
+      );
+      return res.data;
+    },
+
+    saveCall: async (eventId: string, payload: IExhibitorCallUpsertPayload) => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorCall }>(
+        `/exhibitors/events/${eventId}/call`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    getVendors: async (eventId: string, params?: { search?: string; source?: string; status?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.search) qs.append('search', params.search);
+      if (params?.source) qs.append('source', params.source);
+      if (params?.status) qs.append('status', params.status);
+      const queryStr = qs.toString() ? `?${qs.toString()}` : '';
+      const res = await requestApi<{ success: boolean; data: { vendors: IEventVendor[]; totalCount: number; confirmedCount: number; pendingCount: number } }>(
+        `/exhibitors/events/${eventId}/vendors${queryStr}`
+      );
+      return res.data;
+    },
+
+    addManualVendor: async (eventId: string, payload: IManualVendorPayload) => {
+      const res = await requestApi<{ success: boolean; data: IEventVendor }>(
+        `/exhibitors/events/${eventId}/vendors`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    updateVendor: async (eventId: string, vendorId: string, payload: Partial<IManualVendorPayload & { status: string; rejectionReason: string }>) => {
+      const res = await requestApi<{ success: boolean; data: IEventVendor }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    deleteVendor: async (eventId: string, vendorId: string) => {
+      const res = await requestApi<{ success: boolean }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      return res;
+    },
+
+    getPublicExhibitors: async (eventId: string) => {
+      try {
+        const res = await requestApi<{
+          success: boolean; data: Array<{
+            id: string;
+            businessName: string;
+            category: string | null;
+            showcaseDescription: string | null;
+            spaceSqm: number;
+            boothNumber: string | null;
+            logoUrl: string | null;
+            websiteUrl: string | null;
+            source: string;
+          }>
+        }>(
+          `/exhibitors/events/${eventId}/public`
+        );
+        return res.data || [];
+      } catch {
+        return [];
+      }
+    },
+
+    exploreOpenCalls: async (params?: { category?: string; search?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.category) qs.append('category', params.category);
+      if (params?.search) qs.append('search', params.search);
+      const queryStr = qs.toString() ? `?${qs.toString()}` : '';
+      const res = await requestApi<{ success: boolean; data: any[] }>(
+        `/exhibitors/explore${queryStr}`
+      );
+      return res.data || [];
+    },
+
+    apply: async (eventId: string, payload: IExhibitorApplicationPayload) => {
+      const res = await requestApi<{ success: boolean; data: IEventVendor; message: string }>(
+        `/exhibitors/events/${eventId}/apply`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    getMyBooths: async (): Promise<IExhibitorBooth[]> => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorBooth[] }>('/exhibitors/my-booths');
+      return res.data || [];
+    },
+
+    payForBooth: async (
+      vendorId: string,
+      payload?: {
+        paymentMethod?: string;
+        paymentReference?: string;
+        screenshotUrl?: string | null;
+        screenshotBase64?: string | null;
+        transactionId?: string;
+      }
+    ): Promise<IEventVendor> => {
+      const res = await requestApi<{ success: boolean; data: IEventVendor; message: string }>(
+        `/exhibitors/booths/${vendorId}/pay`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload || {}),
+        }
+      );
+      return res.data;
+    },
+
+    getBoothVisitors: async (vendorId: string): Promise<IExhibitorBoothVisitor[]> => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorBoothVisitor[] }>(
+        `/exhibitors/booths/${vendorId}/visitors`
+      );
+      return res.data || [];
+    },
+
+    addBoothVisitor: async (vendorId: string, payload: IBoothVisitorPayload): Promise<IExhibitorBoothVisitor> => {
+      const res = await requestApi<{ success: boolean; data: IExhibitorBoothVisitor; message: string }>(
+        `/exhibitors/booths/${vendorId}/visitors`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    deleteBoothVisitor: async (vendorId: string, visitorId: string): Promise<void> => {
+      await requestApi<{ success: boolean; message: string }>(
+        `/exhibitors/booths/${vendorId}/visitors/${visitorId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+    },
+
+    submitBoothReceipt: async (
+      vendorId: string,
+      payload: ISubmitBoothReceiptPayload
+    ): Promise<{ message: string; payment: IBoothReceipt }> => {
+      const res = await requestApi<{ success: boolean; data: { message: string; payment: IBoothReceipt }; message: string }>(
+        `/exhibitors/booths/${vendorId}/receipt`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    getBoothReceipts: async (vendorId: string): Promise<IBoothReceipt[]> => {
+      const res = await requestApi<{ success: boolean; data: IBoothReceipt[] }>(
+        `/exhibitors/booths/${vendorId}/receipts`
+      );
+      return res.data || [];
+    },
+
+    getVendorReceipts: async (eventId: string, vendorId: string): Promise<IBoothReceipt[]> => {
+      const res = await requestApi<{ success: boolean; data: IBoothReceipt[] }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}/receipts`
+      );
+      return res.data || [];
+    },
+
+    verifyBoothReceipt: async (
+      eventId: string,
+      vendorId: string,
+      payload: IVerifyBoothReceiptPayload
+    ): Promise<{ vendor: IEventVendor; payment: IBoothReceipt }> => {
+      const res = await requestApi<{ success: boolean; data: { vendor: IEventVendor; payment: IBoothReceipt }; message: string }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}/verify-receipt`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+
+    rejectBoothReceipt: async (
+      eventId: string,
+      vendorId: string,
+      payload: IRejectBoothReceiptPayload
+    ): Promise<{ success: boolean; message: string; payment: IBoothReceipt }> => {
+      const res = await requestApi<{ success: boolean; data: { success: boolean; message: string; payment: IBoothReceipt }; message: string }>(
+        `/exhibitors/events/${eventId}/vendors/${vendorId}/reject-receipt`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+      return res.data;
+    },
+  },
+
   contact: {
     sendMessage: async (payload: {
       name: string;
@@ -1961,6 +2194,36 @@ export const api = {
         method: 'DELETE',
       });
       return true;
+    },
+  },
+
+  users: {
+    getProfile: async (): Promise<User> => {
+      const res = await requestApi<{ success: boolean; data: User }>('/users/me');
+      return res.data;
+    },
+    updateProfile: async (payload: {
+      name?: string;
+      full_name?: string;
+      phone?: string;
+      bio?: string;
+      organization?: string;
+      companyName?: string;
+      company_name?: string;
+      industryCategory?: string;
+      industry_category?: string;
+      companyPhone?: string;
+      company_phone?: string;
+      companyWebsite?: string;
+      company_website?: string;
+      avatarUrl?: string;
+      visibility?: 'public' | 'private';
+    }): Promise<User> => {
+      const res = await requestApi<{ success: boolean; data: User }>('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      return res.data;
     },
   },
 };

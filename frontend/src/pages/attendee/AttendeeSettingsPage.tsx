@@ -23,6 +23,7 @@ import {
   Clock,
   X,
   KeyRound,
+  Store,
 } from 'lucide-react';
 import type { ProfileVisibility } from '../../types/user';
 import {
@@ -94,9 +95,15 @@ export const AttendeeSettingsPage: React.FC = () => {
   }, [user, location.state]);
 
   const handleApplyOrganizer = async (e: React.FormEvent) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (user?.hasPassword !== false && !applyPassword) {
+      setApplyError('Please enter your account password to authorize your application.');
+      return;
+    }
+
     const validation = validateForm(applyOrganizerSchema, {
       organization: orgName,
-      applyPassword,
+      applyPassword: applyPassword || undefined,
       bio: orgBio,
       phone: orgPhone,
       telegram,
@@ -117,7 +124,7 @@ export const AttendeeSettingsPage: React.FC = () => {
         organization: orgName.trim(),
         bio: orgBio.trim(),
         phone: orgPhone.trim(),
-        password: applyPassword,
+        password: applyPassword || undefined,
         socials: {
           telegram: telegram.trim(),
           x: xHandle.trim(),
@@ -136,7 +143,13 @@ export const AttendeeSettingsPage: React.FC = () => {
   };
 
   const handleSwitchToOrganizer = async (e: React.FormEvent) => {
-    const validation = validateForm(switchRoleSchema, { switchPassword });
+    if (e?.preventDefault) e.preventDefault();
+    if (user?.hasPassword !== false && !switchPassword) {
+      setSwitchError('Please enter your account password.');
+      return;
+    }
+
+    const validation = validateForm(switchRoleSchema, { switchPassword: switchPassword || undefined });
     if (!validation.success) {
       setSwitchError(validation.errors.switchPassword || 'Please enter your account password.');
       return;
@@ -146,7 +159,7 @@ export const AttendeeSettingsPage: React.FC = () => {
     setSwitchError(null);
 
     try {
-      await switchRole('ORGANIZER', switchPassword);
+      await switchRole('ORGANIZER', switchPassword || undefined);
       setShowSwitchModal(false);
       navigate('/organizer');
     } catch (err: any) {
@@ -606,20 +619,22 @@ export const AttendeeSettingsPage: React.FC = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-[#63474D]" />
-                      Account Password Verification *
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      value={applyPassword}
-                      onChange={(e) => setApplyPassword(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    />
-                  </div>
+                  {user?.hasPassword !== false && (
+                    <div>
+                      <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-[#63474D]" />
+                        Account Password Verification *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={applyPassword}
+                        onChange={(e) => setApplyPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 pt-2">
@@ -642,6 +657,53 @@ export const AttendeeSettingsPage: React.FC = () => {
                 </div>
               </form>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* 2b. Exhibitor Applications & Discovery */}
+      <div className="pt-6 border-t border-[#E8DDD7] space-y-4 max-w-2xl">
+        <div>
+          <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
+            <Store className="w-4 h-4 text-[#AA767C]" />
+            Exhibitor Portals & Booth Applications
+          </h2>
+          <p className="text-xs text-[#756366] mt-0.5">
+            Showcase your company, products, or community initiatives at upcoming conferences and tech exhibitions.
+          </p>
+        </div>
+
+        {user?.hasExhibitorApplications ? (
+          <div className="p-4 bg-[#FAF7F5] border border-[#E8DDD7] rounded-2xl flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-[#2D1F23] block">Active Exhibitor Applications</span>
+              <p className="text-[11px] text-gray-500">
+                You have active booth applications or bookings. Track status, upload payments, and manage leads in your Exhibitor Workspace.
+              </p>
+            </div>
+            <Link
+              to="/exhibitor/booths"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#63474D] text-white text-xs font-semibold hover:bg-[#523A3F] transition-colors shrink-0"
+            >
+              <span>Exhibitor Workspace</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        ) : (
+          <div className="p-4 bg-white border border-[#E8DDD7] rounded-2xl flex items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-[#2D1F23] block">Discover Open Exhibitor Calls</span>
+              <p className="text-[11px] text-gray-500">
+                Explore events currently accepting booth applications and reserve your space.
+              </p>
+            </div>
+            <Link
+              to="/exhibitor/explore"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#63474D] text-[#63474D] text-xs font-semibold hover:bg-[#63474D]/10 transition-colors shrink-0"
+            >
+              <span>Explore Calls</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
           </div>
         )}
       </div>
@@ -950,7 +1012,9 @@ export const AttendeeSettingsPage: React.FC = () => {
             </div>
 
             <p className="text-xs text-[#756366] leading-relaxed">
-              Enter your account password to securely authenticate and launch your Organizer Workspace.
+              {user?.hasPassword === false
+                ? 'Launch your approved Organizer Workspace.'
+                : 'Enter your account password to securely authenticate and launch your Organizer Workspace.'}
             </p>
 
             {switchError && (
@@ -961,23 +1025,25 @@ export const AttendeeSettingsPage: React.FC = () => {
             )}
 
             <form onSubmit={handleSwitchToOrganizer} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                  Account Password
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#756366]" />
-                  <input
-                    type="password"
-                    required
-                    autoFocus
-                    placeholder="••••••••"
-                    value={switchPassword}
-                    onChange={(e) => setSwitchPassword(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                  />
+              {user?.hasPassword !== false && (
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                    Account Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#756366]" />
+                    <input
+                      type="password"
+                      required
+                      autoFocus
+                      placeholder="••••••••"
+                      value={switchPassword}
+                      onChange={(e) => setSwitchPassword(e.target.value)}
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-2 pt-1">
                 <Button
@@ -987,7 +1053,7 @@ export const AttendeeSettingsPage: React.FC = () => {
                   size="sm"
                   disabled={isSwitching}
                 >
-                  {isSwitching ? 'Authenticating...' : 'Authenticate & Enter'}
+                  {isSwitching ? 'Authenticating...' : (user?.hasPassword === false ? 'Launch Workspace' : 'Authenticate & Enter')}
                 </Button>
                 <Button
                   type="button"

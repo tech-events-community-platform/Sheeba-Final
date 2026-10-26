@@ -44,7 +44,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS company_website VARCHAR(255);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company_phone VARCHAR(50);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS sponsor_preferences JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('attendee', 'organizer', 'admin', 'sponsor', 'ATTENDEE', 'ORGANIZER', 'ADMIN', 'SPONSOR'));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS exhibitor_description TEXT;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('attendee', 'organizer', 'admin', 'sponsor', 'exhibitor', 'ATTENDEE', 'ORGANIZER', 'ADMIN', 'SPONSOR', 'EXHIBITOR'));
 
 -- Events Table (Single-day tech events only: hackathon, workshop, meetup)
 CREATE TABLE IF NOT EXISTS events (
@@ -222,6 +223,8 @@ CREATE TABLE IF NOT EXISTS payments (
     organizer_payout NUMERIC(10, 2) NOT NULL,
     currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
     status VARCHAR(50) NOT NULL DEFAULT 'SETTLED' CHECK (status IN ('SETTLED', 'FAILED', 'PENDING', 'REFUNDED')),
+    payment_type VARCHAR(30) NOT NULL DEFAULT 'ticket' CHECK (payment_type IN ('ticket', 'exhibitor_booth')),
+    vendor_id UUID,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -232,7 +235,11 @@ ALTER TABLE payments ADD COLUMN IF NOT EXISTS screenshot_url TEXT;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS provider_response JSONB;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_type VARCHAR(30) NOT NULL DEFAULT 'ticket';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS vendor_id UUID;
 CREATE INDEX IF NOT EXISTS idx_payments_transaction_id ON payments(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_payments_payment_type ON payments(payment_type);
+CREATE INDEX IF NOT EXISTS idx_payments_vendor_id ON payments(vendor_id);
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -340,6 +347,107 @@ ALTER TABLE contact_messages ALTER COLUMN subject SET DEFAULT 'General Inquiry';
 CREATE INDEX IF NOT EXISTS idx_contact_messages_email ON contact_messages(email);
 CREATE INDEX IF NOT EXISTS idx_contact_messages_created_at ON contact_messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_contact_messages_status ON contact_messages(status);
+
+-- Exhibitor Calls Table (Organizer configuration per event)
+CREATE TABLE IF NOT EXISTS exhibitor_calls (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    status VARCHAR(50) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'open', 'closed', 'DRAFT', 'OPEN', 'CLOSED')),
+    description TEXT,
+    pricing_mode VARCHAR(20) NOT NULL DEFAULT 'per_sqm' CHECK (pricing_mode IN ('per_sqm', 'fixed')),
+    total_space_sqm NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    price_per_sqm NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    fixed_fee NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    sheeba_cut_percent NUMERIC(5, 2) NOT NULL DEFAULT 30.00,
+    max_exhibitors INT DEFAULT 10,
+    specifications TEXT,
+    custom_questions JSONB DEFAULT '[]'::jsonb,
+    payment_config JSONB DEFAULT '{}'::jsonb,
+    application_deadline TIMESTAMPTZ,
+    has_booth_numbers BOOLEAN NOT NULL DEFAULT FALSE,
+    has_vendor_checkin BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_event_exhibitor_call UNIQUE (event_id)
+);
+
+ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS pricing_mode VARCHAR(20) NOT NULL DEFAULT 'per_sqm';
+ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS fixed_fee NUMERIC(10, 2) NOT NULL DEFAULT 0;
+ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS custom_questions JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS payment_config JSONB DEFAULT '{}'::jsonb;
+
+CREATE INDEX IF NOT EXISTS idx_exhibitor_calls_event_id ON exhibitor_calls(event_id);
+CREATE INDEX IF NOT EXISTS idx_exhibitor_calls_status ON exhibitor_calls(status);
+
+-- Event Vendors / Exhibitor Applications Table
+CREATE TABLE IF NOT EXISTS event_vendors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    exhibitor_call_id UUID REFERENCES exhibitor_calls(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    source VARCHAR(50) NOT NULL DEFAULT 'applied' CHECK (source IN ('applied', 'manual', 'sponsorship')),
+    business_name VARCHAR(255) NOT NULL,
+    category VARCHAR(100),
+    contact_name VARCHAR(255) NOT NULL,
+    contact_email VARCHAR(255) NOT NULL,
+    contact_phone VARCHAR(50),
+    showcase_description TEXT,
+    special_requirements TEXT,
+    pricing_mode VARCHAR(20) NOT NULL DEFAULT 'per_sqm' CHECK (pricing_mode IN ('per_sqm', 'fixed')),
+    space_sqm NUMERIC(10, 2) NOT NULL DEFAULT 1,
+    organizer_price_per_sqm NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    sheeba_cut_percent NUMERIC(5, 2) NOT NULL DEFAULT 30.00,
+    total_organizer_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    total_cut_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    total_final_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    question_answers JSONB DEFAULT '{}'::jsonb,
+    booth_number VARCHAR(50),
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted_awaiting_payment', 'confirmed', 'rejected', 'cancelled')),
+    rejection_reason TEXT,
+    payment_reference VARCHAR(255),
+    payment_status VARCHAR(50) DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'paid', 'refunded')),
+    paid_at TIMESTAMPTZ,
+    logo_url TEXT,
+    website_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS pricing_mode VARCHAR(20) NOT NULL DEFAULT 'per_sqm';
+ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS question_answers JSONB DEFAULT '{}'::jsonb;
+
+CREATE INDEX IF NOT EXISTS idx_event_vendors_event_id ON event_vendors(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_vendors_user_id ON event_vendors(user_id);
+CREATE INDEX IF NOT EXISTS idx_event_vendors_status ON event_vendors(status);
+CREATE INDEX IF NOT EXISTS idx_event_vendors_source ON event_vendors(source);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_vendors_active_user ON event_vendors (event_id, user_id) WHERE user_id IS NOT NULL AND status NOT IN ('rejected', 'cancelled');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_vendors_active_email ON event_vendors (event_id, LOWER(contact_email)) WHERE status NOT IN ('rejected', 'cancelled');
+
+-- Segregated exhibitor booth payment reference constraint
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_payments_vendor'
+    ) THEN
+        ALTER TABLE payments
+        ADD CONSTRAINT fk_payments_vendor
+        FOREIGN KEY (vendor_id) REFERENCES event_vendors(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
+-- Exhibitor Booth Visitors Table (Lead capture at events)
+CREATE TABLE IF NOT EXISTS exhibitor_booth_visitors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id UUID NOT NULL REFERENCES event_vendors(id) ON DELETE CASCADE,
+    visitor_name VARCHAR(255) NOT NULL,
+    visitor_email VARCHAR(255),
+    visitor_phone VARCHAR(50),
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_exhibitor_booth_visitors_vendor_id ON exhibitor_booth_visitors(vendor_id);
 
 -- Event Reviews & Feedback Table (Attendees review events; only author can edit)
 CREATE TABLE IF NOT EXISTS event_reviews (
