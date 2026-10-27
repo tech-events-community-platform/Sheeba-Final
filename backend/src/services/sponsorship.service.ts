@@ -1,5 +1,6 @@
 import { query } from '../config/db';
 import { ISponsorshipApplication, ISponsorshipDeal, SponsorshipDealStatus, IApplicationAffiliations } from '../types';
+import { CacheService } from './cache.service';
 
 export class SponsorshipService {
   /**
@@ -91,7 +92,15 @@ export class SponsorshipService {
       ]
     );
 
-    return res.rows[0];
+    const created = res.rows[0];
+
+    // Invalidate sponsorship marketplace listings and recommendations
+    await CacheService.delPattern('sponsorship:explore*');
+    await CacheService.delPattern(`sponsorship:organizer:${organizerId}*`);
+    await CacheService.delPattern('*http:*/api/sponsorship*');
+    await CacheService.delPattern('matching:recommendations:*');
+
+    return created;
   }
 
   /**
@@ -128,6 +137,12 @@ export class SponsorshipService {
     minBudget?: number;
     maxBudget?: number;
   }): Promise<ISponsorshipApplication[]> {
+    const cacheKey = `sponsorship:explore:${JSON.stringify(filters || {})}`;
+    const cached = await CacheService.get<ISponsorshipApplication[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     let sql = `
       SELECT 
         sa.*,
@@ -171,6 +186,7 @@ export class SponsorshipService {
     sql += ` ORDER BY sa.created_at DESC`;
 
     const res = await query<ISponsorshipApplication>(sql, params);
+    await CacheService.set(cacheKey, res.rows, 60);
     return res.rows;
   }
 
@@ -178,6 +194,12 @@ export class SponsorshipService {
    * Get single application details with organizer track record
    */
   static async getApplicationById(id: string): Promise<ISponsorshipApplication & { organizer_events_count?: number }> {
+    const cacheKey = `sponsorship:app:${id}`;
+    const cached = await CacheService.get<any>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const res = await query<any>(
       `SELECT 
         sa.*,
@@ -207,6 +229,7 @@ export class SponsorshipService {
       throw err;
     }
 
+    await CacheService.set(cacheKey, res.rows[0], 60);
     return res.rows[0];
   }
 
@@ -258,7 +281,14 @@ export class SponsorshipService {
       ]
     );
 
-    return res.rows[0];
+    const deal = res.rows[0];
+
+    await CacheService.delPattern(`sponsorship:deals:${sponsorId}*`);
+    await CacheService.delPattern(`sponsorship:app:${applicationId}*`);
+    await CacheService.delPattern(`*http:*user:${sponsorId}*sponsorship*`);
+    await CacheService.delPattern('*http:*/api/sponsorship/organizer*');
+
+    return deal;
   }
 
   /**
@@ -370,7 +400,14 @@ export class SponsorshipService {
       throw err;
     }
 
-    return res.rows[0];
+    const deal = res.rows[0];
+
+    await CacheService.delPattern(`sponsorship:deals:${sponsorId}*`);
+    await CacheService.delPattern(`sponsorship:app:${deal.application_id}*`);
+    await CacheService.delPattern(`*http:*user:${sponsorId}*sponsorship*`);
+    await CacheService.delPattern('*http:*/api/sponsorship/organizer*');
+
+    return deal;
   }
 
   /**
@@ -382,6 +419,15 @@ export class SponsorshipService {
       [applicationId, organizerId]
     );
 
-    return Boolean(res.rowCount && res.rowCount > 0);
+    const isDeleted = Boolean(res.rowCount && res.rowCount > 0);
+    if (isDeleted) {
+      await CacheService.delPattern('sponsorship:explore*');
+      await CacheService.delPattern(`sponsorship:app:${applicationId}*`);
+      await CacheService.delPattern(`sponsorship:organizer:${organizerId}*`);
+      await CacheService.delPattern('*http:*/api/sponsorship*');
+      await CacheService.delPattern('matching:recommendations:*');
+    }
+
+    return isDeleted;
   }
 }

@@ -10,6 +10,7 @@ export interface CacheOptions {
 
 /**
  * Express middleware for automatic high-speed endpoint response caching.
+ * Fully supports asynchronous Redis/In-memory caching with strict user/role isolation.
  */
 export const cacheResponse = (options: CacheOptions = {}) => {
   const {
@@ -19,7 +20,7 @@ export const cacheResponse = (options: CacheOptions = {}) => {
     cacheControl,
   } = options;
 
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     // Only cache GET requests
     if (req.method !== 'GET') {
       return next();
@@ -32,23 +33,35 @@ export const cacheResponse = (options: CacheOptions = {}) => {
       return next();
     }
 
-    // Build unique cache key
+    const user = (req as any).user;
+
+    // Safety: If route requires private cache but request is unauthenticated, bypass caching
+    if (isPrivate && !user?.id) {
+      res.setHeader('X-Cache', 'BYPASS');
+      return next();
+    }
+
+    // Build unique cache key with strict user and role scoping
     const effectivePrefix = prefix || req.baseUrl + req.path;
     const queryString = Object.keys(req.query).length > 0 ? JSON.stringify(req.query) : '';
-    const userScope = isPrivate && (req as any).user?.id ? `user:${(req as any).user.id}:` : '';
+    const userScope = isPrivate && user?.id ? `user:${user.id}:role:${user.role || 'user'}:` : '';
     const cacheKey = `http:${userScope}${effectivePrefix}:${queryString}`;
 
-    const cached = CacheService.get(cacheKey);
-    if (cached !== undefined) {
-      res.setHeader('X-Cache', 'HIT');
-      if (cacheControl) {
-        res.setHeader('Cache-Control', cacheControl);
-      } else {
-        const visibility = isPrivate ? 'private' : 'public';
-        res.setHeader('Cache-Control', `${visibility}, max-age=${Math.min(ttlSeconds, 60)}, stale-while-revalidate=60`);
+    try {
+      const cached = await CacheService.get(cacheKey);
+      if (cached !== undefined) {
+        res.setHeader('X-Cache', 'HIT');
+        if (cacheControl) {
+          res.setHeader('Cache-Control', cacheControl);
+        } else {
+          const visibility = isPrivate ? 'private' : 'public';
+          res.setHeader('Cache-Control', `${visibility}, max-age=${Math.min(ttlSeconds, 60)}, stale-while-revalidate=60`);
+        }
+        res.json(cached);
+        return;
       }
-      res.json(cached);
-      return;
+    } catch (cacheErr: any) {
+      console.warn(`[cacheResponse] Cache read failed (${cacheErr.message}). Continuing with database query.`);
     }
 
     res.setHeader('X-Cache', 'MISS');
@@ -59,9 +72,11 @@ export const cacheResponse = (options: CacheOptions = {}) => {
     // Intercept res.json to capture and cache the response body
     const originalJson = res.json.bind(res);
     res.json = (body: any): Response => {
-      // Only cache successful 200 responses
+      // Only cache successful 200-299 responses
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        CacheService.set(cacheKey, body, ttlSeconds);
+        CacheService.set(cacheKey, body, ttlSeconds).catch((err: any) => {
+          console.warn(`[cacheResponse] Cache write failed (${err.message})`);
+        });
       }
       return originalJson(body);
     };
@@ -69,4 +84,3 @@ export const cacheResponse = (options: CacheOptions = {}) => {
     next();
   };
 };
-

@@ -31,11 +31,11 @@ export class ReportService {
       throw err;
     }
 
-    // Check the cache first.
-    const cacheKey = `report:${eventId}`;
+    // Check the cache first using canonical event.id
+    const cacheKey = `report:${event.id}`;
 
     if (!forceRefresh) {
-      const cached = CacheService.get<SponsorReportData>(cacheKey);
+      const cached = await CacheService.get<SponsorReportData>(cacheKey);
 
       if (cached) {
         return cached;
@@ -564,8 +564,11 @@ export class ReportService {
       updatedAt: reportUpdatedAt || undefined,
     };
 
-    // Cache the generated report for 10 minutes.
-    CacheService.set(cacheKey, reportData, 600);
+    // Cache the generated report for 10 minutes (600s) under canonical event.id and requested eventId
+    await CacheService.set(`report:${event.id}`, reportData, 600);
+    if (eventId !== event.id) {
+      await CacheService.set(`report:${eventId}`, reportData, 600);
+    }
 
     return reportData;
   }
@@ -697,8 +700,9 @@ export class ReportService {
     );
 
     // Invalidate cache
-    const cacheKey = `report:${eventId}`;
-    CacheService.del(cacheKey);
+    await CacheService.delPattern(`report:${event.id}*`);
+    await CacheService.delPattern(`report:${eventId}*`);
+    await CacheService.delPattern('*http:*/api/reports*');
 
     return this.getEventReport(eventId, userId, userRole, false);
   }
@@ -726,8 +730,9 @@ export class ReportService {
 
     await query(`DELETE FROM event_reports WHERE event_id = $1`, [event.id]);
 
-    const cacheKey = `report:${eventId}`;
-    CacheService.del(cacheKey);
+    await CacheService.delPattern(`report:${event.id}*`);
+    await CacheService.delPattern(`report:${eventId}*`);
+    await CacheService.delPattern('*http:*/api/reports*');
 
     return this.getEventReport(eventId, userId, userRole, true);
   }

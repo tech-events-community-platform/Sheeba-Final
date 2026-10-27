@@ -1,8 +1,15 @@
 import { query } from '../config/db';
 import { EmailService } from './email.service';
+import { CacheService } from './cache.service';
 
 export class AdminService {
   static async getDashboardMetrics() {
+    const cacheKey = 'admin:dashboard:metrics';
+    const cached = await CacheService.get<any>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const countsRes = await query(`
       SELECT 
         (SELECT COUNT(*)::INTEGER FROM events) AS total_events,
@@ -31,7 +38,7 @@ export class AdminService {
       ? parseFloat(((totalCheckIns / totalRegistrations) * 100).toFixed(1))
       : 0;
 
-    return {
+    const metrics = {
       totalEvents: parseInt(row.total_events || '0', 10),
       totalAttendees: parseInt(row.total_attendees || '0', 10),
       totalOrganizers: parseInt(row.total_organizers || '0', 10),
@@ -43,6 +50,9 @@ export class AdminService {
       turnoutRate,
       totalBadges: parseInt(row.total_badges || '0', 10),
     };
+
+    await CacheService.set(cacheKey, metrics, 30);
+    return metrics;
   }
 
   static async getUsersList() {
@@ -191,6 +201,8 @@ export class AdminService {
       console.warn('Failed to dispatch organizer approval email:', e);
     }
 
+    await CacheService.del('admin:dashboard:metrics');
+    await CacheService.delPattern('*http:*/api/admin*');
     return user;
   }
 
@@ -224,6 +236,8 @@ export class AdminService {
       console.warn('Failed to dispatch organizer rejection email:', e);
     }
 
+    await CacheService.del('admin:dashboard:metrics');
+    await CacheService.delPattern('*http:*/api/admin*');
     return user;
   }
 
@@ -286,6 +300,8 @@ export class AdminService {
       console.warn('Failed to dispatch sponsor rejection email:', e);
     }
 
+    await CacheService.del('admin:dashboard:metrics');
+    await CacheService.delPattern('*http:*/api/admin*');
     return user;
   }
 
@@ -305,6 +321,8 @@ export class AdminService {
       throw err;
     }
 
+    await CacheService.del('admin:dashboard:metrics');
+    await CacheService.delPattern('*http:*/api/admin*');
     return res.rows[0];
   }
 

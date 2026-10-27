@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { query, getClient } from '../config/db';
 import { IExhibitorCall, IEventVendor, ExhibitorPricingMode, RegistrationQuestion, IExhibitorPaymentConfig } from '../types';
 import { PaymentService } from './payment.service';
+import { CacheService } from './cache.service';
 
 
 export class ExhibitorService {
@@ -242,6 +243,13 @@ export class ExhibitorService {
       hasVendorCheckin,
     ]);
 
+    await CacheService.delPattern(`exhibitors:public:${eventId}*`);
+    await CacheService.delPattern('exhibitors:explore*');
+    await CacheService.delPattern(`event:${eventId}*`);
+    await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+    await CacheService.delPattern('*http:*/api/exhibitors/explore*');
+    await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+
     return this.getExhibitorCall(eventId);
   }
 
@@ -436,6 +444,11 @@ export class ExhibitorService {
       data.logoUrl || null,
       data.websiteUrl || null,
     ]);
+
+    await CacheService.delPattern(`exhibitors:public:${eventId}*`);
+    await CacheService.delPattern(`event:${eventId}*`);
+    await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+    await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
 
     return this.mapVendorRow(res.rows[0]);
   }
@@ -655,6 +668,15 @@ export class ExhibitorService {
       ]);
 
       await client.query('COMMIT');
+
+      await CacheService.delPattern(`exhibitors:public:${eventId}*`);
+      await CacheService.delPattern(`event:${eventId}*`);
+      await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+      await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+      if (vendorRes.rows[0]?.user_id) {
+        await CacheService.delPattern(`*http:*user:${vendorRes.rows[0].user_id}*`);
+      }
+
       return this.mapVendorRow(res.rows[0]);
     } catch (error) {
       await client.query('ROLLBACK');
@@ -670,11 +692,22 @@ export class ExhibitorService {
   static async deleteVendor(organizerId: string, eventId: string, vendorId: string, isAdmin: boolean = false): Promise<void> {
     await this.verifyEventOwnership(organizerId, eventId, isAdmin);
 
-    const res = await query('DELETE FROM event_vendors WHERE id = $1 AND event_id = $2 RETURNING id', [vendorId, eventId]);
-    if (res.rows.length === 0) {
+    const vendorRes = await query('SELECT user_id FROM event_vendors WHERE id = $1 AND event_id = $2', [vendorId, eventId]);
+    if (vendorRes.rows.length === 0) {
       const err: any = new Error('Vendor record not found.');
       err.statusCode = 404;
       throw err;
+    }
+    const vendorUserId = vendorRes.rows[0].user_id;
+
+    await query('DELETE FROM event_vendors WHERE id = $1 AND event_id = $2', [vendorId, eventId]);
+
+    await CacheService.delPattern(`exhibitors:public:${eventId}*`);
+    await CacheService.delPattern(`event:${eventId}*`);
+    await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+    await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+    if (vendorUserId) {
+      await CacheService.delPattern(`*http:*user:${vendorUserId}*`);
     }
   }
 
@@ -693,9 +726,16 @@ export class ExhibitorService {
     websiteUrl: string | null;
     source: string;
   }>> {
+    const cacheKey = `exhibitors:public:${eventId}`;
+    const cached = await CacheService.get<any[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // Check if exhibitors are enabled for this event
     const callRes = await query('SELECT is_enabled FROM exhibitor_calls WHERE event_id = $1', [eventId]);
     if (callRes.rows.length === 0 || !callRes.rows[0].is_enabled) {
+      await CacheService.set(cacheKey, [], 60);
       return [];
     }
 
@@ -707,7 +747,7 @@ export class ExhibitorService {
       [eventId]
     );
 
-    return res.rows.map((row) => ({
+    const result = res.rows.map((row) => ({
       id: row.id,
       businessName: row.business_name,
       category: row.category,
@@ -718,6 +758,9 @@ export class ExhibitorService {
       websiteUrl: row.website_url,
       source: row.source,
     }));
+
+    await CacheService.set(cacheKey, result, 60);
+    return result;
   }
 
   /**
@@ -726,6 +769,12 @@ export class ExhibitorService {
    * Strips private organizer settings such as payout accounts/telebirr numbers.
    */
   static async exploreOpenCalls(filters?: { category?: string; search?: string }): Promise<any[]> {
+    const cacheKey = `exhibitors:explore:${JSON.stringify(filters || {})}`;
+    const cached = await CacheService.get<any[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     let sql = `
       SELECT 
         ec.id as exhibitor_call_id,
@@ -836,6 +885,7 @@ export class ExhibitorService {
       });
     }
 
+    await CacheService.set(cacheKey, eligibleCalls, 60);
     return eligibleCalls;
   }
 
@@ -1072,6 +1122,10 @@ export class ExhibitorService {
       ]);
 
       await client.query('COMMIT');
+
+      await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+      await CacheService.delPattern(`*http:*user:${userId}*`);
+
       return this.mapVendorRow(res.rows[0]);
     } catch (error: any) {
       await client.query('ROLLBACK');
@@ -1285,6 +1339,13 @@ export class ExhibitorService {
         );
 
         await client.query('COMMIT');
+
+        await CacheService.delPattern(`exhibitors:public:${vendor.event_id}*`);
+        await CacheService.delPattern(`event:${vendor.event_id}*`);
+        await CacheService.delPattern(`*http:*/api/exhibitors/events/${vendor.event_id}*`);
+        await CacheService.delPattern(`*http:*/api/events/${vendor.event_id}*`);
+        await CacheService.delPattern(`*http:*user:${userId}*`);
+
         return this.mapVendorRow(updateRes.rows[0]);
       }
 
@@ -1411,6 +1472,13 @@ export class ExhibitorService {
       );
 
       await client.query('COMMIT');
+
+      await CacheService.delPattern(`exhibitors:public:${vendor.event_id}*`);
+      await CacheService.delPattern(`event:${vendor.event_id}*`);
+      await CacheService.delPattern(`*http:*/api/exhibitors/events/${vendor.event_id}*`);
+      await CacheService.delPattern(`*http:*/api/events/${vendor.event_id}*`);
+      await CacheService.delPattern(`*http:*user:${userId}*`);
+
       return this.mapVendorRow(updateRes.rows[0]);
     } catch (error) {
       await client.query('ROLLBACK');
@@ -1730,6 +1798,9 @@ export class ExhibitorService {
 
       await client.query('COMMIT');
 
+      await CacheService.delPattern(`*http:*/api/exhibitors/events/${vendor.event_id}*`);
+      await CacheService.delPattern(`*http:*user:${userId}*`);
+
       return {
         message: 'Payment receipt submitted successfully and is awaiting organizer verification.',
         payment: paymentRes.rows[0],
@@ -1999,6 +2070,14 @@ export class ExhibitorService {
 
       await client.query('COMMIT');
 
+      await CacheService.delPattern(`exhibitors:public:${eventId}*`);
+      await CacheService.delPattern(`event:${eventId}*`);
+      await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+      await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+      if (vendor.user_id) {
+        await CacheService.delPattern(`*http:*user:${vendor.user_id}*`);
+      }
+
       const mappedVendor = this.mapVendorRow(updatedVendorRes.rows[0]);
       return {
         vendor: mappedVendor,
@@ -2112,6 +2191,14 @@ export class ExhibitorService {
 
       // Vendor remains accepted_awaiting_payment, unpaid.
       await client.query('COMMIT');
+
+      await CacheService.delPattern(`exhibitors:public:${eventId}*`);
+      await CacheService.delPattern(`event:${eventId}*`);
+      await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+      await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+      if (vendor.user_id) {
+        await CacheService.delPattern(`*http:*user:${vendor.user_id}*`);
+      }
 
       return {
         success: true,
