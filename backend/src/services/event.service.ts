@@ -175,8 +175,9 @@ export class EventService {
     });
 
     // Invalidate cached event lists
-    CacheService.delPrefix('events:list');
-    CacheService.delPrefix('http:');
+    await CacheService.delPattern('events:list*');
+    await CacheService.delPattern('*http:*/api/events*');
+    await CacheService.delPattern('matching:recommendations:*');
 
     return formatted;
   }
@@ -189,7 +190,7 @@ export class EventService {
     isPublicized?: boolean | string;
   } = {}) {
     const cacheKey = `events:list:${JSON.stringify(filters || {})}`;
-    const cached = CacheService.get<any[]>(cacheKey);
+    const cached = await CacheService.get<any[]>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -258,13 +259,13 @@ export class EventService {
 
     const result = await query(queryText, values);
     const events = result.rows.map(this.formatEvent);
-    CacheService.set(cacheKey, events, 30);
+    await CacheService.set(cacheKey, events, 30);
     return events;
   }
 
   static async getEventById(identifier: string): Promise<any> {
     const cacheKey = `event:${identifier}`;
-    const cached = CacheService.get<any>(cacheKey);
+    const cached = await CacheService.get<any>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -299,12 +300,12 @@ export class EventService {
     }
 
     const formatted = this.formatEvent(result.rows[0]);
-    CacheService.set(cacheKey, formatted, 60);
+    await CacheService.set(cacheKey, formatted, 60);
     if (formatted.id && formatted.id !== identifier) {
-      CacheService.set(`event:${formatted.id}`, formatted, 60);
+      await CacheService.set(`event:${formatted.id}`, formatted, 60);
     }
     if (formatted.shareLinkToken && formatted.shareLinkToken !== identifier) {
-      CacheService.set(`event:${formatted.shareLinkToken}`, formatted, 60);
+      await CacheService.set(`event:${formatted.shareLinkToken}`, formatted, 60);
     }
 
     return formatted;
@@ -431,14 +432,18 @@ export class EventService {
     `;
 
     await query(queryText, values);
-    CacheService.delPrefix('events:list');
-    CacheService.delPrefix(`event:${realId}`);
-    CacheService.delPrefix(`event:${eventId}`);
+    await CacheService.delPattern('events:list*');
+    await CacheService.delPattern(`event:${realId}*`);
+    await CacheService.delPattern(`event:${eventId}*`);
     if ((existing.rows[0] as any)?.share_link_token) {
-      CacheService.delPrefix(`event:${(existing.rows[0] as any).share_link_token}`);
+      await CacheService.delPattern(`event:${(existing.rows[0] as any).share_link_token}*`);
     }
-    CacheService.del(`report:${realId}`);
-    CacheService.del(`report:${eventId}`);
+    await CacheService.delPattern(`*http:*/api/events/${realId}*`);
+    await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+    await CacheService.delPattern('*http:*/api/events*');
+    await CacheService.del(`report:${realId}`);
+    await CacheService.del(`report:${eventId}`);
+    await CacheService.delPattern('matching:recommendations:*');
     return this.getEventById(realId);
   }
 
@@ -462,16 +467,20 @@ export class EventService {
     }
 
     await query('DELETE FROM events WHERE id = $1', [realId]);
-    CacheService.delPrefix('events:list');
-    CacheService.delPrefix(`event:${realId}`);
-    CacheService.delPrefix(`event:${eventId}`);
+    await CacheService.delPattern('events:list*');
+    await CacheService.delPattern(`event:${realId}*`);
+    await CacheService.delPattern(`event:${eventId}*`);
     if ((existing.rows[0] as any)?.share_link_token) {
-      CacheService.delPrefix(`event:${(existing.rows[0] as any).share_link_token}`);
+      await CacheService.delPattern(`event:${(existing.rows[0] as any).share_link_token}*`);
     }
-    CacheService.del(`event:${realId}:roster`);
-    CacheService.del(`event:${eventId}:roster`);
-    CacheService.del(`report:${realId}`);
-    CacheService.del(`report:${eventId}`);
+    await CacheService.del(`event:${realId}:roster`);
+    await CacheService.del(`event:${eventId}:roster`);
+    await CacheService.delPattern(`*http:*/api/events/${realId}*`);
+    await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+    await CacheService.delPattern('*http:*/api/events*');
+    await CacheService.del(`report:${realId}`);
+    await CacheService.del(`report:${eventId}`);
+    await CacheService.delPattern('matching:recommendations:*');
     return true;
   }
 
@@ -692,9 +701,11 @@ export class EventService {
 
         await client.query('COMMIT');
 
-        CacheService.delPrefix('events:list');
-        CacheService.delPrefix(`event:${event.id}`);
-        CacheService.del(`report:${event.id}`);
+        await CacheService.delPattern('events:list*');
+        await CacheService.delPattern(`event:${event.id}*`);
+        await CacheService.delPattern(`event:${event.id}:roster*`);
+        await CacheService.delPattern(`*http:*/api/events/${event.id}*`);
+        await CacheService.del(`report:${event.id}`);
 
         const userRes = await query('SELECT full_name, email FROM users WHERE id = $1', [userId]);
         const attendeeUser = userRes.rows[0] || {};
@@ -845,9 +856,11 @@ export class EventService {
       await client.query('COMMIT');
 
       // Invalidate event cache, roster cache, reports, and list
-      CacheService.delPrefix('events:list');
-      CacheService.delPrefix(`event:${event.id}`);
-      CacheService.del(`report:${event.id}`);
+      await CacheService.delPattern('events:list*');
+      await CacheService.delPattern(`event:${event.id}*`);
+      await CacheService.delPattern(`event:${event.id}:roster*`);
+      await CacheService.delPattern(`*http:*/api/events/${event.id}*`);
+      await CacheService.del(`report:${event.id}`);
 
       const rawTicket = ticketRes.rows[0];
 
@@ -917,7 +930,7 @@ export class EventService {
     }
 
     const cacheKey = `event:${event.id}:roster`;
-    const cached = CacheService.get<AttendeeRosterItem[]>(cacheKey);
+    const cached = await CacheService.get<AttendeeRosterItem[]>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -986,7 +999,7 @@ export class EventService {
       };
     });
 
-    CacheService.set(cacheKey, roster, 20);
+    await CacheService.set(cacheKey, roster, 20);
     return roster;
   }
 
@@ -1117,9 +1130,11 @@ export class EventService {
 
       await client.query('COMMIT');
 
-      CacheService.delPrefix('events:list');
-      CacheService.delPrefix(`event:${event.id}`);
-      CacheService.del(`report:${event.id}`);
+      await CacheService.delPattern('events:list*');
+      await CacheService.delPattern(`event:${event.id}*`);
+      await CacheService.delPattern(`event:${event.id}:roster*`);
+      await CacheService.delPattern(`*http:*/api/events/${event.id}*`);
+      await CacheService.del(`report:${event.id}`);
 
       // Dispatch Email Notification
       try {
@@ -1220,9 +1235,11 @@ export class EventService {
 
       await client.query('COMMIT');
 
-      CacheService.delPrefix('events:list');
-      CacheService.delPrefix(`event:${event.id}`);
-      CacheService.del(`report:${event.id}`);
+      await CacheService.delPattern('events:list*');
+      await CacheService.delPattern(`event:${event.id}*`);
+      await CacheService.delPattern(`event:${event.id}:roster*`);
+      await CacheService.delPattern(`*http:*/api/events/${event.id}*`);
+      await CacheService.del(`report:${event.id}`);
 
       try {
         if (reg.email) {
@@ -1314,13 +1331,15 @@ export class EventService {
     await query(`DELETE FROM check_ins WHERE registration_id::text = $2`, [targetId]);
 
     // Invalidate caches
-    CacheService.delPrefix('events:list');
-    CacheService.delPrefix(`event:${realEventId}`);
-    CacheService.delPrefix(`event:${eventId}`);
-    CacheService.del(`event:${realEventId}:roster`);
-    CacheService.del(`event:${eventId}:roster`);
-    CacheService.del(`report:${realEventId}`);
-    CacheService.del(`report:${eventId}`);
+    await CacheService.delPattern('events:list*');
+    await CacheService.delPattern(`event:${realEventId}*`);
+    await CacheService.delPattern(`event:${eventId}*`);
+    await CacheService.del(`event:${realEventId}:roster`);
+    await CacheService.del(`event:${eventId}:roster`);
+    await CacheService.delPattern(`*http:*/api/events/${realEventId}*`);
+    await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+    await CacheService.del(`report:${realEventId}`);
+    await CacheService.del(`report:${eventId}`);
 
     return true;
   }

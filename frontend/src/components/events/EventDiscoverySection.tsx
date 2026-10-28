@@ -45,7 +45,7 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
     const fetchPublicized = async () => {
       setLoading(true);
       try {
-        const data = await api.events.getDiscoveryEvents(true);
+        const data = await api.events.getDiscoveryEvents();
         // Only show upcoming / ongoing open events
         const activeEvents = data.filter((e) => !e.isPassed && e.status !== 'canceled');
         setEvents(activeEvents);

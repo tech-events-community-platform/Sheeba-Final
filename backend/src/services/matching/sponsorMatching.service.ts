@@ -8,6 +8,7 @@ import {
 import { rankEventsForSponsor } from './rankingEngine';
 import { EmbeddingService } from './embeddingService';
 import { computeEventDayExpiration } from '../../utils/qr.util';
+import { CacheService } from '../cache.service';
 
 export class SponsorMatchingService {
   /**
@@ -139,6 +140,11 @@ export class SponsorMatchingService {
       [JSON.stringify(updated), userId]
     );
 
+    // Invalidate cached recommendations and private sponsorship views for this sponsor
+    await CacheService.delPattern(`matching:recommendations:${userId}*`);
+    await CacheService.delPattern(`*http:*user:${userId}*sponsorship*`);
+    await CacheService.delPattern(`*http:*user:${userId}*matching*`);
+
     return updated;
   }
 
@@ -160,6 +166,12 @@ export class SponsorMatchingService {
     totalEligibleEvents: number;
     generatedAt: string;
   }> {
+    const cacheKey = `matching:recommendations:${userId}:${JSON.stringify(overrides || {})}`;
+    const cached = await CacheService.get<any>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // 1. Get sponsor details and preferences
     const sponsorData = await this.getSponsorPreferences(userId);
     const activePreferences: SponsorPreferences = {
@@ -230,7 +242,7 @@ export class SponsorMatchingService {
     });
 
     if (candidateRows.length === 0) {
-      return {
+      const emptyResult = {
         sponsor: {
           id: userId,
           companyName: sponsorData.companyName,
@@ -241,6 +253,8 @@ export class SponsorMatchingService {
         totalEligibleEvents: 0,
         generatedAt: new Date().toISOString(),
       };
+      await CacheService.set(cacheKey, emptyResult, 60);
+      return emptyResult;
     }
 
     // 3. For all events with registrations, fetch registration answers to extract participant roles and skills
@@ -352,7 +366,7 @@ export class SponsorMatchingService {
       topN: overrides?.limit || 10,
     });
 
-    return {
+    const result = {
       sponsor: {
         id: userId,
         companyName: sponsorData.companyName,
@@ -363,5 +377,8 @@ export class SponsorMatchingService {
       totalEligibleEvents: candidates.length,
       generatedAt: new Date().toISOString(),
     };
+
+    await CacheService.set(cacheKey, result, 60);
+    return result;
   }
 }

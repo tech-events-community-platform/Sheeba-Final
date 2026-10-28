@@ -193,8 +193,10 @@ export class ReviewService {
       [eventId, userId, data.rating, data.comment.trim(), Boolean(data.isAnonymous)]
     );
 
-    CacheService.delPrefix('http:');
-    CacheService.del(`report:${eventId}`);
+    await CacheService.delPattern(`*http:*/api/reviews/event/${eventId}*`);
+    await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+    await CacheService.delPattern(`event:${eventId}*`);
+    await CacheService.delPattern(`report:${eventId}*`);
 
     const saved = insertRes.rows[0];
     const userRes = await query('SELECT full_name, avatar_url FROM users WHERE id = $1', [userId]);
@@ -256,8 +258,10 @@ export class ReviewService {
       [updatedRating, updatedComment, updatedAnonymous, reviewId, userId]
     );
 
-    CacheService.delPrefix('http:');
-    CacheService.del(`report:${existing.event_id}`);
+    await CacheService.delPattern(`*http:*/api/reviews/event/${existing.event_id}*`);
+    await CacheService.delPattern(`*http:*/api/events/${existing.event_id}*`);
+    await CacheService.delPattern(`event:${existing.event_id}*`);
+    await CacheService.delPattern(`report:${existing.event_id}*`);
 
     const saved = updateRes.rows[0];
     const userRes = await query('SELECT full_name, avatar_url FROM users WHERE id = $1', [userId]);
@@ -299,8 +303,10 @@ export class ReviewService {
     }
 
     await query('DELETE FROM event_reviews WHERE id = $1', [reviewId]);
-    CacheService.delPrefix('http:');
-    CacheService.del(`report:${existing.event_id}`);
+    await CacheService.delPattern(`*http:*/api/reviews/event/${existing.event_id}*`);
+    await CacheService.delPattern(`*http:*/api/events/${existing.event_id}*`);
+    await CacheService.delPattern(`event:${existing.event_id}*`);
+    await CacheService.delPattern(`report:${existing.event_id}*`);
     return true;
   }
 }

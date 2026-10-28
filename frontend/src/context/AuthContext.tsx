@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserRole } from '../types/user';
-import { api, getAuthToken } from '../services/api';
+import { api, getAuthToken, removeAuthToken } from '../services/api';
 
 export interface RegisterResult {
   user?: User;
@@ -241,7 +241,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setUser(null);
       localStorage.removeItem('sheba_auth_user');
-      localStorage.removeItem('sheba_auth_token');
+      removeAuthToken();
       setIsLoading(false);
     }
   };

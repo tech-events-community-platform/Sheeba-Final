@@ -674,10 +674,18 @@ export class CheckinService {
       await client.query('COMMIT');
 
       // Invalidate event cache, roster, and reports
-      CacheService.delPrefix(`event:${realEventId}`);
-      CacheService.del(`report:${realEventId}`);
-      CacheService.delPrefix('events:list');
-      CacheService.delPrefix('http:');
+      await CacheService.delPattern(`event:${realEventId}*`);
+      await CacheService.delPattern(`report:${realEventId}*`);
+      if (eventId !== realEventId) {
+        await CacheService.delPattern(`event:${eventId}*`);
+        await CacheService.delPattern(`report:${eventId}*`);
+        await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+      }
+      await CacheService.delPattern('*http:*/api/reports*');
+      await CacheService.delPattern(`events:list*`);
+      await CacheService.delPattern(`*http:*/api/events/${realEventId}*`);
+      await CacheService.delPattern(`*http:*user:${attendeeId}*`);
+      await CacheService.delPattern('matching:recommendations:*');
 
       const updatedAttendee = await this.lookupAttendee(realEventId, attendeeId);
       const rawBadge = badgeRes.rows[0];
@@ -773,10 +781,18 @@ export class CheckinService {
       await client.query('COMMIT');
 
       // Invalidate event cache, roster, and reports
-      CacheService.delPrefix(`event:${realEventId}`);
-      CacheService.del(`report:${realEventId}`);
-      CacheService.delPrefix('events:list');
-      CacheService.delPrefix('http:');
+      await CacheService.delPattern(`event:${realEventId}*`);
+      await CacheService.delPattern(`report:${realEventId}*`);
+      if (eventId !== realEventId) {
+        await CacheService.delPattern(`event:${eventId}*`);
+        await CacheService.delPattern(`report:${eventId}*`);
+        await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
+      }
+      await CacheService.delPattern('*http:*/api/reports*');
+      await CacheService.delPattern(`events:list*`);
+      await CacheService.delPattern(`*http:*/api/events/${realEventId}*`);
+      await CacheService.delPattern(`*http:*user:${attendeeId}*`);
+      await CacheService.delPattern('matching:recommendations:*');
 
       const updatedAttendee = await this.lookupAttendee(realEventId, attendeeId);
 
@@ -1233,9 +1249,11 @@ export class CheckinService {
       NotificationQueueService.triggerAsyncProcessing();
 
       // Invalidate caches
-      CacheService.delPrefix(`event:${realEventId}`);
-      CacheService.del(`report:${realEventId}`);
-      CacheService.delPrefix('events:list');
+      await CacheService.delPattern(`event:${realEventId}*`);
+      await CacheService.delPattern(`report:${realEventId}*`);
+      await CacheService.delPattern(`events:list*`);
+      await CacheService.delPattern(`*http:*/api/events/${realEventId}*`);
+      await CacheService.delPattern(`*http:*user:${userId}*`);
 
       let updatedAttendee: any = null;
       try {

@@ -28,7 +28,7 @@ import { getEndOfEventDay } from '../utils/date';
  * - Defaults to http://localhost:5000/api during local development.
  */
 const resolveApiBaseUrl = (): string => {
-  const envUrl = import.meta.env.VITE_API_URL;
+  const envUrl = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) || '';
 
   if (typeof window !== 'undefined' && window.location) {
     const hostname = window.location.hostname;
@@ -55,6 +55,7 @@ export const getAuthToken = (): string | null => {
 
 export const setAuthToken = (token: string): void => {
   localStorage.setItem('sheba_auth_token', token);
+  clearApiCache();
 };
 
 export const removeAuthToken = (): void => {
@@ -85,6 +86,94 @@ export function clearApiCache(filter?: string | RegExp): void {
     if (typeof filter === 'string' ? key.includes(filter) : filter.test(key)) {
       clientApiCache.delete(key);
     }
+  }
+}
+
+export function getClientApiCacheStats(): { size: number; keys: string[] } {
+  return {
+    size: clientApiCache.size,
+    keys: Array.from(clientApiCache.keys()),
+  };
+}
+
+/**
+ * Resolves suitable fresh cache durations according to data stability.
+ */
+export function getDefaultTtlForEndpoint(endpoint: string): number {
+  const clean = endpoint.toLowerCase().split('?')[0];
+
+  // 1. Static / Public Discovery & Event details (Longer Freshness: 60s)
+  if (clean === '/events' || clean.startsWith('/events/share') || clean.match(/^\/events\/[a-zA-Z0-9_-]+$/)) {
+    return 60;
+  }
+  if (clean.startsWith('/exhibitors/public') || clean.startsWith('/exhibitors/explore')) {
+    return 60;
+  }
+  if (clean.startsWith('/sponsorships/explore') || clean.startsWith('/sponsorship/explore') || clean.includes('/applications/')) {
+    return 60;
+  }
+
+  // 2. Dashboards, Metrics, Rosters, Tickets (Medium Freshness: 25-30s)
+  if (clean.includes('/roster') || clean.includes('/attendees')) {
+    return 25;
+  }
+  if (clean.startsWith('/admin/dashboard') || clean.startsWith('/admin/users')) {
+    return 30;
+  }
+  if (clean.startsWith('/tickets')) {
+    return 30;
+  }
+  if (clean.startsWith('/badges')) {
+    return 30;
+  }
+  if (clean.startsWith('/reviews')) {
+    return 30;
+  }
+  if (clean.startsWith('/reports')) {
+    return 120; // 2 minutes for heavy analytics/AI reports
+  }
+
+  return 30;
+}
+
+/**
+ * Granular entity-based invalidation for mutations so other unrelated cached entities are preserved.
+ */
+export function invalidateClientCacheForMutation(endpoint: string): void {
+  const clean = endpoint.toLowerCase().split('?')[0];
+
+  if (clean.includes('/checkin')) {
+    clearApiCache('/events');
+    clearApiCache('/reports');
+    clearApiCache('/tickets');
+    clearApiCache('/badges');
+  } else if (clean.includes('/events')) {
+    clearApiCache('/events');
+    clearApiCache('/reports');
+    clearApiCache('/exhibitors');
+    clearApiCache('/sponsorship');
+    clearApiCache('/matching');
+  } else if (clean.includes('/tickets')) {
+    clearApiCache('/tickets');
+    clearApiCache('/events');
+  } else if (clean.includes('/reviews')) {
+    clearApiCache('/reviews');
+    clearApiCache('/events');
+    clearApiCache('/reports');
+  } else if (clean.includes('/exhibitors') || clean.includes('/booths')) {
+    clearApiCache('/exhibitors');
+    clearApiCache('/events');
+  } else if (clean.includes('/sponsorship') || clean.includes('/matching')) {
+    clearApiCache('/sponsorship');
+    clearApiCache('/matching');
+  } else if (clean.includes('/admin')) {
+    clearApiCache('/admin');
+  } else if (clean.includes('/users') || clean.includes('/auth')) {
+    clearApiCache('/users');
+    clearApiCache('/auth');
+  } else {
+    // Fallback for generic mutations
+    clearApiCache();
   }
 }
 
@@ -164,8 +253,8 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
       throw errorObj;
     }
 
-    // Invalidate client-side cache upon successful mutation
-    clearApiCache();
+    // Invalidate client-side cache for the affected entity namespace upon successful mutation
+    invalidateClientCacheForMutation(endpoint);
 
     return data;
   }
@@ -232,7 +321,8 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
 
     // Cache valid JSON responses (avoid Blobs or file downloads)
     if (!shouldSkipCache && !(data instanceof Blob) && !endpoint.includes('/export')) {
-      const ttlMs = (options.ttlSeconds || 20) * 1000;
+      const effectiveTtl = options.ttlSeconds || getDefaultTtlForEndpoint(endpoint);
+      const ttlMs = effectiveTtl * 1000;
       clientApiCache.set(cacheKey, {
         data,
         expiresAt: Date.now() + ttlMs,
@@ -2150,7 +2240,7 @@ export const api = {
   reviews: {
     getEventReviews: async (eventId: string): Promise<EventReviewsSummary> => {
       try {
-        const res = await requestApi(`/reviews/event/${eventId}`, { skipCache: true });
+        const res = await requestApi(`/reviews/event/${eventId}`);
         if (res.data) return res.data;
       } catch (err) {
         console.warn('Failed to load event reviews:', err);
@@ -2166,7 +2256,7 @@ export const api = {
 
     getMyReview: async (eventId: string): Promise<EventReviewItem | null> => {
       try {
-        const res = await requestApi(`/reviews/event/${eventId}/my`, { skipCache: true });
+        const res = await requestApi(`/reviews/event/${eventId}/my`);
         return res.data || null;
       } catch {
         return null;

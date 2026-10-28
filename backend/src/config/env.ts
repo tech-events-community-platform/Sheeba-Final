@@ -24,6 +24,10 @@ export const ENV = {
   CORS_ORIGIN: process.env.CORS_ORIGIN || '*',
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   LINKS_ET_API_KEY: process.env.LINKS_ET_API_KEY || process.env.PAYMENT_VERIFICATION_API_KEY || '',
+  REDIS_URL: process.env.REDIS_URL || '',
+  REDIS_HOST: process.env.REDIS_HOST || '',
+  REDIS_PORT: parseInt(process.env.REDIS_PORT || '6379', 10),
+  REDIS_PASSWORD: process.env.REDIS_PASSWORD || process.env.REDIS_API_KEY || '',
   get FRONTEND_URL(): string {
     return getFrontendUrl();
   },
