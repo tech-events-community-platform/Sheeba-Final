@@ -5,6 +5,7 @@ import { RoleSpotlightSection } from '../../components/sections/RoleSpotlightSec
 import { HowItWorksSection } from '../../components/sections/HowItWorksSection';
 import { LiveTicketSimulatorSection } from '../../components/sections/LiveTicketSimulatorSection';
 import { StrideMilestoneCard } from '../../components/sections/StrideMilestoneCard';
+import { SelectedEventsSection } from '../../components/sections/SelectedEventsSection';
 import { ContactUsSection } from '../../components/sections/ContactUsSection';
 import { EventDiscoverySection } from '../../components/events/EventDiscoverySection';
 import { ExhibitorSpotlightSection } from '../../components/sections/ExhibitorSpotlightSection';
@@ -23,6 +24,9 @@ export const LandingPage: React.FC = () => {
           <StrideMilestoneCard />
         </FadeIn>
       </section>
+
+      {/* SELECTED EVENTS PORTFOLIO */}
+      <SelectedEventsSection />
 
       {/* 2. ROLE SPOTLIGHT (FEATURES SECTION - SCREENSHOT 1 ALTERNATING LAYOUT) */}
       <RoleSpotlightSection />

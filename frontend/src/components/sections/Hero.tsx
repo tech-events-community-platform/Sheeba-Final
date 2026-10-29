@@ -50,17 +50,33 @@ export default function Hero() {
             </div>
           </FadeIn>
 
-          {/* Sponsor Portal Entry - Transparent / Glassmorphic */}
+          {/* Sponsor & Exhibitor Portal Entries - Transparent / Glassmorphic */}
           <FadeIn delay={400}>
-            <div className="pt-2 flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-900">
-              <span className="font-normal">Looking to sponsor premier gatherings & back upcoming initiatives?</span>
-              <Link
-                to="/sponsor/auth"
-                className="inline-flex items-center gap-1.5 font-bold text-[#63474D] hover:text-[#2D1F23] bg-white/20 hover:bg-white/35 backdrop-blur-md border border-white/40 hover:border-[#63474D]/40 px-4 py-2 rounded-full shadow-sm transition-all duration-200"
-              >
-                <span>Are you a sponsor?</span>
-                <ArrowRight className="w-3.5 h-3.5 text-[#FFA686]" />
-              </Link>
+            <div className="pt-2 flex flex-col 2xl:flex-row 2xl:items-center gap-3 2xl:gap-6 text-xs sm:text-sm text-gray-900">
+              {/* Sponsor Prompt */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-normal">Looking to sponsor premier gatherings & back upcoming initiatives?</span>
+                <Link
+                  to="/sponsor/auth"
+                  className="inline-flex items-center gap-1.5 font-bold text-[#63474D] hover:text-[#2D1F23] bg-white/20 hover:bg-white/35 backdrop-blur-md border border-white/40 hover:border-[#63474D]/40 px-4 py-2 rounded-full shadow-sm transition-all duration-200"
+                >
+                  <span>Are you a sponsor?</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#FFA686]" />
+                </Link>
+              </div>
+
+              {/* Exhibitor Prompt */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-[#2D1F23]">Are you an exhibitor?</span>
+                <span className="font-normal">Showcase your brand and explore event booth opportunities.</span>
+                <Link
+                  to="/exhibitor/auth"
+                  className="inline-flex items-center gap-1.5 font-bold text-[#63474D] hover:text-[#2D1F23] bg-white/20 hover:bg-white/35 backdrop-blur-md border border-white/40 hover:border-[#63474D]/40 px-4 py-2 rounded-full shadow-sm transition-all duration-200"
+                >
+                  <span>Sign in as an exhibitor</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#FFA686]" />
+                </Link>
+              </div>
             </div>
           </FadeIn>
         </div>
