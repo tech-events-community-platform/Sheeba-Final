@@ -13,6 +13,7 @@ import contactRoutes from './contact.routes';
 import uploadRoutes from './upload.routes';
 import reviewRoutes from './review.routes';
 import exhibitorRoutes from './exhibitor.routes';
+import recycleBinRoutes from './recycleBin.routes';
 
 const router = Router();
 
@@ -41,6 +42,7 @@ router.use('/contact', contactRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/exhibitors', exhibitorRoutes);
+router.use('/recycle-bin', recycleBinRoutes);
 
 export default router;
 

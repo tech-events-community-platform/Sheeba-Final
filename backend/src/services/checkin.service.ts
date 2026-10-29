@@ -90,7 +90,7 @@ export class CheckinService {
       }
     }
 
-    const conditions: string[] = ['r.event_id = $1', "r.status = 'registered'"];
+    const conditions: string[] = ['r.event_id = $1', "r.status = 'registered'", 'r.deleted_at IS NULL'];
     const values: any[] = [realEventId];
 
     if (targetTicketId) {
@@ -250,9 +250,9 @@ export class CheckinService {
         `SELECT t.*, u.id as user_id, u.full_name, u.email, u.phone, u.avatar_url, u.organization,
                 e.id as event_id, e.title as event_title, e.description as event_description,
                 e.event_date, e.event_type, e.location as event_location, e.venue_name,
-                e.organizer_id, e.custom_questions, e.start_time, e.end_time,
+                e.organizer_id, e.custom_questions, e.start_time, e.end_time, e.deleted_at as event_deleted_at,
                 org.full_name as organizer_name, org.organization as organizer_org, org.email as organizer_email,
-                r.id as registration_id, r.registered_at, r.answers, r.status as reg_status
+                r.id as registration_id, r.registered_at, r.answers, r.status as reg_status, r.deleted_at as reg_deleted_at
          FROM tickets t
          JOIN users u ON t.user_id = u.id
          JOIN events e ON t.event_id = e.id
@@ -268,9 +268,9 @@ export class CheckinService {
         `SELECT t.*, u.id as user_id, u.full_name, u.email, u.phone, u.avatar_url, u.organization,
                 e.id as event_id, e.title as event_title, e.description as event_description,
                 e.event_date, e.event_type, e.location as event_location, e.venue_name,
-                e.organizer_id, e.custom_questions, e.start_time, e.end_time,
+                e.organizer_id, e.custom_questions, e.start_time, e.end_time, e.deleted_at as event_deleted_at,
                 org.full_name as organizer_name, org.organization as organizer_org, org.email as organizer_email,
-                r.id as registration_id, r.registered_at, r.answers, r.status as reg_status
+                r.id as registration_id, r.registered_at, r.answers, r.status as reg_status, r.deleted_at as reg_deleted_at
          FROM tickets t
          JOIN users u ON t.user_id = u.id
          JOIN events e ON t.event_id = e.id
@@ -289,6 +289,21 @@ export class CheckinService {
     }
 
     const row = ticketRes.rows[0];
+
+    if (row.event_deleted_at) {
+      const err: any = new Error(`Cannot check in: The event "${row.event_title}" is currently in the Recycle Bin.`);
+      err.statusCode = 400;
+      err.code = 'EVENT_DELETED';
+      throw err;
+    }
+
+    if (row.reg_deleted_at) {
+      const err: any = new Error('Cannot check in: This attendee registration is currently in the Recycle Bin.');
+      err.statusCode = 400;
+      err.code = 'REGISTRATION_DELETED';
+      throw err;
+    }
+
     const now = new Date();
     const expDate = row.expires_at ? new Date(row.expires_at) : (row.event_date ? computeEventDayExpiration(row.event_date) : null);
     const isExpired = expDate ? now.getTime() > expDate.getTime() : false;
@@ -383,6 +398,13 @@ export class CheckinService {
 
     const event = await EventService.getEventById(eventId);
     if (!event) {
+      const deletedCheck = await query('SELECT title, deleted_at FROM events WHERE id::text = $1', [eventId]);
+      if (deletedCheck.rowCount && deletedCheck.rows[0].deleted_at) {
+        const err: any = new Error(`Cannot check in: The event "${deletedCheck.rows[0].title}" is currently in the Recycle Bin.`);
+        err.statusCode = 400;
+        err.code = 'EVENT_DELETED';
+        throw err;
+      }
       const err: any = new Error('Event not found.');
       err.statusCode = 404;
       throw err;
@@ -441,7 +463,7 @@ export class CheckinService {
     let ticketRes;
     if (targetTicketId) {
       ticketRes = await query(
-        `SELECT t.*, u.full_name, u.email, u.phone, u.avatar_url, u.organization, r.registered_at, r.answers, r.status as reg_status
+        `SELECT t.*, u.full_name, u.email, u.phone, u.avatar_url, u.organization, r.registered_at, r.answers, r.status as reg_status, r.deleted_at as reg_deleted_at
          FROM tickets t
          JOIN users u ON t.user_id = u.id
          JOIN registrations r ON t.registration_id = r.id
@@ -450,7 +472,7 @@ export class CheckinService {
       );
     } else {
       ticketRes = await query(
-        `SELECT t.*, u.full_name, u.email, u.phone, u.avatar_url, u.organization, r.registered_at, r.answers, r.status as reg_status
+        `SELECT t.*, u.full_name, u.email, u.phone, u.avatar_url, u.organization, r.registered_at, r.answers, r.status as reg_status, r.deleted_at as reg_deleted_at
          FROM tickets t
          JOIN users u ON t.user_id = u.id
          JOIN registrations r ON t.registration_id = r.id
@@ -478,6 +500,12 @@ export class CheckinService {
     }
 
     const row = ticketRes.rows[0];
+    if (row.reg_deleted_at) {
+      const err: any = new Error('Cannot check in: This attendee registration is currently in the Recycle Bin.');
+      err.statusCode = 400;
+      err.code = 'REGISTRATION_DELETED';
+      throw err;
+    }
     const now = new Date();
     const expDate = row.expires_at ? new Date(row.expires_at) : (row.event_date ? computeEventDayExpiration(row.event_date) : null);
     const isExpired = expDate ? now.getTime() > expDate.getTime() : false;
@@ -555,6 +583,13 @@ export class CheckinService {
 
     const event = await EventService.getEventById(eventId);
     if (!event) {
+      const deletedCheck = await query('SELECT title, deleted_at FROM events WHERE id::text = $1', [eventId]);
+      if (deletedCheck.rowCount && deletedCheck.rows[0].deleted_at) {
+        const err: any = new Error(`Cannot check in: The event "${deletedCheck.rows[0].title}" is currently in the Recycle Bin.`);
+        err.statusCode = 400;
+        err.code = 'EVENT_DELETED';
+        throw err;
+      }
       const err: any = new Error('Event not found.');
       err.statusCode = 404;
       throw err;
@@ -573,7 +608,7 @@ export class CheckinService {
 
       // 1. Fetch registration with row lock
       const regRes = await client.query(
-        `SELECT r.id, r.user_id, r.status, u.full_name, u.email 
+        `SELECT r.id, r.user_id, r.status, r.deleted_at, u.full_name, u.email 
          FROM registrations r 
          JOIN users u ON r.user_id = u.id 
          WHERE r.event_id = $1 AND r.user_id = $2 FOR UPDATE`,
@@ -587,6 +622,12 @@ export class CheckinService {
       }
 
       const registration = regRes.rows[0];
+      if (registration.deleted_at) {
+        const err: any = new Error('Cannot check in: This registration is currently in the Recycle Bin.');
+        err.statusCode = 400;
+        err.code = 'REGISTRATION_DELETED';
+        throw err;
+      }
       if (registration.status === 'cancelled') {
         const err: any = new Error('Cannot check in. Registration has been cancelled.');
         err.statusCode = 400;
@@ -1083,7 +1124,7 @@ export class CheckinService {
 
       // 2. Duplicate registration check: do not create duplicate registration or ticket!
       const regLookup = await client.query(
-        `SELECT id, approval_status, payment_status FROM registrations WHERE event_id = $1 AND user_id = $2`,
+        `SELECT id, approval_status, payment_status FROM registrations WHERE event_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
         [realEventId, userId]
       );
       if (regLookup.rowCount && regLookup.rowCount > 0) {

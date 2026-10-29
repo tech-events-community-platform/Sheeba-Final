@@ -103,7 +103,7 @@ export class TicketService {
       JOIN users u ON r.user_id = u.id
       JOIN users org ON e.organizer_id = org.id
       LEFT JOIN tickets t ON t.registration_id = r.id
-      WHERE r.user_id = $1 AND r.status = 'registered'
+      WHERE r.user_id = $1 AND r.status = 'registered' AND r.deleted_at IS NULL AND e.deleted_at IS NULL
       ORDER BY e.event_date DESC
     `;
 
@@ -148,7 +148,7 @@ export class TicketService {
       JOIN users u ON r.user_id = u.id
       JOIN users org ON e.organizer_id = org.id
       LEFT JOIN tickets t ON t.registration_id = r.id
-      WHERE (r.event_id::text = $1 OR e.share_link_token = $1) AND r.user_id = $2 AND r.status = 'registered'
+      WHERE (r.event_id::text = $1 OR e.share_link_token = $1) AND r.user_id = $2 AND r.status = 'registered' AND r.deleted_at IS NULL AND e.deleted_at IS NULL
     `;
 
     const result = await query(sql, [eventId, userId]);

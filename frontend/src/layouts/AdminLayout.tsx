@@ -9,6 +9,7 @@ import {
   Award,
   CreditCard,
   User,
+  Trash2,
 } from 'lucide-react';
 
 export const AdminLayout: React.FC = () => {
@@ -37,6 +38,7 @@ export const AdminLayout: React.FC = () => {
             { label: 'Overview', path: '/admin', icon: LayoutDashboard },
             { label: 'Events', path: '/admin/events', icon: Calendar },
             { label: 'Users', path: '/admin/users', icon: Users },
+            { label: 'Recycle Bin', path: '/admin/recycle-bin', icon: Trash2 },
             { label: 'Badge Queue', path: '/admin#badges', icon: Award },
             { label: 'Payments', path: '/admin#payments', icon: CreditCard },
             { label: 'Profile', path: '/admin/profile', icon: User },

@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 
 export const AttendeeSidebar: React.FC = () => {
@@ -28,12 +29,14 @@ export const AttendeeSidebar: React.FC = () => {
   const navItems = [
     { label: 'Badges', path: '/app', icon: Award },
     { label: 'My Registrations', path: '/app/events', icon: Ticket },
+    { label: 'Recycle Bin', path: '/app/recycle-bin', icon: Trash2 },
     { label: 'Settings', path: '/app/settings', icon: Settings },
   ];
 
   const isActive = (path: string) => {
     if (path === '/app') return location.pathname === '/app' || location.pathname === '/app/badges';
     if (path === '/app/events') return location.pathname === '/app/events' || location.pathname === '/app/registrations' || location.pathname.startsWith('/app/ticket');
+    if (path === '/app/recycle-bin') return location.pathname.startsWith('/app/recycle-bin');
     if (path === '/app/settings') return location.pathname === '/app/settings';
     return location.pathname.startsWith(path);
   };

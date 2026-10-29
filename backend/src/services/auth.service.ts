@@ -386,7 +386,7 @@ export class AuthService {
     const { email, password, role } = data;
 
     const result = await query<IUser>(
-      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password,
+      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
               created_at, updated_at
        FROM users WHERE LOWER(email) = LOWER($1)`,
@@ -400,6 +400,12 @@ export class AuthService {
     }
 
     const rawUser = result.rows[0];
+
+    if ((rawUser as any).deleted_at) {
+      const err: any = new Error('This account has been deleted. Please contact support or an administrator to restore it.');
+      err.statusCode = 403;
+      throw err;
+    }
 
     // Ensure password is provided and of valid type
     if (!password || typeof password !== 'string') {
@@ -540,14 +546,14 @@ export class AuthService {
 
   static async getCurrentUser(userId: string): Promise<any> {
     const result = await query<IUser>(
-      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, (password_hash IS NOT NULL) AS has_password,
+      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, (password_hash IS NOT NULL) AS has_password,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
               created_at, updated_at
        FROM users WHERE id = $1`,
       [userId]
     );
 
-    if (!result.rowCount || result.rowCount === 0) {
+    if (!result.rowCount || result.rowCount === 0 || (result.rows[0] as any).deleted_at) {
       const err: any = new Error('User not found.');
       err.statusCode = 404;
       throw err;

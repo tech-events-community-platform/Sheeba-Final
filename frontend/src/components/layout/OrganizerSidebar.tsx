@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Store,
+  Trash2,
 } from 'lucide-react';
 
 export const OrganizerSidebar: React.FC = () => {
@@ -38,6 +39,7 @@ export const OrganizerSidebar: React.FC = () => {
     { label: 'Check-in', path: '/organizer/check-in', icon: QrCode },
     { label: 'Badges', path: '/organizer/badges', icon: Award },
     { label: 'Reports', path: '/organizer/reports', icon: BarChart3 },
+    { label: 'Recycle Bin', path: '/organizer/recycle-bin', icon: Trash2 },
     { label: 'Settings', path: '/organizer/settings', icon: Settings },
   ];
 
@@ -46,6 +48,7 @@ export const OrganizerSidebar: React.FC = () => {
     if (path === '/organizer/events/create') return location.pathname === '/organizer/events/create';
     if (path === '/organizer/exhibitors') return location.pathname.startsWith('/organizer/exhibitors');
     if (path === '/organizer/apply-sponsors') return location.pathname.startsWith('/organizer/apply-sponsors');
+    if (path === '/organizer/recycle-bin') return location.pathname.startsWith('/organizer/recycle-bin');
     if (path === '/organizer/check-in') {
       return location.pathname.startsWith('/organizer/check-in') || location.pathname.includes('/scanner');
     }

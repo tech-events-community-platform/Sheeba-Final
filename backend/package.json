@@ -20,7 +20,9 @@
     "test:payment": "ts-node src/tests/test_payment_integration.ts",
     "test:manual-reg": "ts-node src/tests/test_enhanced_manual_registration.ts",
     "test:exhibitors": "ts-node src/tests/test_exhibitor_receipt_workflow.ts",
-    "test:organizer": "ts-node src/tests/test_organizer_flow_stabilization.ts"
+    "test:organizer": "ts-node src/tests/test_organizer_flow_stabilization.ts",
+    "test:recycle-bin": "ts-node src/tests/test_recycle_bin.ts",
+    "test:audit-fixes": "ts-node src/tests/test_audit_fixes.ts"
   },
   "keywords": [],
   "author": "",

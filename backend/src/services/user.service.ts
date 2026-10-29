@@ -1,6 +1,7 @@
 import { query } from '../config/db';
 import { AuthService } from './auth.service';
 import { BadgeService } from './badge.service';
+import { RecycleBinService } from './recycleBin.service';
 
 export class UserService {
   static async getUserProfile(userId: string) {
@@ -156,6 +157,7 @@ export class UserService {
     const activeEventsRes = await query(
       `SELECT id, title, event_date FROM events 
        WHERE organizer_id = $1 
+         AND deleted_at IS NULL
          AND (event_date >= CURRENT_DATE - INTERVAL '1 day')`,
       [userId]
     );
@@ -168,7 +170,22 @@ export class UserService {
       throw err;
     }
 
-    await query('DELETE FROM users WHERE id = $1', [userId]);
+    const userRes = await query('SELECT full_name, email, role FROM users WHERE id = $1', [userId]);
+    const user = userRes.rows[0];
+
+    await query(
+      'UPDATE users SET deleted_at = NOW(), deleted_by = $1, is_active = FALSE, updated_at = NOW() WHERE id = $1',
+      [userId]
+    );
+
+    await RecycleBinService.recordAuditLog({
+      entityType: 'user',
+      entityId: userId,
+      action: 'soft_delete',
+      performedBy: userId,
+      entityTitle: user?.full_name || 'User Account',
+      metadata: { email: user?.email, role: user?.role },
+    });
     return true;
   }
 

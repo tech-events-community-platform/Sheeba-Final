@@ -4,6 +4,7 @@ import { generateTicketToken, generateQrDataUrl, generateTicketCode, computeEven
 import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
 import { PaymentService } from './payment.service';
+import { RecycleBinService } from './recycleBin.service';
 import { getFrontendUrl } from '../config/env';
 
 export class EventService {
@@ -197,7 +198,7 @@ export class EventService {
 
     const { search, type, status, organizerId, isPublicized } = filters;
 
-    const conditions: string[] = [];
+    const conditions: string[] = ['e.deleted_at IS NULL'];
     const values: any[] = [];
     let counter = 1;
 
@@ -248,7 +249,7 @@ export class EventService {
         END) AS checked_in_count
       FROM events e
       JOIN users u ON e.organizer_id = u.id
-      LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered'
+      LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered' AND r.deleted_at IS NULL
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON e.id = t.event_id AND t.registration_id = r.id
       LEFT JOIN badge_awards b ON b.event_id = e.id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
@@ -285,11 +286,11 @@ export class EventService {
         END) AS checked_in_count
       FROM events e
       JOIN users u ON e.organizer_id = u.id
-      LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered'
+      LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered' AND r.deleted_at IS NULL
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON e.id = t.event_id AND t.registration_id = r.id
       LEFT JOIN badge_awards b ON b.event_id = e.id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
-      WHERE e.id::text = $1 OR e.share_link_token = $1
+      WHERE (e.id::text = $1 OR e.share_link_token = $1) AND e.deleted_at IS NULL
       GROUP BY e.id, u.id
     `;
 
@@ -318,12 +319,18 @@ export class EventService {
     data: any
   ): Promise<any> {
     const existing = await query(
-      'SELECT id, organizer_id, share_link_token, start_time, end_time FROM events WHERE id::text = $1 OR share_link_token = $1',
+      'SELECT id, organizer_id, share_link_token, start_time, end_time, deleted_at FROM events WHERE id::text = $1 OR share_link_token = $1',
       [eventId]
     );
     if (!existing.rowCount || existing.rowCount === 0) {
       const err: any = new Error('Event not found.');
       err.statusCode = 404;
+      throw err;
+    }
+
+    if (existing.rows[0].deleted_at) {
+      const err: any = new Error('Cannot update an event that is in the Recycle Bin. Please restore it first.');
+      err.statusCode = 400;
       throw err;
     }
 
@@ -466,7 +473,16 @@ export class EventService {
       throw err;
     }
 
-    await query('DELETE FROM events WHERE id = $1', [realId]);
+    const title = (existing.rows[0] as any).title || 'Event';
+    await query('UPDATE events SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2', [userId, realId]);
+
+    await RecycleBinService.recordAuditLog({
+      entityType: 'event',
+      entityId: realId,
+      action: 'soft_delete',
+      performedBy: userId,
+      entityTitle: title,
+    });
     await CacheService.delPattern('events:list*');
     await CacheService.delPattern(`event:${realId}*`);
     await CacheService.delPattern(`event:${eventId}*`);
@@ -655,7 +671,7 @@ export class EventService {
 
     // Reject duplicate registration or handle pending/rejected/payment completion
     const existingReg = await query(
-      'SELECT id, approval_status, payment_status FROM registrations WHERE event_id = $1 AND user_id = $2',
+      'SELECT id, approval_status, payment_status FROM registrations WHERE event_id = $1 AND user_id = $2 AND deleted_at IS NULL',
       [event.id, userId]
     );
 
@@ -961,7 +977,7 @@ export class EventService {
       LEFT JOIN check_ins ci ON ci.registration_id = r.id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON t.registration_id = r.id
       LEFT JOIN badge_awards b ON b.event_id = r.event_id AND b.user_id = u.id
-      WHERE r.event_id = $1 AND r.status = 'registered'
+      WHERE r.event_id = $1 AND r.status = 'registered' AND r.deleted_at IS NULL
       GROUP BY r.id, u.id, ci.id, t.id
       ORDER BY r.registered_at ASC
     `;
@@ -1316,19 +1332,40 @@ export class EventService {
       throw err;
     }
 
-    // Delete registration for this event (matching registration id OR user_id)
-    await query(
-      `DELETE FROM registrations 
-       WHERE event_id = $1 AND (id::text = $2 OR user_id::text = $2 OR user_id IN (SELECT id FROM users WHERE email = $2))`,
+    const regRes = await query(
+      `SELECT r.id, r.user_id, u.full_name AS attendee_name 
+       FROM registrations r
+       JOIN users u ON r.user_id = u.id
+       WHERE r.event_id = $1 AND (r.id::text = $2 OR r.user_id::text = $2 OR r.user_id IN (SELECT id FROM users WHERE email = $2))`,
       [realEventId, targetId]
     );
 
-    // Also delete associated tickets and check-ins if any
-    await query(
-      `DELETE FROM tickets WHERE event_id = $1 AND (registration_id::text = $2 OR user_id::text = $2)`,
-      [realEventId, targetId]
-    );
-    await query(`DELETE FROM check_ins WHERE registration_id::text = $2`, [targetId]);
+    if (regRes.rowCount && regRes.rowCount > 0) {
+      const regId = regRes.rows[0].id;
+      const targetUserId = regRes.rows[0].user_id;
+      const attendeeName = regRes.rows[0].attendee_name;
+
+      await query(
+        `UPDATE registrations 
+         SET deleted_at = NOW(), deleted_by = $1, status = 'cancelled' 
+         WHERE id = $2`,
+        [userId, regId]
+      );
+
+      await query(
+        `UPDATE tickets SET status = 'CANCELLED' WHERE registration_id = $1`,
+        [regId]
+      );
+
+      await RecycleBinService.recordAuditLog({
+        entityType: 'registration',
+        entityId: regId,
+        action: 'soft_delete',
+        performedBy: userId,
+        entityTitle: `${attendeeName} - Registration for ${(existing.rows[0] as any).title || 'Event'}`,
+        metadata: { eventId: realEventId, userId: targetUserId },
+      });
+    }
 
     // Invalidate caches
     await CacheService.delPattern('events:list*');

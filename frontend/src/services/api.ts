@@ -18,6 +18,7 @@ import type {
   IVerifyBoothReceiptPayload,
   IRejectBoothReceiptPayload,
 } from '../types/exhibitor';
+import type { RecycleBinItem, RecycleBinStats, RecycleBinAuditLog, RecycleBinEntityType } from '../types/recycleBin';
 import { getEndOfEventDay } from '../utils/date';
 
 /**
@@ -2314,6 +2315,69 @@ export const api = {
         body: JSON.stringify(payload),
       });
       return res.data;
+    },
+  },
+
+  recycleBin: {
+    getItems: async (entityType?: string, search?: string): Promise<RecycleBinItem[]> => {
+      const params = new URLSearchParams();
+      if (entityType && entityType !== 'all') params.append('entityType', entityType);
+      if (search && search.trim()) params.append('search', search.trim());
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const res = await requestApi<{ success: boolean; data: RecycleBinItem[] }>(`/recycle-bin${queryStr}`, {
+        skipCache: true,
+      });
+      return res.data || [];
+    },
+
+    getStats: async (): Promise<RecycleBinStats> => {
+      const res = await requestApi<{ success: boolean; data: RecycleBinStats }>('/recycle-bin/stats', {
+        skipCache: true,
+      });
+      return res.data || { totalItems: 0, expiringSoonCount: 0, byType: {} };
+    },
+
+    restore: async (entityType: RecycleBinEntityType, id: string): Promise<any> => {
+      clearApiCache();
+      const res = await requestApi<{ success: boolean; data: any; message: string }>(
+        `/recycle-bin/${entityType}/${id}/restore`,
+        {
+          method: 'POST',
+        }
+      );
+      return res.data;
+    },
+
+    deletePermanent: async (entityType: RecycleBinEntityType, id: string): Promise<boolean> => {
+      clearApiCache();
+      await requestApi<{ success: boolean; message: string }>(
+        `/recycle-bin/${entityType}/${id}/permanent`,
+        {
+          method: 'DELETE',
+        }
+      );
+      return true;
+    },
+
+    purgeExpired: async (): Promise<{ purgedCount: number; purgedItems: any[] }> => {
+      clearApiCache();
+      const res = await requestApi<{ success: boolean; data: { purgedCount: number; purgedItems: any[] } }>(
+        '/recycle-bin/purge',
+        {
+          method: 'POST',
+        }
+      );
+      return res.data;
+    },
+
+    getAuditLogs: async (limit: number = 50, offset: number = 0): Promise<RecycleBinAuditLog[]> => {
+      const res = await requestApi<{ success: boolean; data: RecycleBinAuditLog[] }>(
+        `/recycle-bin/audit?limit=${limit}&offset=${offset}`,
+        {
+          skipCache: true,
+        }
+      );
+      return res.data || [];
     },
   },
 };
