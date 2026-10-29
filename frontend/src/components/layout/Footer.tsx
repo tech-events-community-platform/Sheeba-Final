@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { LinkedInIcon, XIcon, TikTokIcon } from '../ui/SocialIcons';
 
 export const Footer: React.FC = () => {
@@ -28,15 +28,6 @@ export const Footer: React.FC = () => {
             }`}
           >
             <span>All rights reserved. Addis Ababa, Ethiopia.</span>
-            <span>•</span>
-            <Link
-              to="/contact"
-              className={`font-semibold transition-colors hover:underline ${
-                isExternalRegistration ? 'text-white hover:text-white/90' : 'text-[#63474D] hover:text-[#2D1F23]'
-              }`}
-            >
-              Contact Us
-            </Link>
             <span>•</span>
             <a
               href="mailto:sheebanet.events@gmail.com"
