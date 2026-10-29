@@ -13,6 +13,7 @@ import {
   Sparkles,
   ChevronRight,
   ChevronLeft,
+  Trash2,
 } from 'lucide-react';
 
 export const SponsorLayout: React.FC = () => {
@@ -55,6 +56,12 @@ export const SponsorLayout: React.FC = () => {
       path: '/sponsor/deliverables',
       icon: Award,
       subtitle: 'Assets & Rep Info',
+    },
+    {
+      name: 'Recycle Bin',
+      path: '/sponsor/recycle-bin',
+      icon: Trash2,
+      subtitle: 'Restoration',
     },
     {
       name: 'Settings',

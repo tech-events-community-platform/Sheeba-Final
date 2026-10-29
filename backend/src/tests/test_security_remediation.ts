@@ -347,6 +347,7 @@ async function runSecurityRemediationTests() {
   if (failed > 0) {
     process.exit(1);
   }
+  process.exit(0);
 }
 
 runSecurityRemediationTests().catch((err) => {

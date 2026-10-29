@@ -1,5 +1,6 @@
 import { query } from '../config/db';
 import { CacheService } from './cache.service';
+import { RecycleBinService } from './recycleBin.service';
 import { UserRole } from '../types';
 
 export interface EventReviewItem {
@@ -55,7 +56,7 @@ export class ReviewService {
         ) AS is_verified_attendee
       FROM event_reviews r
       JOIN users u ON r.user_id = u.id
-      WHERE r.event_id = $1
+      WHERE r.event_id = $1 AND r.deleted_at IS NULL
       ORDER BY r.created_at DESC
     `;
 
@@ -116,7 +117,7 @@ export class ReviewService {
       `SELECT r.*, u.full_name, u.avatar_url
        FROM event_reviews r
        JOIN users u ON r.user_id = u.id
-       WHERE r.event_id = $1 AND r.user_id = $2`,
+       WHERE r.event_id = $1 AND r.user_id = $2 AND r.deleted_at IS NULL`,
       [eventId, userId]
     );
 
@@ -302,7 +303,16 @@ export class ReviewService {
       throw err;
     }
 
-    await query('DELETE FROM event_reviews WHERE id = $1', [reviewId]);
+    await query('UPDATE event_reviews SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2', [userId, reviewId]);
+
+    await RecycleBinService.recordAuditLog({
+      entityType: 'review',
+      entityId: reviewId,
+      action: 'soft_delete',
+      performedBy: userId,
+      entityTitle: `Review on event ${existing.event_id}`,
+      metadata: { eventId: existing.event_id, rating: existing.rating },
+    });
     await CacheService.delPattern(`*http:*/api/reviews/event/${existing.event_id}*`);
     await CacheService.delPattern(`*http:*/api/events/${existing.event_id}*`);
     await CacheService.delPattern(`event:${existing.event_id}*`);

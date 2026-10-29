@@ -43,3 +43,19 @@ export const idParamSchema = z.object({
 export const tokenParamSchema = z.object({
   token: z.string().trim().min(1, 'Token parameter is required.'),
 });
+
+export const recycleBinItemParamSchema = z.object({
+  entityType: z.enum(
+    [
+      'event',
+      'registration',
+      'sponsorship_application',
+      'sponsorship_deal',
+      'event_vendor',
+      'user',
+      'review',
+    ],
+    { message: 'Invalid Recycle Bin entity type.' }
+  ),
+  id: z.string().trim().min(1, 'ID parameter is required.'),
+});

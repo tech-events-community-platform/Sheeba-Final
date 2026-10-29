@@ -12,21 +12,21 @@ export class AdminService {
 
     const countsRes = await query(`
       SELECT 
-        (SELECT COUNT(*)::INTEGER FROM events) AS total_events,
-        (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'attendee' OR role IS NULL) AS total_attendees,
-        (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'organizer' OR is_organizer = TRUE) AS total_organizers,
-        (SELECT COUNT(*)::INTEGER FROM users WHERE (role = 'organizer' AND approval_status = 'pending') OR organizer_approval_status = 'pending') AS pending_organizers,
-        (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'sponsor') AS total_sponsors,
-        (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'sponsor' AND approval_status = 'pending') AS pending_sponsors,
-        (SELECT COUNT(*)::INTEGER FROM registrations WHERE status = 'registered') AS total_registrations,
+        (SELECT COUNT(*)::INTEGER FROM events WHERE deleted_at IS NULL) AS total_events,
+        (SELECT COUNT(*)::INTEGER FROM users WHERE (role = 'attendee' OR role IS NULL) AND deleted_at IS NULL) AS total_attendees,
+        (SELECT COUNT(*)::INTEGER FROM users WHERE (role = 'organizer' OR is_organizer = TRUE) AND deleted_at IS NULL) AS total_organizers,
+        (SELECT COUNT(*)::INTEGER FROM users WHERE ((role = 'organizer' AND approval_status = 'pending') OR organizer_approval_status = 'pending') AND deleted_at IS NULL) AS pending_organizers,
+        (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'sponsor' AND deleted_at IS NULL) AS total_sponsors,
+        (SELECT COUNT(*)::INTEGER FROM users WHERE role = 'sponsor' AND approval_status = 'pending' AND deleted_at IS NULL) AS pending_sponsors,
+        (SELECT COUNT(*)::INTEGER FROM registrations WHERE status = 'registered' AND deleted_at IS NULL) AS total_registrations,
         (SELECT COUNT(DISTINCT r.id)::INTEGER 
          FROM registrations r 
          LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL 
          LEFT JOIN tickets t ON t.registration_id = r.id 
          LEFT JOIN badge_awards b ON b.event_id = r.event_id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL 
-         WHERE (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
+         WHERE r.deleted_at IS NULL AND ((ci.id IS NOT NULL AND ci.voided_at IS NULL) 
             OR t.status IN ('CHECKED_IN', 'Used') 
-            OR (b.id IS NOT NULL AND b.revoked_at IS NULL)
+            OR (b.id IS NOT NULL AND b.revoked_at IS NULL))
         ) AS total_check_ins,
         (SELECT COUNT(*)::INTEGER FROM badge_awards WHERE revoked_at IS NULL) AS total_badges
     `);
@@ -71,7 +71,7 @@ export class AdminService {
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON u.id = t.user_id
       LEFT JOIN badge_awards b ON b.event_id = r.event_id AND b.user_id = u.id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
-      WHERE u.role = 'attendee' OR u.role IS NULL
+      WHERE (u.role = 'attendee' OR u.role IS NULL) AND u.deleted_at IS NULL
       GROUP BY u.id
       ORDER BY u.created_at DESC
     `);
@@ -88,12 +88,12 @@ export class AdminService {
           THEN r.id 
         END)::INTEGER AS total_check_ins
       FROM users u
-      LEFT JOIN events e ON u.id = e.organizer_id
-      LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered'
+      LEFT JOIN events e ON u.id = e.organizer_id AND e.deleted_at IS NULL
+      LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered' AND r.deleted_at IS NULL
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON e.id = t.event_id AND t.registration_id = r.id
       LEFT JOIN badge_awards b ON b.event_id = e.id AND b.user_id = r.user_id AND b.badge_code = 'attended' AND b.revoked_at IS NULL
-      WHERE u.role = 'organizer' OR u.is_organizer = TRUE OR (u.organizer_approval_status IS NOT NULL AND u.organizer_approval_status != 'none')
+      WHERE (u.role = 'organizer' OR u.is_organizer = TRUE OR (u.organizer_approval_status IS NOT NULL AND u.organizer_approval_status != 'none')) AND u.deleted_at IS NULL
       GROUP BY u.id
       ORDER BY 
         CASE WHEN (u.organizer_approval_status = 'pending' OR u.approval_status = 'pending') THEN 0 ELSE 1 END,
@@ -106,7 +106,7 @@ export class AdminService {
         u.company_phone, u.company_website, u.organization, u.role, u.is_active,
         u.approval_status, u.created_at
       FROM users u
-      WHERE u.role = 'sponsor'
+      WHERE u.role = 'sponsor' AND u.deleted_at IS NULL
       ORDER BY 
         CASE WHEN u.approval_status = 'pending' THEN 0 ELSE 1 END,
         u.created_at DESC

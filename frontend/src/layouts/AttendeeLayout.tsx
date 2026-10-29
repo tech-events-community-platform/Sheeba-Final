@@ -6,6 +6,7 @@ import {
   Ticket,
   Award,
   User,
+  Trash2,
 } from 'lucide-react';
 
 export const AttendeeLayout: React.FC = () => {
@@ -14,6 +15,7 @@ export const AttendeeLayout: React.FC = () => {
   const isTabActive = (path: string) => {
     if (path === '/app') return location.pathname === '/app' || location.pathname === '/app/badges';
     if (path === '/app/events') return location.pathname === '/app/events' || location.pathname.startsWith('/app/ticket');
+    if (path === '/app/recycle-bin') return location.pathname.startsWith('/app/recycle-bin');
     if (path === '/app/settings') return location.pathname === '/app/settings';
     return location.pathname.startsWith(path);
   };
@@ -50,6 +52,17 @@ export const AttendeeLayout: React.FC = () => {
           >
             <Ticket className="w-3.5 h-3.5" />
             <span>My Registrations</span>
+          </Link>
+          <Link
+            to="/app/recycle-bin"
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 ${
+              isTabActive('/app/recycle-bin')
+                ? 'bg-[#AA767C] text-white'
+                : 'text-[#E8DDD7]'
+            }`}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Recycle Bin</span>
           </Link>
           <Link
             to="/app/settings"

@@ -68,6 +68,13 @@ import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { AdminEventsPage } from '../pages/admin/AdminEventsPage';
 import { AdminUsersPage } from '../pages/admin/AdminUsersPage';
 
+// Recycle Bin Pages
+import { OrganizerRecycleBinPage } from '../pages/organizer/OrganizerRecycleBinPage';
+import { AttendeeRecycleBinPage } from '../pages/attendee/AttendeeRecycleBinPage';
+import { SponsorRecycleBinPage } from '../pages/sponsor/SponsorRecycleBinPage';
+import { ExhibitorRecycleBinPage } from '../pages/exhibitor/ExhibitorRecycleBinPage';
+import { AdminRecycleBinPage } from '../pages/admin/AdminRecycleBinPage';
+
 export const router = createBrowserRouter([
   // Public Routes (SRS Section 18)
   {
@@ -117,6 +124,7 @@ export const router = createBrowserRouter([
           { path: 'profile/attendance', element: <AttendanceHistoryPage /> },
           { path: 'record', element: <RecordPage /> },
           { path: 'dashboard', element: <AttendeeDashboardPage /> },
+          { path: 'recycle-bin', element: <AttendeeRecycleBinPage /> },
         ],
       },
     ],
@@ -147,6 +155,7 @@ export const router = createBrowserRouter([
           { path: 'exhibitors', element: <OrganizerExhibitorsPage /> },
           { path: 'exhibitors/:id', element: <OrganizerExhibitorsPage /> },
           { path: 'apply-sponsors', element: <ApplyToSponsorsPage /> },
+          { path: 'recycle-bin', element: <OrganizerRecycleBinPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
           { path: 'change-password', element: <ChangePasswordPage /> },
         ],
@@ -166,6 +175,7 @@ export const router = createBrowserRouter([
           { path: 'users', element: <AdminUsersPage /> },
           { path: 'organizers', element: <AdminUsersPage /> },
           { path: 'reports', element: <AdminDashboardPage /> },
+          { path: 'recycle-bin', element: <AdminRecycleBinPage /> },
           { path: 'profile', element: <AccountSettingsPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
           { path: 'change-password', element: <ChangePasswordPage /> },
@@ -187,6 +197,7 @@ export const router = createBrowserRouter([
           { path: 'applications/:id', element: <SponsorApplicationDetailPage /> },
           { path: 'deals', element: <SponsorDealsPage /> },
           { path: 'deliverables', element: <SponsorDeliverablesPage /> },
+          { path: 'recycle-bin', element: <SponsorRecycleBinPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
           { path: 'change-password', element: <ChangePasswordPage /> },
           { path: 'dashboard', element: <Navigate to="/sponsor" replace /> },
@@ -203,6 +214,7 @@ export const router = createBrowserRouter([
       { path: 'explore', element: <ExhibitorExplorePage /> },
       { path: 'booths', element: <ExhibitorBoothsPage /> },
       { path: 'applications', element: <ExhibitorBoothsPage /> },
+      { path: 'recycle-bin', element: <ExhibitorRecycleBinPage /> },
       { path: 'settings', element: <ExhibitorSettingsPage /> },
       { path: 'change-password', element: <ChangePasswordPage /> },
     ],

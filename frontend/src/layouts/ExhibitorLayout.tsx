@@ -14,6 +14,7 @@ import {
   X,
   ChevronRight,
   ChevronLeft,
+  Trash2,
 } from 'lucide-react';
 
 export const ExhibitorLayout: React.FC = () => {
@@ -71,6 +72,12 @@ export const ExhibitorLayout: React.FC = () => {
       path: '/exhibitor/booths',
       icon: Layers,
       subtitle: 'Bookings & Pipeline',
+    },
+    {
+      name: 'Recycle Bin',
+      path: '/exhibitor/recycle-bin',
+      icon: Trash2,
+      subtitle: 'Restoration',
     },
     {
       name: 'Settings & Profile',

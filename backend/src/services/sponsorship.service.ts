@@ -1,6 +1,7 @@
 import { query } from '../config/db';
 import { ISponsorshipApplication, ISponsorshipDeal, SponsorshipDealStatus, IApplicationAffiliations } from '../types';
 import { CacheService } from './cache.service';
+import { RecycleBinService } from './recycleBin.service';
 
 export class SponsorshipService {
   /**
@@ -116,11 +117,11 @@ export class SponsorshipService {
         COALESCE((
           SELECT COUNT(*)::int 
           FROM sponsorship_deals sd 
-          WHERE sd.application_id = sa.id AND sd.status = 'INTERESTED'
+          WHERE sd.application_id = sa.id AND sd.status = 'INTERESTED' AND sd.deleted_at IS NULL
         ), 0) AS interested_sponsors_count
       FROM sponsorship_applications sa
       JOIN users u ON sa.organizer_id = u.id
-      WHERE sa.organizer_id = $1
+      WHERE sa.organizer_id = $1 AND sa.deleted_at IS NULL
       ORDER BY sa.created_at DESC`,
       [organizerId]
     );
@@ -152,11 +153,11 @@ export class SponsorshipService {
         COALESCE((
           SELECT COUNT(*)::int 
           FROM sponsorship_deals sd 
-          WHERE sd.application_id = sa.id AND sd.status = 'INTERESTED'
+          WHERE sd.application_id = sa.id AND sd.status = 'INTERESTED' AND sd.deleted_at IS NULL
         ), 0) AS interested_sponsors_count
       FROM sponsorship_applications sa
       JOIN users u ON sa.organizer_id = u.id
-      WHERE sa.status != 'CLOSED'
+      WHERE sa.status != 'CLOSED' AND sa.deleted_at IS NULL
     `;
 
     const params: any[] = [];
@@ -414,13 +415,23 @@ export class SponsorshipService {
    * Delete or close an application (Organizer)
    */
   static async deleteApplication(applicationId: string, organizerId: string): Promise<boolean> {
+    const titleRes = await query('SELECT event_title FROM sponsorship_applications WHERE id = $1 AND organizer_id = $2', [applicationId, organizerId]);
+    const eventTitle = titleRes.rows[0]?.event_title || 'Sponsorship Application';
+
     const res = await query(
-      `DELETE FROM sponsorship_applications WHERE id = $1 AND organizer_id = $2`,
+      `UPDATE sponsorship_applications SET deleted_at = NOW(), deleted_by = $2 WHERE id = $1 AND organizer_id = $2`,
       [applicationId, organizerId]
     );
 
     const isDeleted = Boolean(res.rowCount && res.rowCount > 0);
     if (isDeleted) {
+      await RecycleBinService.recordAuditLog({
+        entityType: 'sponsorship_application',
+        entityId: applicationId,
+        action: 'soft_delete',
+        performedBy: organizerId,
+        entityTitle: eventTitle,
+      });
       await CacheService.delPattern('sponsorship:explore*');
       await CacheService.delPattern(`sponsorship:app:${applicationId}*`);
       await CacheService.delPattern(`sponsorship:organizer:${organizerId}*`);

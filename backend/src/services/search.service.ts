@@ -12,7 +12,7 @@ export class SearchService {
     const usersRes = await query(
       `SELECT id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since
        FROM users
-       WHERE visibility = 'public' AND (full_name ILIKE $1 OR email ILIKE $1)
+       WHERE visibility = 'public' AND deleted_at IS NULL AND (full_name ILIKE $1 OR email ILIKE $1)
        LIMIT 20`,
       [`%${q}%`]
     );

@@ -87,7 +87,7 @@ export class SponsorMatchingService {
   }> {
     const result = await query(
       `SELECT id, role, company_name, organization, industry_category, bio, sponsor_preferences 
-       FROM users WHERE id = $1`,
+       FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [userId]
     );
 
@@ -211,12 +211,13 @@ export class SponsorMatchingService {
         COALESCE(AVG(er.rating), 0)::NUMERIC(3, 2) AS avg_rating,
         COUNT(DISTINCT er.id) AS review_count
       FROM events e
-      LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered'
+      LEFT JOIN registrations r ON e.id = r.event_id AND r.status = 'registered' AND r.deleted_at IS NULL
       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
       LEFT JOIN tickets t ON e.id = t.event_id AND t.registration_id = r.id
       LEFT JOIN badge_awards b ON e.id = b.event_id AND b.revoked_at IS NULL
-      LEFT JOIN event_reviews er ON e.id = er.event_id
+      LEFT JOIN event_reviews er ON e.id = er.event_id AND er.deleted_at IS NULL
       WHERE e.status NOT IN ('canceled', 'cancelled', 'draft', 'completed')
+        AND e.deleted_at IS NULL
         AND e.event_date >= (CURRENT_DATE - INTERVAL '1 day')
       GROUP BY e.id
       ORDER BY e.event_date DESC
@@ -264,7 +265,7 @@ export class SponsorMatchingService {
         event_id,
         answers
       FROM registrations
-      WHERE status = 'registered' AND answers IS NOT NULL AND answers::text != '{}'
+      WHERE status = 'registered' AND deleted_at IS NULL AND answers IS NOT NULL AND answers::text != '{}'
     `);
 
     const eventRolesMap = new Map<string, Record<string, number>>();

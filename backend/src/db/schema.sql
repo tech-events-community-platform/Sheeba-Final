@@ -122,7 +122,7 @@ ALTER TABLE registrations ADD COLUMN IF NOT EXISTS notification_status VARCHAR(5
 ALTER TABLE registrations ADD COLUMN IF NOT EXISTS notification_sent_at TIMESTAMPTZ;
 ALTER TABLE registrations ADD COLUMN IF NOT EXISTS notification_error TEXT;
 ALTER TABLE registrations DROP CONSTRAINT IF EXISTS unique_event_user_registration;
-ALTER TABLE registrations ADD CONSTRAINT unique_event_user_registration UNIQUE (event_id, user_id);
+-- unique constraint migrated to partial unique index idx_unique_active_registration WHERE deleted_at IS NULL
 
 -- Password Reset Tokens Table
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
@@ -485,3 +485,75 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_notification_outbox_poll ON notification_outbox(status, next_run_at);
 CREATE INDEX IF NOT EXISTS idx_notification_outbox_reg_id ON notification_outbox(registration_id);
+
+-- =========================================================================
+-- Recycle Bin & Data Restoration Architecture (Soft Deletion & Retention)
+-- =========================================================================
+
+-- Events soft deletion
+ALTER TABLE events ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS delete_reason TEXT;
+CREATE INDEX IF NOT EXISTS idx_events_deleted_at ON events(deleted_at);
+
+-- Registrations soft deletion
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE registrations ADD COLUMN IF NOT EXISTS delete_reason TEXT;
+CREATE INDEX IF NOT EXISTS idx_registrations_deleted_at ON registrations(deleted_at);
+
+-- Sponsorship Applications soft deletion
+ALTER TABLE sponsorship_applications ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE sponsorship_applications ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_sponsorship_applications_deleted_at ON sponsorship_applications(deleted_at);
+
+-- Sponsorship Deals soft deletion
+ALTER TABLE sponsorship_deals ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE sponsorship_deals ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_sponsorship_deals_deleted_at ON sponsorship_deals(deleted_at);
+
+-- Event Vendors / Exhibitor Applications soft deletion
+ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_event_vendors_deleted_at ON event_vendors(deleted_at);
+
+-- Users soft deletion
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_users_deleted_at ON users(deleted_at);
+
+-- Event Reviews soft deletion
+ALTER TABLE event_reviews ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE event_reviews ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_event_reviews_deleted_at ON event_reviews(deleted_at);
+
+-- Recycle Bin Audit Logs Table
+CREATE TABLE IF NOT EXISTS recycle_bin_audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entity_type VARCHAR(50) NOT NULL, -- 'event', 'registration', 'sponsorship_application', 'sponsorship_deal', 'event_vendor', 'user', 'review'
+    entity_id UUID NOT NULL,
+    action VARCHAR(50) NOT NULL, -- 'soft_delete', 'restore', 'permanent_delete', 'purge_expired'
+    performed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    entity_title VARCHAR(255),
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_recycle_bin_audit_logs_entity ON recycle_bin_audit_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_recycle_bin_audit_logs_performed_by ON recycle_bin_audit_logs(performed_by);
+CREATE INDEX IF NOT EXISTS idx_recycle_bin_audit_logs_created_at ON recycle_bin_audit_logs(created_at);
+
+-- Partial Unique Indexes for Soft Deletion (Allow re-entry/re-registration when deleted_at IS NOT NULL)
+ALTER TABLE registrations DROP CONSTRAINT IF EXISTS unique_event_user_registration;
+DROP INDEX IF EXISTS idx_unique_active_registration;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_registration ON registrations (event_id, user_id) WHERE deleted_at IS NULL;
+
+ALTER TABLE sponsorship_deals DROP CONSTRAINT IF EXISTS unique_sponsor_application_deal;
+DROP INDEX IF EXISTS idx_unique_active_sponsor_deal;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_sponsor_deal ON sponsorship_deals (application_id, sponsor_id) WHERE deleted_at IS NULL;
+
+ALTER TABLE event_reviews DROP CONSTRAINT IF EXISTS unique_user_event_review;
+DROP INDEX IF EXISTS idx_unique_active_review;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_review ON event_reviews (event_id, user_id) WHERE deleted_at IS NULL;
+
+

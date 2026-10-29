@@ -3,6 +3,7 @@ import { query, getClient } from '../config/db';
 import { IExhibitorCall, IEventVendor, ExhibitorPricingMode, RegistrationQuestion, IExhibitorPaymentConfig } from '../types';
 import { PaymentService } from './payment.service';
 import { CacheService } from './cache.service';
+import { RecycleBinService } from './recycleBin.service';
 
 
 export class ExhibitorService {
@@ -331,7 +332,7 @@ export class ExhibitorService {
         ) as latest_receipt
       FROM event_vendors v
       JOIN events e ON e.id = v.event_id
-      WHERE v.event_id = $1
+      WHERE v.event_id = $1 AND v.deleted_at IS NULL
     `;
     const params: any[] = [eventId];
     let paramIndex = 2;
@@ -366,7 +367,7 @@ export class ExhibitorService {
          COUNT(*) FILTER (WHERE status = 'confirmed')::int as confirmed,
          COUNT(*) FILTER (WHERE status = 'pending')::int as pending
        FROM event_vendors 
-       WHERE event_id = $1`,
+       WHERE event_id = $1 AND deleted_at IS NULL`,
       [eventId]
     );
 
@@ -692,15 +693,28 @@ export class ExhibitorService {
   static async deleteVendor(organizerId: string, eventId: string, vendorId: string, isAdmin: boolean = false): Promise<void> {
     await this.verifyEventOwnership(organizerId, eventId, isAdmin);
 
-    const vendorRes = await query('SELECT user_id FROM event_vendors WHERE id = $1 AND event_id = $2', [vendorId, eventId]);
+    const vendorRes = await query('SELECT user_id, business_name FROM event_vendors WHERE id = $1 AND event_id = $2', [vendorId, eventId]);
     if (vendorRes.rows.length === 0) {
       const err: any = new Error('Vendor record not found.');
       err.statusCode = 404;
       throw err;
     }
     const vendorUserId = vendorRes.rows[0].user_id;
+    const businessName = vendorRes.rows[0].business_name;
 
-    await query('DELETE FROM event_vendors WHERE id = $1 AND event_id = $2', [vendorId, eventId]);
+    await query(
+      'UPDATE event_vendors SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2 AND event_id = $3',
+      [organizerId, vendorId, eventId]
+    );
+
+    await RecycleBinService.recordAuditLog({
+      entityType: 'event_vendor',
+      entityId: vendorId,
+      action: 'soft_delete',
+      performedBy: organizerId,
+      entityTitle: businessName,
+      metadata: { eventId, vendorUserId },
+    });
 
     await CacheService.delPattern(`exhibitors:public:${eventId}*`);
     await CacheService.delPattern(`event:${eventId}*`);
@@ -742,7 +756,7 @@ export class ExhibitorService {
     const res = await query(
       `SELECT id, business_name, category, showcase_description, space_sqm, booth_number, logo_url, website_url, source
        FROM event_vendors
-       WHERE event_id = $1 AND status = 'confirmed'
+       WHERE event_id = $1 AND status = 'confirmed' AND deleted_at IS NULL
        ORDER BY business_name ASC`,
       [eventId]
     );
@@ -806,12 +820,13 @@ export class ExhibitorService {
       FROM exhibitor_calls ec
       JOIN events e ON e.id = ec.event_id
       JOIN users u ON u.id = e.organizer_id
-      LEFT JOIN event_vendors v ON v.event_id = e.id
+      LEFT JOIN event_vendors v ON v.event_id = e.id AND v.deleted_at IS NULL
       WHERE ec.is_enabled = TRUE
         AND ec.status = 'open'
         AND (ec.application_deadline IS NULL OR ec.application_deadline >= NOW())
         AND (COALESCE(e.end_date, e.event_date) >= CURRENT_DATE)
         AND e.status NOT IN ('cancelled', 'canceled', 'completed', 'draft')
+        AND e.deleted_at IS NULL
     `;
     const params: any[] = [];
     let paramIndex = 1;
