@@ -90,7 +90,6 @@ export default function Header() {
       { name: 'Features', href: '#features', isInternal: true },
       { name: 'Explore Events', href: '#explore-events', isInternal: true },
       { name: 'How It Works', href: '#how-it-works', isInternal: true },
-      { name: 'Live Simulator', href: '#simulator', isInternal: true },
       { name: 'Exhibitors', href: '#exhibitors', isInternal: true },
       { name: 'Contact Us', href: '#contact', isInternal: true },
     ]

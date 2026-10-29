@@ -1,6 +1,6 @@
 import React from 'react';
 import FadeIn from '../FadeIn';
-import { Award, Users, CalendarCheck, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Award, Users, CalendarCheck, ShieldCheck, ArrowRight, Store } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const RoleSpotlightSection: React.FC = () => {
@@ -9,14 +9,11 @@ export const RoleSpotlightSection: React.FC = () => {
       {/* Section Header */}
       <FadeIn direction="up">
         <div className="text-center space-y-3 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#63474D]/10 text-[#63474D] text-xs font-bold uppercase tracking-wider">
-            <span>Three-Sided Ecosystem</span>
-          </div>
           <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-[#2D1F23] tracking-tight">
             How Sheeba Powers Every Role
           </h2>
           <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
-            A unified, tamper-proof platform connecting attendees, organizers, and corporate sponsors with verified data and zero friction.
+            A unified, tamper-proof platform connecting attendees, organizers, corporate sponsors, and exhibitors with verified data and zero friction.
           </p>
         </div>
       </FadeIn>
@@ -141,6 +138,53 @@ export const RoleSpotlightSection: React.FC = () => {
                   decoding="async"
                   className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
                 />
+              </div>
+            </div>
+          </FadeIn>
+        </div>
+
+        {/* ROW 4: Exhibitors (Image Left, Text Right) */}
+        <div id="exhibitors" className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center scroll-mt-28">
+          <FadeIn direction="right" className="order-2 md:order-1">
+            <div className="flex justify-center md:justify-start">
+              <div className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-gray-200/80 shadow-lg hover:shadow-2xl transition-all duration-300 max-w-lg w-full bg-white">
+                <img
+                  src="/landing-exhibitor.jpg"
+                  alt="Exhibitors showcasing products and live demos at tech booths"
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+              </div>
+            </div>
+          </FadeIn>
+
+          <FadeIn direction="left" className="order-1 md:order-2">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#63474D]/10 text-[#63474D] text-xs font-bold uppercase tracking-wider">
+                <Store className="w-3.5 h-3.5" />
+                <span>For Exhibitors</span>
+              </div>
+              <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#2D1F23]">
+                Put Your Product on the Exhibition Floor
+              </h3>
+              <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
+                Take center stage at Ethiopia&apos;s most influential gatherings. Connect face-to-face with attendees, demo software, and turn physical foot traffic into lasting business partnerships. Exhibiting gives your company a dedicated physical booth footprint at live conferences, summits, and hackathons with pre-verified attendees eager to test solutions and meet founders.
+              </p>
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <Link
+                  to="/exhibitors"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#63474D] hover:bg-[#4E373C] text-white font-bold text-xs sm:text-sm shadow-md transition-all group"
+                >
+                  <span>Explore Exhibitor Opportunities</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <Link
+                  to="/exhibitor/auth"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-white hover:bg-gray-50 border border-[#E8DDD7] text-[#2D1F23] font-bold text-xs sm:text-sm transition-all"
+                >
+                  <span>Exhibitor Portal Login</span>
+                </Link>
               </div>
             </div>
           </FadeIn>
