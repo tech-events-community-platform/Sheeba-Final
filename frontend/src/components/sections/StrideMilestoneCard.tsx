@@ -11,21 +11,21 @@ interface SlideItem {
 const TRUSTED_SLIDES: SlideItem[] = [
   {
     id: 'stride-mint',
-    posterUrl: '/stride-poster.jpg',
+    posterUrl: '/stride-poster.webp',
     title: 'STRIDE Ethiopia 2.0 Summit (Hosted by MInT)',
     description:
       "Ethiopia's Ministry of Innovation and Technology (MInT) chose Sheeba for official event infrastructure and live QR door check-ins at STRIDE 2.0.",
   },
   {
     id: 'tech-ai-summit',
-    posterUrl: '/trusted-demo-1.jpg',
+    posterUrl: '/trusted-demo-1.webp',
     title: 'National Tech & AI Summit (Hosted by Ethiopian Innovation Hub)',
     description:
       'Admitted over 3,500 attendees and developers with seamless sub-second door check-ins and verified participation badges.',
   },
   {
     id: 'fintech-forum',
-    posterUrl: '/trusted-demo-2.jpg',
+    posterUrl: '/trusted-demo-2.webp',
     title: 'Addis Business & FinTech Forum (Hosted by FinTech Leaders)',
     description:
       'Enterprise exhibition showcases and turnout analytics trusted by leading financial and corporate institutions.',

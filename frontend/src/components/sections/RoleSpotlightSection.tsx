@@ -149,7 +149,7 @@ export const RoleSpotlightSection: React.FC = () => {
             <div className="flex justify-center md:justify-start">
               <div className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-gray-200/80 shadow-lg hover:shadow-2xl transition-all duration-300 max-w-lg w-full bg-white">
                 <img
-                  src="/landing-exhibitor.jpg"
+                  src="/landing-exhibitor.webp"
                   alt="Exhibitors showcasing products and live demos at tech booths"
                   loading="lazy"
                   decoding="async"
