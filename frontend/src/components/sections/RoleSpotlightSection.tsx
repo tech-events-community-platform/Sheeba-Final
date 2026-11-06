@@ -1,6 +1,7 @@
 import React from 'react';
 import FadeIn from '../FadeIn';
 import { Award, Users, CalendarCheck, ShieldCheck, ArrowRight, Store } from 'lucide-react';
+
 import { Link } from 'react-router-dom';
 
 export const RoleSpotlightSection: React.FC = () => {
@@ -16,7 +17,7 @@ export const RoleSpotlightSection: React.FC = () => {
             How Sheeba Powers Every Role
           </h2>
           <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
-            A unified platform connecting attendees, organizers, sponsors, and exhibitors through trusted event experiences.
+            A unified, tamper-proof platform connecting attendees, organizers, corporate sponsors, and exhibitors with verified data and zero friction.
           </p>
         </div>
       </FadeIn>
@@ -147,13 +148,13 @@ export const RoleSpotlightSection: React.FC = () => {
         </div>
 
         {/* ROW 4: Exhibitors (Image Left, Text Right) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center">
+        <div id="exhibitors" className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center scroll-mt-28">
           <FadeIn direction="right" className="order-2 md:order-1">
             <div className="flex justify-center md:justify-start">
               <div className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-gray-200/80 shadow-lg hover:shadow-2xl transition-all duration-300 max-w-lg w-full bg-white">
                 <img
-                  src="/image.png"
-                  alt="Exhibitors showcasing products and managing event booths"
+                  src="/landing-exhibitor.webp"
+                  alt="Exhibitors showcasing products and live demos at tech booths"
                   loading="lazy"
                   decoding="async"
                   className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500"
@@ -169,18 +170,24 @@ export const RoleSpotlightSection: React.FC = () => {
                 <span>For Exhibitors</span>
               </div>
               <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#2D1F23]">
-                A Space to Showcase Your Brand
+                Put Your Product on the Exhibition Floor
               </h3>
               <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
-                Discover exhibition opportunities, apply for event booths, and showcase your products or services to event audiences. Track your application and payment status, and access booth management tools once your participation is confirmed.
+                Take center stage at Ethiopia&apos;s most influential gatherings. Connect face-to-face with attendees, demo software, and turn physical foot traffic into lasting business partnerships. Exhibiting gives your company a dedicated physical booth footprint at live conferences, summits, and hackathons with pre-verified attendees eager to test solutions and meet founders.
               </p>
-              <div className="pt-2">
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <Link
                   to="/exhibitors"
-                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#63474D] hover:text-[#4E373C] group"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-[#63474D] hover:bg-[#4E373C] text-white font-bold text-xs sm:text-sm shadow-md transition-all group"
                 >
-                  <span>Explore exhibition opportunities</span>
+                  <span>Explore Exhibitor Opportunities</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <Link
+                  to="/exhibitor/auth"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-white hover:bg-gray-50 border border-[#E8DDD7] text-[#2D1F23] font-bold text-xs sm:text-sm transition-all"
+                >
+                  <span>Exhibitor Portal Login</span>
                 </Link>
               </div>
             </div>

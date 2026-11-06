@@ -8,7 +8,7 @@ export default function Hero() {
       {/*Background Image Layer with Tapered Gradient Overlay */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <img
-          src="/image.png"
+          src="/hero-bg.webp"
           alt="Ethiopian Community Ecosystem"
           fetchPriority="high"
           decoding="async"

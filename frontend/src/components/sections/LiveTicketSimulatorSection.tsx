@@ -20,10 +20,12 @@ import {
 } from 'lucide-react';
 
 export const LiveTicketSimulatorSection: React.FC = () => {
-  const [attendeeName, setAttendeeName] = useState('Sara Tesfaye');
-  const [jobTitle, setJobTitle] = useState('Founder & Lead Organizer');
+  const [attendeeName, setAttendeeName] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
   const [hasSimulated, setHasSimulated] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+
+  const canSimulate = attendeeName.trim().length > 0 && jobTitle.trim().length > 0;
 
   // Popular hardcoded event
   const eventName = 'Sheeba Annual Summit 2026';
@@ -36,6 +38,7 @@ export const LiveTicketSimulatorSection: React.FC = () => {
   const qrTokenPayload = `SHEEBA_PASS:${passCode}:${cleanName || 'Attendee'}:${eventName}`;
 
   const handleSimulate = () => {
+    if (!canSimulate) return;
     setIsSimulating(true);
     setTimeout(() => {
       setIsSimulating(false);
@@ -76,8 +79,8 @@ export const LiveTicketSimulatorSection: React.FC = () => {
                 type="text"
                 value={attendeeName}
                 onChange={(e) => setAttendeeName(e.target.value)}
-                placeholder="Your Full Name (e.g. Sara Tesfaye)"
-                className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-gray-200 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold text-[#2D1F23] placeholder-gray-400 focus:border-[#63474D] focus:bg-white outline-none transition-all"
+                placeholder="Write your name"
+                className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-gray-200 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold text-[#2D1F23] placeholder:text-gray-400 placeholder:font-normal focus:border-[#63474D] focus:bg-white outline-none transition-all"
               />
             </div>
 
@@ -90,16 +93,16 @@ export const LiveTicketSimulatorSection: React.FC = () => {
                 type="text"
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
-                placeholder="Job Title (e.g. Founder & Lead Organizer)"
-                className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-gray-200 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold text-[#2D1F23] placeholder-gray-400 focus:border-[#63474D] focus:bg-white outline-none transition-all"
+                placeholder="Write your profession"
+                className="w-full pl-10 pr-4 py-2.5 bg-stone-50 border border-gray-200 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold text-[#2D1F23] placeholder:text-gray-400 placeholder:font-normal focus:border-[#63474D] focus:bg-white outline-none transition-all"
               />
             </div>
 
             {/* Simulate Button */}
             <button
               type="submit"
-              disabled={isSimulating}
-              className="w-full sm:w-auto px-7 py-2.5 bg-[#63474D] hover:bg-[#523a3f] text-white text-xs sm:text-sm font-bold rounded-xl sm:rounded-full shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-75"
+              disabled={!canSimulate || isSimulating}
+              className="w-full sm:w-auto px-7 py-2.5 bg-[#63474D] hover:bg-[#523a3f] text-white text-xs sm:text-sm font-bold rounded-xl sm:rounded-full shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {isSimulating ? (
                 <>
@@ -126,7 +129,7 @@ export const LiveTicketSimulatorSection: React.FC = () => {
             </div>
             <h3 className="font-serif font-bold text-lg text-[#2D1F23]">Interactive Preview Ready</h3>
             <p className="text-xs sm:text-sm text-[#2D1F23]/80 font-medium max-w-md mx-auto">
-              Enter your name and job title above, then click <span className="font-bold text-[#63474D]">&apos;Simulate&apos;</span> to reveal your compact ticket pass and verified badge dashboard.
+              Enter your name and profession above, then click <span className="font-bold text-[#63474D]">&apos;Simulate&apos;</span> to reveal your compact ticket pass and verified badge dashboard.
             </p>
           </div>
         </FadeIn>
