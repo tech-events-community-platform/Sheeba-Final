@@ -9,14 +9,10 @@ import {
   Calendar,
   Clock,
   MapPin,
-  Users,
-  Tag,
   ArrowRight,
-  Sparkles,
   Ticket as TicketIcon,
   CheckCircle2,
   Share2,
-  ExternalLink,
   Filter,
 } from 'lucide-react';
 
@@ -98,10 +94,6 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
       {showHeader && (
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#E8DDD7] pb-5">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EAF4EF] text-[#2A7B5F] text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Upcoming Events on Sheeba</span>
-            </div>
             <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23]">
               Upcoming Events
             </h2>
@@ -149,21 +141,27 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
 
       {/* Loading Skeleton */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((n) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2, 3, 4].map((n) => (
             <div
               key={n}
-              className="bg-white rounded-3xl border border-[#E8DDD7] overflow-hidden p-4 space-y-3 animate-pulse"
+              className="bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] overflow-hidden min-h-[340px] p-6 flex flex-col justify-between animate-pulse"
             >
-              <div className="h-44 bg-[#F5ECE8] rounded-2xl" />
-              <div className="h-4 bg-[#F5ECE8] rounded-md w-3/4" />
-              <div className="h-3 bg-[#F5ECE8] rounded-md w-1/2" />
-              <div className="h-8 bg-[#F5ECE8] rounded-xl" />
+              <div className="flex justify-between">
+                <div className="h-6 w-24 bg-[#E8DDD7] rounded-full" />
+                <div className="h-6 w-16 bg-[#E8DDD7] rounded-full" />
+              </div>
+              <div className="space-y-3">
+                <div className="h-4 bg-[#E8DDD7] rounded-md w-1/3" />
+                <div className="h-6 bg-[#E8DDD7] rounded-md w-3/4" />
+                <div className="h-3 bg-[#E8DDD7] rounded-md w-1/2" />
+                <div className="h-10 bg-[#E8DDD7] rounded-xl" />
+              </div>
             </div>
           ))}
         </div>
       ) : displayedEvents.length === 0 ? (
-        <div className="bg-[#FAF7F5] border border-[#E8DDD7] rounded-3xl p-10 text-center space-y-3">
+        <div className="bg-[#FAF7F5] border border-[#E8DDD7] rounded-2xl p-10 text-center space-y-3">
           <div className="w-12 h-12 rounded-full bg-[#F5ECE8] text-[#AA767C] flex items-center justify-center mx-auto">
             <Calendar className="w-6 h-6" />
           </div>
@@ -175,7 +173,7 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {displayedEvents.map((evt) => {
             const isRegistered = registeredEventIds.includes(evt.id);
             const isFull = evt.isFull || (evt.registeredCount >= evt.capacity);
@@ -184,105 +182,107 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
             return (
               <div
                 key={evt.id}
-                className="group bg-white rounded-3xl border border-[#E8DDD7] hover:border-[#AA767C]/50 hover:shadow-lg transition-all duration-300 flex flex-col overflow-hidden relative"
+                className="group relative bg-[#2D1F23] rounded-2xl border border-[#E8DDD7] hover:border-[#AA767C] overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 min-h-[350px] sm:min-h-[370px] flex flex-col justify-between"
               >
-                {/* Poster Image */}
-                <div className="relative h-44 w-full overflow-hidden bg-[#2D1F23]">
-                  <img
-                    src={poster}
-                    alt={evt.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                {/* Background Poster Image */}
+                <img
+                  src={poster}
+                  alt={evt.title}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                />
 
-                  {/* Top Badges */}
-                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/20">
+                {/* Light top vignette for badge contrast */}
+                <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
+
+                {/* Bottom-only fade so the poster stays vibrant while description texts remain crisp */}
+                <div className="absolute inset-x-0 bottom-0 h-52 bg-gradient-to-t from-black/95 via-black/65 to-transparent pointer-events-none" />
+
+                {/* Top Badges Bar */}
+                <div className="relative z-10 p-4 sm:p-5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/20">
                       {evt.type || 'Event'}
                     </span>
 
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider shadow-sm ${
-                        evt.isPaid
-                          ? 'bg-[#FFA686] text-[#2D1F23]'
-                          : 'bg-[#2A7B5F] text-white'
-                      }`}
-                    >
-                      {evt.isPaid ? `${evt.ticketPrice} ETB` : 'FREE'}
-                    </span>
+                    {isRegistered && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#2A7B5F] text-white text-[10px] font-bold shadow-md">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Registered</span>
+                      </span>
+                    )}
                   </div>
 
-                  {/* Registered indicator badge on top of image */}
-                  {isRegistered && (
-                    <div className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#2A7B5F] text-white text-xs font-bold shadow-md">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Registered</span>
-                    </div>
-                  )}
+                  <span
+                    className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider shadow-sm ${
+                      evt.isPaid
+                        ? 'bg-[#FFA686] text-[#2D1F23]'
+                        : 'bg-[#2A7B5F] text-white'
+                    }`}
+                  >
+                    {evt.isPaid ? `${evt.ticketPrice} ETB` : 'FREE'}
+                  </span>
                 </div>
 
-                {/* Content */}
-                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    {/* Date & Time */}
-                    <div className="flex items-center gap-3 text-xs font-semibold text-[#63474D]">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-[#AA767C]" />
-                        <span>{evt.date}</span>
-                      </div>
-                      <span>•</span>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-[#AA767C]" />
-                        <span>{evt.startTime || '09:00 AM'}</span>
-                      </div>
+                {/* Bottom Content Area Overlaid On Fade */}
+                <div className="relative z-10 p-5 sm:p-6 space-y-2.5">
+                  {/* Date & Time */}
+                  <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-[#FFA686]">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#FFA686]" />
+                      <span className="text-white/95">{evt.date}</span>
                     </div>
-
-                    {/* Title */}
-                    <h3 className="font-serif font-bold text-base text-[#2D1F23] line-clamp-2 leading-snug group-hover:text-[#63474D] transition-colors">
-                      {evt.title}
-                    </h3>
-
-                    {/* Organizer & Location */}
-                    <div className="space-y-1 text-xs text-[#756366]">
-                      <p className="font-medium text-[#2D1F23] truncate">
-                        By {evt.organizationName || evt.organizerName || 'Community Lead'}
-                      </p>
-                      <div className="flex items-center gap-1 truncate text-[11px]">
-                        <MapPin className="w-3 h-3 text-[#AA767C] shrink-0" />
-                        <span className="truncate">{evt.location}</span>
-                      </div>
+                    <span className="text-white/40">•</span>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#FFA686]" />
+                      <span className="text-white/95">{evt.startTime || '09:00 AM'}</span>
                     </div>
+                  </div>
 
-                    {/* Spots remaining progress */}
-                    <div className="pt-2">
-                      <div className="flex items-center justify-between text-[11px] font-medium text-[#756366] mb-1">
-                        <span>Capacity</span>
-                        <span>
-                          {evt.registeredCount} / {evt.capacity} registered
-                        </span>
-                      </div>
-                      <div className="w-full bg-[#FAF7F5] border border-[#E8DDD7] h-2 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            isFull ? 'bg-red-500' : 'bg-[#2A7B5F]'
-                          }`}
-                          style={{
-                            width: `${Math.min(
-                              100,
-                              Math.round((evt.registeredCount / Math.max(1, evt.capacity)) * 100)
-                            )}%`,
-                          }}
-                        />
-                      </div>
+                  {/* Title */}
+                  <h3 className="font-serif font-bold text-lg sm:text-xl text-white group-hover:text-[#FFA686] transition-colors leading-snug line-clamp-2">
+                    {evt.title}
+                  </h3>
+
+                  {/* Organizer & Location */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/80">
+                    <p className="font-medium truncate max-w-[55%]">
+                      By {evt.organizationName || evt.organizerName || 'Community Lead'}
+                    </p>
+                    <div className="flex items-center gap-1 text-[11px] text-white/70 truncate max-w-[42%]">
+                      <MapPin className="w-3 h-3 text-[#FFA686] shrink-0" />
+                      <span className="truncate">{evt.location}</span>
+                    </div>
+                  </div>
+
+                  {/* Capacity Bar */}
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between text-[11px] font-medium text-white/70 mb-1">
+                      <span>Capacity</span>
+                      <span>
+                        {evt.registeredCount} / {evt.capacity} registered
+                      </span>
+                    </div>
+                    <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          isFull ? 'bg-red-400' : 'bg-emerald-400'
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round((evt.registeredCount / Math.max(1, evt.capacity)) * 100)
+                          )}%`,
+                        }}
+                      />
                     </div>
                   </div>
 
                   {/* Actions Row */}
-                  <div className="pt-3 border-t border-gray-100 flex items-center gap-2">
+                  <div className="pt-3 border-t border-white/15 flex items-center justify-between gap-3">
                     {isRegistered ? (
                       <Link
                         to={`/app/ticket/${evt.id}`}
-                        className="flex-1 py-2.5 px-3 bg-[#FAF7F5] hover:bg-[#F5ECE8] border border-[#E8DDD7] rounded-xl text-xs font-bold text-[#63474D] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        className="px-4 sm:px-5 py-2 bg-white/15 hover:bg-white/25 border border-white/25 rounded-xl text-xs font-bold text-white inline-flex items-center justify-center gap-1.5 backdrop-blur-md transition-colors cursor-pointer"
                       >
                         <TicketIcon className="w-3.5 h-3.5" />
                         <span>View Ticket Pass</span>
@@ -291,7 +291,7 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
                       <button
                         type="button"
                         disabled
-                        className="flex-1 py-2.5 px-3 bg-gray-100 rounded-xl text-xs font-bold text-gray-400 cursor-not-allowed text-center"
+                        className="px-4 sm:px-5 py-2 bg-white/10 rounded-xl text-xs font-bold text-white/40 border border-white/10 cursor-not-allowed"
                       >
                         Capacity Reached (Sold Out)
                       </button>
@@ -299,7 +299,7 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRegisterClick(evt)}
-                        className="flex-1 py-2.5 px-3 bg-[#63474D] hover:bg-[#523a3f] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                        className="px-4 sm:px-5 py-2 bg-[#63474D] hover:bg-[#7b5760] text-white border border-[#AA767C]/40 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
                       >
                         <span>{isAuthenticated ? 'Register Now' : 'Sign Up to Register'}</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -311,10 +311,10 @@ export const EventDiscoverySection: React.FC<EventDiscoverySectionProps> = ({
                       type="button"
                       onClick={(e) => handleCopyLink(evt.shareLinkToken, e)}
                       title="Copy Share Link"
-                      className="p-2.5 bg-white border border-[#E8DDD7] hover:bg-[#FAF7F5] rounded-xl text-[#756366] transition-colors cursor-pointer"
+                      className="p-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white backdrop-blur-md transition-colors cursor-pointer shrink-0"
                     >
                       {copiedId === evt.shareLinkToken ? (
-                        <CheckCircle2 className="w-4 h-4 text-[#2A7B5F]" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                       ) : (
                         <Share2 className="w-4 h-4" />
                       )}
