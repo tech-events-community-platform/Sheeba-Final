@@ -1,3 +1,4 @@
+```tsx
 import React from 'react';
 import FadeIn from '../FadeIn';
 import { Award, Users, CalendarCheck, ShieldCheck, ArrowRight, Store } from 'lucide-react';
@@ -6,25 +7,32 @@ import { Link } from 'react-router-dom';
 
 export const RoleSpotlightSection: React.FC = () => {
   return (
-    <section id="features" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16 lg:space-y-20 scroll-mt-28">
+    <section
+      id="features"
+      className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16 lg:space-y-20 scroll-mt-28"
+    >
       {/* Section Header */}
       <FadeIn direction="up">
         <div className="text-center space-y-3 max-w-2xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#63474D]/10 text-[#63474D] text-xs font-bold uppercase tracking-wider">
             <span>FOUR-SIDED ECOSYSTEM</span>
           </div>
+
           <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-[#2D1F23] tracking-tight">
             How Sheeba Powers Every Role
           </h2>
+
           <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
-            A unified, tamper-proof platform connecting attendees, organizers, corporate sponsors, and exhibitors with verified data and zero friction.
+            A unified platform connecting attendees, organizers, sponsors,
+            and exhibitors through trusted event experiences.
           </p>
         </div>
       </FadeIn>
 
-      {/* Alternating Layout: Matching Screenshot 1 */}
+      {/* Alternating Layout */}
       <div className="space-y-16 lg:space-y-24">
-        {/* ROW 1: Attendees (Text Left, Image Right) */}
+
+        {/* ROW 1: Attendees */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center">
           <FadeIn direction="right">
             <div className="space-y-4">
@@ -32,12 +40,15 @@ export const RoleSpotlightSection: React.FC = () => {
                 <Users className="w-3.5 h-3.5" />
                 <span>For Attendees</span>
               </div>
+
               <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#2D1F23]">
                 Verifiable Proof of Attendance & Digital Badges
               </h3>
+
               <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
                 Every time you attend a gathering that matters, your participation is preserved as authentic, tamper-proof proof. No more digging through inbox clutter for paper tickets or lost confirmation emails. Attendees carry a permanent digital pass wallet and earn official participation badges (from Attended and Participant to Speaker and Winner) recognized by organizations and peers across Ethiopia.
               </p>
+
               <div className="pt-2">
                 <Link
                   to="/register"
@@ -65,7 +76,7 @@ export const RoleSpotlightSection: React.FC = () => {
           </FadeIn>
         </div>
 
-        {/* ROW 2: Organizers (Image Left, Text Right) */}
+        {/* ROW 2: Organizers */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center">
           <FadeIn direction="right" className="order-2 md:order-1">
             <div className="flex justify-center md:justify-start">
@@ -87,12 +98,15 @@ export const RoleSpotlightSection: React.FC = () => {
                 <CalendarCheck className="w-3.5 h-3.5" />
                 <span>For Organizers</span>
               </div>
+
               <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#2D1F23]">
                 Effortless Door Check-In & Sponsor Pitching
               </h3>
+
               <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
                 Organizing events should never be bottlenecked by manual spreadsheets or long entrance queues. Sheeba equips organizers with instant registration links, camera-based QR door scanners that verify tickets in under half a second, and automated badge issuance. Furthermore, organizers can pitch upcoming, uncreated events on the marketplace to secure funding from sponsors before opening doors.
               </p>
+
               <div className="pt-2">
                 <Link
                   to="/register"
@@ -106,7 +120,7 @@ export const RoleSpotlightSection: React.FC = () => {
           </FadeIn>
         </div>
 
-        {/* ROW 3: Sponsors (Text Left, Image Right) */}
+        {/* ROW 3: Sponsors */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center">
           <FadeIn direction="right">
             <div className="space-y-4">
@@ -114,12 +128,15 @@ export const RoleSpotlightSection: React.FC = () => {
                 <Award className="w-3.5 h-3.5" />
                 <span>For Sponsors</span>
               </div>
+
               <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#2D1F23]">
                 Marketplace Discovery & Transparent Turnout Metrics
               </h3>
+
               <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
                 Fund premier community organizers and get your products, goods, and services directly promoted to engaged audiences. Through the Sheeba Marketplace, corporate sponsors discover upcoming gatherings, back organizers with financial sponsorship, and secure tangible brand promotion including dedicated product booths, on-stage spotlights, live product demos, and official co-branding. Track every pledge transparently in Deals and Pledges, coordinate custom deliverables, and receive verifiable post-event turnout proof backed by real door scans.
               </p>
+
               <div className="pt-2">
                 <Link
                   to="/sponsor/auth"
@@ -147,8 +164,11 @@ export const RoleSpotlightSection: React.FC = () => {
           </FadeIn>
         </div>
 
-        {/* ROW 4: Exhibitors (Image Left, Text Right) */}
-        <div id="exhibitors" className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center scroll-mt-28">
+        {/* ROW 4: Exhibitors */}
+        <div
+          id="exhibitors"
+          className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 items-center scroll-mt-28"
+        >
           <FadeIn direction="right" className="order-2 md:order-1">
             <div className="flex justify-center md:justify-start">
               <div className="group relative overflow-hidden rounded-2xl sm:rounded-3xl border border-gray-200/80 shadow-lg hover:shadow-2xl transition-all duration-300 max-w-lg w-full bg-white">
@@ -169,12 +189,15 @@ export const RoleSpotlightSection: React.FC = () => {
                 <Store className="w-3.5 h-3.5" />
                 <span>For Exhibitors</span>
               </div>
+
               <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#2D1F23]">
                 Put Your Product on the Exhibition Floor
               </h3>
+
               <p className="text-sm sm:text-base text-[#2D1F23] leading-relaxed font-medium">
                 Take center stage at Ethiopia&apos;s most influential gatherings. Connect face-to-face with attendees, demo software, and turn physical foot traffic into lasting business partnerships. Exhibiting gives your company a dedicated physical booth footprint at live conferences, summits, and hackathons with pre-verified attendees eager to test solutions and meet founders.
               </p>
+
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <Link
                   to="/exhibitors"
@@ -183,6 +206,7 @@ export const RoleSpotlightSection: React.FC = () => {
                   <span>Explore Exhibitor Opportunities</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
+
                 <Link
                   to="/exhibitor/auth"
                   className="inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-white hover:bg-gray-50 border border-[#E8DDD7] text-[#2D1F23] font-bold text-xs sm:text-sm transition-all"
@@ -197,3 +221,4 @@ export const RoleSpotlightSection: React.FC = () => {
     </section>
   );
 };
+```
