@@ -59,6 +59,31 @@ export const authorizeRoles = (...allowedRoles: (UserRole | string)[]) => {
       }
     }
 
+    // Dynamic verification: If 'exhibitor' is allowed, verify whether user has the exhibitor role in DB
+    if (normalizedAllowed.includes('exhibitor') && req.user.userId) {
+      try {
+        const userCheck = await query(
+          'SELECT role, is_exhibitor, is_active FROM users WHERE id = $1',
+          [req.user.userId]
+        );
+        if (userCheck.rowCount && userCheck.rowCount > 0) {
+          const row = userCheck.rows[0];
+          if (row.role?.toLowerCase() === 'admin') {
+            req.user.role = 'admin';
+            return next();
+          }
+          const hasExhibitorRole = Boolean(
+            row.is_active !== false && (row.is_exhibitor || row.role?.toLowerCase() === 'exhibitor')
+          );
+          if (hasExhibitorRole) {
+            return next();
+          }
+        }
+      } catch (err) {
+        // Fall through to 403
+      }
+    }
+
     sendError(
       res,
       `Forbidden. Access restricted to: ${allowedRoles.join(', ')}`,

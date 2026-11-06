@@ -24,7 +24,15 @@ interface AuthContextType {
     password?: string;
     socials?: Record<string, string>;
   }) => Promise<{ user: User; message: string }>;
-  switchRole: (targetRole: 'ATTENDEE' | 'ORGANIZER', password?: string) => Promise<User>;
+  switchRole: (targetRole: 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR', password?: string) => Promise<User>;
+  addExhibitorRole: (data: {
+    companyName: string;
+    industryCategory: string;
+    companyPhone?: string;
+    companyWebsite?: string;
+    exhibitorDescription?: string;
+    password: string;
+  }) => Promise<{ user: User; message: string }>;
   register: (userData: {
     email: string;
     password: string;
@@ -44,6 +52,16 @@ interface AuthContextType {
     industry_category: string;
     company_phone: string;
     company_website?: string;
+    company_description: string;
+    company_logo?: string;
+    sponsorship_objectives: string[];
+    target_audience: string[];
+    preferred_event_categories: string[];
+    skills_and_interests: string[];
+    preferred_locations?: string[];
+    budget_range?: number;
+    preferred_benefits?: string[];
+    additional_preferences?: Record<string, any>;
   }) => Promise<{ user: User; message: string }>;
   loginSponsorWithGoogle: (credential: string, mode?: 'login' | 'register', sponsorData?: any) => Promise<User>;
   logout: () => Promise<void>;
@@ -116,13 +134,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const switchRole = async (targetRole: 'ATTENDEE' | 'ORGANIZER', password?: string): Promise<User> => {
+  const switchRole = async (targetRole: 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR', password?: string): Promise<User> => {
     setIsLoading(true);
     try {
       const res = await api.auth.switchRole({ targetRole, password });
       setUser(res.user);
       localStorage.setItem('sheba_auth_user', JSON.stringify(res.user));
       return res.user;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addExhibitorRole = async (data: {
+    companyName: string;
+    industryCategory: string;
+    companyPhone?: string;
+    companyWebsite?: string;
+    exhibitorDescription?: string;
+    password: string;
+  }): Promise<{ user: User; message: string }> => {
+    setIsLoading(true);
+    try {
+      const res = await api.auth.addExhibitorRole(data);
+      setUser(res.user);
+      localStorage.setItem('sheba_auth_user', JSON.stringify(res.user));
+      return res;
     } finally {
       setIsLoading(false);
     }
@@ -204,6 +241,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     industry_category: string;
     company_phone: string;
     company_website?: string;
+    company_description: string;
+    company_logo?: string;
+    sponsorship_objectives: string[];
+    target_audience: string[];
+    preferred_event_categories: string[];
+    skills_and_interests: string[];
+    preferred_locations?: string[];
+    budget_range?: number;
+    preferred_benefits?: string[];
+    additional_preferences?: Record<string, any>;
   }): Promise<{ user: User; message: string }> => {
     setIsLoading(true);
     try {
@@ -260,6 +307,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginSponsorWithGoogle,
         applyForOrganizer,
         switchRole,
+        addExhibitorRole,
         register,
         verifyRegistrationOtp,
         logout,

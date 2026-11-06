@@ -2,8 +2,13 @@ import { Router } from 'express';
 import { AdminController } from '../controllers/admin.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { authorizeRoles } from '../middlewares/role.middleware';
-import { validateParams } from '../middlewares/validate.middleware';
+import { validateParams, validateQuery, validateBody } from '../middlewares/validate.middleware';
 import { idParamSchema } from '../schemas/common.schema';
+import {
+  adminApplicationsQuerySchema,
+  adminApproveApplicationSchema,
+  adminRejectApplicationSchema,
+} from '../schemas/sponsorship.schema';
 
 const router = Router();
 
@@ -11,11 +16,39 @@ router.use(authenticate, authorizeRoles('admin'));
 
 router.get('/dashboard', AdminController.getDashboard);
 router.get('/users', AdminController.getUsers);
+router.get('/users/:id/sponsor-details', validateParams(idParamSchema), AdminController.getSponsorDetails);
 router.patch('/users/:id/approve', validateParams(idParamSchema), AdminController.approveOrganizer);
 router.patch('/users/:id/reject', validateParams(idParamSchema), AdminController.rejectOrganizer);
 router.patch('/users/:id/approve-sponsor', validateParams(idParamSchema), AdminController.approveSponsor);
 router.patch('/users/:id/reject-sponsor', validateParams(idParamSchema), AdminController.rejectSponsor);
 router.patch('/users/:id/status', validateParams(idParamSchema), AdminController.toggleUserStatus);
 router.get('/payments', AdminController.getPayments);
+
+// Stage 2: Admin Sponsorship Applications Review
+router.get(
+  '/sponsorship-applications',
+  validateQuery(adminApplicationsQuerySchema),
+  AdminController.getSponsorshipApplications
+);
+
+router.get(
+  ['/sponsorship-applications/:id', '/sponsorship-applications'],
+  validateParams(idParamSchema),
+  AdminController.getSponsorshipApplicationDetail
+);
+
+router.patch(
+  ['/sponsorship-applications/:id/approve', '/sponsorship-applications/approve'],
+  validateParams(idParamSchema),
+  validateBody(adminApproveApplicationSchema),
+  AdminController.approveSponsorshipApplication
+);
+
+router.patch(
+  ['/sponsorship-applications/:id/reject', '/sponsorship-applications/reject'],
+  validateParams(idParamSchema),
+  validateBody(adminRejectApplicationSchema),
+  AdminController.rejectSponsorshipApplication
+);
 
 export default router;

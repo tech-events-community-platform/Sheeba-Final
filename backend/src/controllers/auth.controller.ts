@@ -159,17 +159,7 @@ export class AuthController {
 
   static async registerSponsor(req: Request, res: Response, next: NextFunction) {
     try {
-      const { full_name, email, password, company_name, industry_category, company_phone, company_website } = req.body;
-      const result = await AuthService.registerSponsor({
-        full_name,
-        email,
-        password,
-        company_name,
-        industry_category,
-        company_phone,
-        company_website,
-      });
-
+      const result = await AuthService.registerSponsor(req.body);
       return sendSuccess(res, result, result.message, 201);
     } catch (error) {
       next(error);
@@ -225,6 +215,24 @@ export class AuthController {
     try {
       const { email, otp, newPassword } = req.body;
       const result = await AuthService.verifyOtpAndResetPassword(email, otp, newPassword);
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async addExhibitorRole(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { companyName, industryCategory, companyPhone, companyWebsite, exhibitorDescription, password } = req.body;
+      const result = await AuthService.addExhibitorRole(userId, {
+        companyName,
+        industryCategory,
+        companyPhone,
+        companyWebsite,
+        exhibitorDescription,
+        password,
+      });
       sendSuccess(res, result, result.message);
     } catch (error) {
       next(error);

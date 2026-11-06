@@ -45,8 +45,46 @@ export const forgotPasswordSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address.'),
 });
 
+export const SPONSORSHIP_OBJECTIVES = [
+  'Brand awareness',
+  'Talent recruitment',
+  'Startup discovery',
+  'Community impact',
+  'Product promotion',
+  'Networking and partnerships',
+] as const;
+
+export const TARGET_AUDIENCES = [
+  'University students',
+  'Software developers',
+  'Entrepreneurs and startup founders',
+  'Researchers',
+  'Technology professionals',
+  'Business owners',
+] as const;
+
+export const PREFERRED_EVENT_CATEGORIES = [
+  'Hackathons',
+  'Workshops',
+  'Tech conferences',
+  'Career fairs',
+  'Startup competitions',
+  'Training programs',
+  'Innovation events',
+] as const;
+
+export const PREDEFINED_SKILLS_INTERESTS = [
+  'AI',
+  'Software engineering',
+  'Python',
+  'Cloud computing',
+  'Cybersecurity',
+  'Data science',
+  'Entrepreneurship',
+] as const;
+
 export const sponsorRegisterSchema = z.object({
-  fullName: z.string().trim().min(1, 'Full name is required.'),
+  fullName: z.string().trim().min(1, 'Representative full name is required.'),
   email: z.string().trim().email('Please enter a valid corporate email address.'),
   password: z.string().min(6, 'Password must be at least 6 characters long.'),
   companyName: z.string().trim().min(1, 'Company name is required.'),
@@ -58,6 +96,22 @@ export const sponsorRegisterSchema = z.object({
     .url('Please provide a valid company website URL.')
     .or(z.literal(''))
     .optional(),
+  companyDescription: z.string().trim().min(1, 'Company description is required.'),
+  companyLogo: z
+    .string()
+    .trim()
+    .url('Please provide a valid company logo URL.')
+    .or(z.literal(''))
+    .optional(),
+  sponsorshipObjectives: z.array(z.string().trim().min(1)).min(1, 'Please select at least one sponsorship objective.'),
+  targetAudience: z.array(z.string().trim().min(1)).min(1, 'Please select at least one target audience.'),
+  preferredEventCategories: z.array(z.string().trim().min(1)).min(1, 'Please select at least one preferred event category.'),
+  skillsAndInterests: z
+    .array(z.string().trim().min(1).max(50, 'Skill/interest tag cannot exceed 50 characters.'))
+    .min(1, 'Please select or add at least one skill or interest.'),
+  preferredLocations: z.array(z.string().trim().min(1).max(100)).optional(),
+  budgetRange: z.coerce.number().positive('Budget range must be greater than 0.').optional().nullable(),
+  preferredBenefits: z.array(z.string().trim().min(1).max(100)).optional(),
 });
 
 export const sponsorForgotOtpStep1Schema = z.object({

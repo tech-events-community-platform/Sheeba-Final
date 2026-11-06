@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  HandCoins,
 } from 'lucide-react';
 
 export const AdminSidebar: React.FC = () => {
@@ -32,6 +33,7 @@ export const AdminSidebar: React.FC = () => {
     { label: 'Platform Dashboard', path: '/admin', icon: LayoutDashboard },
     { label: 'Event Oversight', path: '/admin/events', icon: Calendar },
     { label: 'Users & Organizers', path: '/admin/users', icon: Users },
+    { label: 'Sponsorship Applications', path: '/admin/sponsorship-applications', icon: HandCoins },
     { label: 'Recycle Bin & Audit', path: '/admin/recycle-bin', icon: Trash2 },
     { label: 'Badge Revocation Queue', path: '/admin#badges', icon: Award },
     { label: 'Payment Issues Log', path: '/admin#payments', icon: CreditCard },

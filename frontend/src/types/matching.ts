@@ -3,8 +3,23 @@ export interface SponsorPreferences {
   targetSkills: string[];
   sponsorshipObjectives: string[];
   preferredEventTypes?: string[];
+  preferredEventCategories?: string[];
+  targetAudience?: string[];
   preferredLocations?: string[];
-  maxBudget?: number;
+  maxBudget?: number | null;
+  preferredBenefits?: string[];
+  additionalPreferences?: Record<string, any>;
+}
+
+export interface SponsorProfileAndPreferences {
+  preferences: SponsorPreferences;
+  companyName: string;
+  industryCategory: string;
+  bio?: string;
+  avatarUrl?: string;
+  companyPhone?: string;
+  companyWebsite?: string;
+  isCustomized: boolean;
 }
 
 export interface RecommendedEventCandidate {

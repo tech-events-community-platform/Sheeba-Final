@@ -13,6 +13,16 @@ export interface ISponsorRegistration {
   industry_category: string;
   company_phone: string;
   company_website?: string;
+  company_description: string;
+  company_logo?: string;
+  sponsorship_objectives: string[];
+  target_audience: string[];
+  preferred_event_categories: string[];
+  skills_and_interests: string[];
+  preferred_locations?: string[];
+  budget_range?: number;
+  preferred_benefits?: string[];
+  additional_preferences?: Record<string, any>;
 }
 
 export interface IUser {
@@ -39,6 +49,8 @@ export interface IUser {
   organizer_approval_status?: OrganizerApprovalStatus;
   organizer_bio?: string | null;
   organizer_socials?: Record<string, string> | null;
+  is_exhibitor?: boolean;
+  exhibitor_approval_status?: string;
   must_change_password?: boolean;
   created_at: Date;
   updated_at: Date;
@@ -387,7 +399,7 @@ export interface ISponsorshipApplication {
   interested_sponsors_count?: number;
 }
 
-export type SponsorshipDealStatus = 'INTERESTED' | 'DECLINED';
+export type SponsorshipDealStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'INTERESTED' | 'DECLINED';
 
 export interface ISponsorshipDeal {
   id: string;
@@ -397,11 +409,22 @@ export interface ISponsorshipDeal {
   package_name?: string;
   pledged_amount?: number;
   sponsor_notes?: string;
+  proposal_message?: string;
+  rejection_reason?: string;
+  reviewed_by?: string;
+  reviewed_at?: Date;
+  deleted_at?: Date;
+  deleted_by?: string;
   created_at: Date;
   updated_at: Date;
   // Joined fields
   application?: ISponsorshipApplication;
   sponsor?: IUserSafe;
+  reviewer?: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
 }
 
 // --- EXHIBITOR MODULE TYPES ---

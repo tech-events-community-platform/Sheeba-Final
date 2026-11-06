@@ -34,6 +34,11 @@ async function runSponsorPipelineTest() {
       industry_category: 'Fintech & Financial Services',
       company_phone: '+251911002233',
       company_website: 'https://ethiotech.et',
+      company_description: 'Venture fund and tech incubator accelerating Ethiopian developer talent.',
+      sponsorship_objectives: ['Brand awareness', 'Startup discovery'],
+      target_audience: ['Software developers', 'Entrepreneurs and startup founders'],
+      preferred_event_categories: ['Hackathons', 'Startup competitions'],
+      skills_and_interests: ['AI', 'Python', 'Entrepreneurship'],
     });
     const sponsorId = sponsorRes.user.id;
     // Approve sponsor

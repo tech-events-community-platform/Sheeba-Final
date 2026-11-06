@@ -43,6 +43,7 @@ import type {
   IEventPastSponsor,
   IEventPartner,
   IApplicationAffiliations,
+  IApprovedPitchSponsor,
 } from '../../types/sponsorship';
 import { applyToSponsorsFormSchema, validateForm } from '../../schemas';
 
@@ -203,6 +204,23 @@ export const ApplyToSponsorsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [myApplications, setMyApplications] = useState<ISponsorshipApplication[]>([]);
+  const [selectedPitchForSponsors, setSelectedPitchForSponsors] = useState<ISponsorshipApplication | null>(null);
+  const [approvedSponsors, setApprovedSponsors] = useState<IApprovedPitchSponsor[]>([]);
+  const [loadingApprovedSponsors, setLoadingApprovedSponsors] = useState<boolean>(false);
+
+  const handleOpenApprovedSponsors = async (pitch: ISponsorshipApplication) => {
+    setSelectedPitchForSponsors(pitch);
+    setLoadingApprovedSponsors(true);
+    try {
+      const data = await api.sponsorship.getApprovedSponsorsForPitch(pitch.id);
+      setApprovedSponsors(data);
+    } catch (err: any) {
+      console.error('Failed to load approved sponsors', err);
+      alert(err.message || 'Failed to load approved sponsors.');
+    } finally {
+      setLoadingApprovedSponsors(false);
+    }
+  };
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -1844,6 +1862,197 @@ export const ApplyToSponsorsPage: React.FC = () => {
           )}
         </div>
       )}
-    </div>
+    
+      {/* Approved Sponsors Modal for Organizers (Stage 2) */}
+      {selectedPitchForSponsors && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-stone-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100 flex items-start justify-between gap-4 bg-[#FAF7F5]">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-900 border border-emerald-200">
+                    Approved Sponsors
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {approvedSponsors.length} Confirmed
+                  </span>
+                </div>
+                <h2 className="text-xl font-serif font-bold text-gray-900">
+                  {selectedPitchForSponsors.event_title}
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Vetted and approved by Sheeba Administration. Reach out to coordinate execution.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPitchForSponsors(null);
+                  setApprovedSponsors([]);
+                }}
+                className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {loadingApprovedSponsors ? (
+                <div className="p-12 text-center text-gray-500">
+                  <div className="animate-spin w-8 h-8 border-3 border-[#63474D] border-t-transparent rounded-full mx-auto mb-3" />
+                  <p className="text-sm font-medium">Loading approved sponsors...</p>
+                </div>
+              ) : approvedSponsors.length === 0 ? (
+                <div className="p-10 text-center bg-stone-50 rounded-2xl border border-dashed border-gray-200">
+                  <div className="w-12 h-12 rounded-2xl bg-stone-200/60 text-gray-400 flex items-center justify-center mx-auto mb-3">
+                    <Handshake className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-bold text-gray-900">No Approved Sponsors Yet</h3>
+                  <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                    Sponsors who apply to this pitch undergo manual review by Sheeba Administration. Once an application is approved, their details and contact line will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {approvedSponsors.map((item) => {
+                    const sp = item.sponsor;
+                    return (
+                      <div
+                        key={item.dealId}
+                        className="bg-white rounded-2xl p-5 border border-emerald-100 shadow-xs space-y-4 hover:border-emerald-300 transition-all"
+                      >
+                        {/* Company & Package Banner */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                          <div className="flex items-center gap-3">
+                            {sp.companyLogo ? (
+                              <img
+                                src={sp.companyLogo}
+                                alt={sp.companyName}
+                                className="w-11 h-11 rounded-xl object-contain border border-gray-200 p-1 bg-white"
+                              />
+                            ) : (
+                              <div className="w-11 h-11 rounded-xl bg-[#63474D]/10 text-[#63474D] font-bold flex items-center justify-center text-sm">
+                                {(sp.companyName || 'SP').slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-gray-900 text-base">
+                                  {sp.companyName}
+                                </h4>
+                                {sp.industryCategory && (
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-stone-100 text-stone-700">
+                                    {sp.industryCategory}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                Representative: {sp.representativeName}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-left sm:text-right">
+                            <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                              {item.packageName || 'Confirmed Tier'}
+                            </span>
+                            <span className="font-serif font-bold text-[#63474D] text-base">
+                              {item.pledgedAmount?.toLocaleString()} ETB
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Proposal Message */}
+                        {item.proposalMessage && (
+                          <div className="p-3 bg-[#FAF7F5] rounded-xl border border-[#63474D]/10">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D] block mb-1">
+                              Sponsor Proposal Message
+                            </span>
+                            <p className="text-xs text-gray-700 leading-relaxed italic">
+                              "{item.proposalMessage}"
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Sponsor Contact Info */}
+                        <div className="bg-emerald-50/70 border border-emerald-200/60 rounded-xl p-3.5 space-y-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-900 block">
+                            Direct Contact Lines
+                          </span>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            {sp.phone && (
+                              <a
+                                href={`tel:${sp.phone}`}
+                                className="px-3 py-1.5 rounded-lg bg-white border border-emerald-200 hover:border-emerald-400 font-semibold text-emerald-950 flex items-center gap-1.5 transition-colors shadow-2xs"
+                              >
+                                <img src="/phone-icon.webp" alt="Phone" className="w-3.5 h-3.5 object-contain" />
+                                <span>{sp.phone}</span>
+                              </a>
+                            )}
+                            {sp.contactEmail && (
+                              <a
+                                href={`mailto:${sp.contactEmail}?subject=Sponsorship%20Coordination%20-` + encodeURIComponent(selectedPitchForSponsors.event_title)}
+                                className="px-3 py-1.5 rounded-lg bg-white border border-emerald-200 hover:border-emerald-400 font-semibold text-emerald-950 flex items-center gap-1.5 transition-colors shadow-2xs"
+                              >
+                                <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
+                                <span>{sp.contactEmail}</span>
+                              </a>
+                            )}
+                            {sp.companyWebsite && (
+                              <a
+                                href={sp.companyWebsite.startsWith('http') ? sp.companyWebsite : `https://${sp.companyWebsite}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 rounded-lg bg-white border border-emerald-200 hover:border-emerald-400 font-semibold text-emerald-950 flex items-center gap-1.5 transition-colors shadow-2xs"
+                              >
+                                <Globe className="w-3.5 h-3.5 text-blue-500" />
+                                <span>Website</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Note & Reviewed Timestamp */}
+                        <div className="flex items-center justify-between text-[11px] text-gray-400 pt-1">
+                          <span>
+                            Approved by Sheeba Admin
+                            {item.reviewedAt ? ` on ${new Date(item.reviewedAt).toLocaleDateString()}` : ''}
+                          </span>
+                          <span className="text-emerald-700 font-medium">
+                            Authorized Partnership
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+              <span className="flex items-center gap-1.5 text-stone-600 font-medium">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                Sponsorship applications are formally authorized by Sheeba Administration.
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPitchForSponsors(null);
+                  setApprovedSponsors([]);
+                }}
+                className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+</div>
   );
 };

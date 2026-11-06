@@ -15,6 +15,10 @@ export class AuthService {
       ? user.organizer_approval_status
       : (user.role?.toLowerCase() === 'organizer' ? (user.approval_status || 'pending') : 'none');
 
+    const isExhibitor = Boolean(
+      user.is_exhibitor || user.role?.toLowerCase() === 'exhibitor'
+    );
+
     const hasExhibitorApplications = Boolean(
       user.has_exhibitor_applications || user.role?.toLowerCase() === 'exhibitor'
     );
@@ -24,7 +28,7 @@ export class AuthService {
       ...(isOrganizer ? ['ORGANIZER'] : []),
       ...(user.role?.toLowerCase() === 'admin' ? ['ADMIN'] : []),
       ...(isSponsor ? ['SPONSOR'] : []),
-      ...(hasExhibitorApplications ? ['EXHIBITOR'] : []),
+      ...(isExhibitor || hasExhibitorApplications ? ['EXHIBITOR'] : []),
     ];
 
     return {
@@ -46,9 +50,11 @@ export class AuthService {
       approvalStatus: user.approval_status || (user.role?.toLowerCase() === 'organizer' ? 'pending' : 'approved'),
       isOrganizer,
       organizerApprovalStatus,
+      isExhibitor,
       hasExhibitorApplications,
       mustChangePassword: Boolean(user.must_change_password),
       hasPassword: user.has_password !== undefined ? Boolean(user.has_password) : Boolean(user.password_hash),
+      sponsorPreferences: user.sponsor_preferences || undefined,
       roles,
       stats: stats || {
         meetupsCount: 0,
@@ -118,6 +124,7 @@ export class AuthService {
     if (existing.rowCount && existing.rowCount > 0) {
       const existingUser = existing.rows[0];
       const hasOrganizerProfile = Boolean(existingUser.is_organizer || existingUser.role?.toLowerCase() === 'organizer');
+      const isExhibitorRegistration = normalizedRole === 'exhibitor';
 
       if (isOrganizer) {
         if (hasOrganizerProfile) {
@@ -129,6 +136,13 @@ export class AuthService {
           err.statusCode = 409;
           throw err;
         }
+      } else if (isExhibitorRegistration) {
+        // Existing users can add the exhibitor role — signal the frontend to use add-exhibitor-role flow
+        const err: any = new Error('An account with this email already exists. Confirm your password to add the Exhibitor role to your account.');
+        err.statusCode = 409;
+        err.code = 'EXHIBITOR_EMAIL_EXISTS';
+        err.requiresExhibitorRoleAdd = true;
+        throw err;
       } else {
         const err: any = new Error('An account with this email already exists. Please sign in to your account.');
         err.statusCode = 409;
@@ -200,6 +214,9 @@ export class AuthService {
           phone: phone ? phone.trim() : null,
           bio: bio ? bio.trim() : null,
           organization: organization ? organization.trim() : null,
+          industry_category: (data as any).industry_category ? (data as any).industry_category.trim() : null,
+          is_exhibitor_registration: normalizedRole === 'exhibitor',
+          company_name: organization ? organization.trim() : null,
         }),
       ]
     );
@@ -283,14 +300,16 @@ export class AuthService {
 
     const userRole = (meta.role || 'attendee').toLowerCase();
 
+    const isExhibitorReg = Boolean(meta.is_exhibitor_registration);
     const result = await query<IUser>(
       `INSERT INTO users (
         email, password_hash, full_name, role, phone, bio, organization,
         avatar_url, visibility, member_since, is_active, approval_status,
-        is_organizer, organizer_approval_status
+        is_organizer, organizer_approval_status,
+        is_exhibitor, company_name, industry_category
        )
-       VALUES (LOWER($1), $2, $3, $8, $4, $5, $6, $7, 'public', 'August 2026', TRUE, 'approved', FALSE, 'none')
-       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, created_at, updated_at`,
+       VALUES (LOWER($1), $2, $3, $9, $4, $5, $6, $7, 'public', 'August 2026', TRUE, 'approved', FALSE, 'none', $8, $6, $10)
+       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, is_exhibitor, company_name, industry_category, created_at, updated_at`,
       [
         cleanEmail,
         meta.password_hash,
@@ -299,7 +318,9 @@ export class AuthService {
         meta.bio || null,
         meta.organization || null,
         avatarUrl,
+        isExhibitorReg,
         userRole,
+        meta.industry_category || null,
       ]
     );
 
@@ -386,7 +407,7 @@ export class AuthService {
     const { email, password, role } = data;
 
     const result = await query<IUser>(
-      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at,
+      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
               created_at, updated_at
        FROM users WHERE LOWER(email) = LOWER($1)`,
@@ -484,6 +505,19 @@ export class AuthService {
     } else if (requestedRole === 'sponsor') {
       sessionRole = 'sponsor';
     } else if (requestedRole === 'exhibitor') {
+      const hasExhibitorRole = Boolean(
+        rawUser.is_exhibitor ||
+        rawUser.role?.toLowerCase() === 'exhibitor'
+      );
+      if (!hasExhibitorRole) {
+        const err: any = new Error(
+          'Your account is not currently registered as an exhibitor. Please complete exhibitor registration to access the Exhibitor Workspace.'
+        );
+        err.statusCode = 403;
+        err.code = 'EXHIBITOR_ROLE_NOT_ACTIVATED';
+        err.requiresExhibitorRegistration = true;
+        throw err;
+      }
       sessionRole = 'exhibitor';
     } else if (requestedRole === 'organizer') {
       if (!isOrganizerAccount && !isAdmin) {
@@ -546,7 +580,7 @@ export class AuthService {
 
   static async getCurrentUser(userId: string): Promise<any> {
     const result = await query<IUser>(
-      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, (password_hash IS NOT NULL) AS has_password,
+      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, (password_hash IS NOT NULL) AS has_password,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
               created_at, updated_at
        FROM users WHERE id = $1`,
@@ -621,7 +655,7 @@ export class AuthService {
            is_organizer = TRUE,
            updated_at = NOW()
        WHERE id = $5
-       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, created_at, updated_at`,
+       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, is_exhibitor, created_at, updated_at`,
       [organization.trim(), bio ? bio.trim() : null, phone ? phone.trim() : null, JSON.stringify(socials), userId]
     );
 
@@ -636,15 +670,15 @@ export class AuthService {
   static async switchRole(
     userId: string,
     data: {
-      targetRole: 'ATTENDEE' | 'ORGANIZER';
+      targetRole: 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR';
       password?: string;
     }
   ): Promise<{ user: any; token: string }> {
     const { targetRole, password } = data;
-    const normalizedTarget = (targetRole || 'ATTENDEE').toUpperCase() as 'ATTENDEE' | 'ORGANIZER';
+    const normalizedTarget = (targetRole || 'ATTENDEE').toUpperCase() as 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR';
 
     const userRes = await query<IUser>(
-      `SELECT id, email, password_hash, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, created_at, updated_at
+      `SELECT id, email, password_hash, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, is_exhibitor, created_at, updated_at
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -702,6 +736,28 @@ export class AuthService {
       const userFormatted = this.formatUserResponse(rawUser, stats);
       userFormatted.role = rawUser.role?.toLowerCase() === 'admin' ? 'ADMIN' : 'ORGANIZER';
       return { user: userFormatted, token };
+    } else if (normalizedTarget === 'EXHIBITOR') {
+      const hasExhibitorRole = Boolean(rawUser.is_exhibitor || rawUser.role?.toLowerCase() === 'exhibitor');
+      if (!hasExhibitorRole) {
+        const err: any = new Error(
+          'This account does not have an exhibitor profile. Please complete exhibitor registration to access the Exhibitor Workspace.'
+        );
+        err.statusCode = 403;
+        err.code = 'EXHIBITOR_ROLE_NOT_ACTIVATED';
+        throw err;
+      }
+
+      const token = signAuthToken({
+        userId: rawUser.id,
+        email: rawUser.email,
+        role: 'exhibitor',
+        fullName: rawUser.full_name,
+      });
+
+      const stats = await this.computeUserStats(rawUser.id);
+      const userFormatted = this.formatUserResponse(rawUser, stats);
+      userFormatted.role = 'EXHIBITOR';
+      return { user: userFormatted, token };
     } else {
       // Switching to ATTENDEE
       const token = signAuthToken({
@@ -716,6 +772,93 @@ export class AuthService {
       userFormatted.role = rawUser.role?.toLowerCase() === 'admin' ? 'ADMIN' : 'ATTENDEE';
       return { user: userFormatted, token };
     }
+  }
+
+  /**
+   * Add Exhibitor role to an existing authenticated user account.
+   * Password verification required. Does NOT change the user's primary role.
+   */
+  static async addExhibitorRole(
+    userId: string,
+    data: {
+      companyName: string;
+      industryCategory: string;
+      companyPhone?: string;
+      companyWebsite?: string;
+      exhibitorDescription?: string;
+      password: string;
+    }
+  ): Promise<{ user: any; message: string }> {
+    const { companyName, industryCategory, companyPhone, companyWebsite, exhibitorDescription, password } = data;
+
+    if (!companyName || !companyName.trim()) {
+      const err: any = new Error('Company / Organization name is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!industryCategory || !industryCategory.trim()) {
+      const err: any = new Error('Industry category is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const userRes = await query<IUser>(
+      'SELECT id, email, full_name, password_hash, is_exhibitor, role FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (!userRes.rowCount || userRes.rowCount === 0) {
+      const err: any = new Error('User account not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const rawUser = userRes.rows[0];
+
+    // Password verification gate
+    if (rawUser.password_hash) {
+      if (!password) {
+        const err: any = new Error('Please confirm with your account password to add the Exhibitor role.');
+        err.statusCode = 401;
+        throw err;
+      }
+      const isMatch = await bcrypt.compare(password, rawUser.password_hash);
+      if (!isMatch) {
+        const err: any = new Error('Incorrect password. Please verify your credentials.');
+        err.statusCode = 401;
+        throw err;
+      }
+    }
+
+    const updated = await query<IUser>(
+      `UPDATE users
+       SET is_exhibitor = TRUE,
+           company_name = $1,
+           industry_category = $2,
+           company_phone = COALESCE($3, company_phone),
+           company_website = COALESCE($4, company_website),
+           bio = COALESCE($5, bio),
+           organization = COALESCE(organization, $1),
+           updated_at = NOW()
+       WHERE id = $6
+       RETURNING id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, is_exhibitor, created_at, updated_at`,
+      [
+        companyName.trim(),
+        industryCategory.trim(),
+        companyPhone ? companyPhone.trim() : null,
+        companyWebsite ? companyWebsite.trim() : null,
+        exhibitorDescription ? exhibitorDescription.trim() : null,
+        userId,
+      ]
+    );
+
+    const updatedUser = updated.rows[0];
+    const stats = await this.computeUserStats(updatedUser.id);
+
+    return {
+      user: this.formatUserResponse(updatedUser, stats),
+      message: 'Exhibitor role has been successfully added to your account. You can now access the Exhibitor Workspace.',
+    };
   }
 
   static async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
@@ -1116,10 +1259,50 @@ export class AuthService {
       industry_category,
       company_phone,
       company_website = null,
+      company_description,
+      company_logo = null,
+      sponsorship_objectives = [],
+      target_audience = [],
+      preferred_event_categories = [],
+      skills_and_interests = [],
+      preferred_locations = [],
+      budget_range = null,
+      preferred_benefits = [],
+      additional_preferences = {},
     } = data;
 
     if (!full_name || !email || !password || !company_name || !industry_category || !company_phone) {
       const err: any = new Error('All required sponsor fields must be provided.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!company_description || !company_description.trim()) {
+      const err: any = new Error('Company description is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!sponsorship_objectives || !Array.isArray(sponsorship_objectives) || sponsorship_objectives.length === 0) {
+      const err: any = new Error('Please select at least one sponsorship objective.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!target_audience || !Array.isArray(target_audience) || target_audience.length === 0) {
+      const err: any = new Error('Please select at least one target audience.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!preferred_event_categories || !Array.isArray(preferred_event_categories) || preferred_event_categories.length === 0) {
+      const err: any = new Error('Please select at least one preferred event category.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!skills_and_interests || !Array.isArray(skills_and_interests) || skills_and_interests.length === 0) {
+      const err: any = new Error('Please select or enter at least one skill or interest.');
       err.statusCode = 400;
       throw err;
     }
@@ -1140,15 +1323,48 @@ export class AuthService {
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
-    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(company_name)}&background=63474D&color=FFA686`;
+    const avatarUrl = company_logo && company_logo.trim()
+      ? company_logo.trim()
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(company_name)}&background=63474D&color=FFA686`;
+
+    // Build preferences object structured for seamless AI matching consumption
+    const targetInterests = Array.from(
+      new Set([
+        ...skills_and_interests,
+        ...preferred_event_categories,
+        industry_category,
+      ].filter(Boolean))
+    );
+
+    const preferredEventTypes = preferred_event_categories.map((c) => {
+      const lower = c.toLowerCase();
+      if (lower.includes('hackathon')) return 'hackathon';
+      if (lower.includes('workshop')) return 'workshop';
+      if (lower.includes('conference')) return 'conference';
+      if (lower.includes('meetup')) return 'meetup';
+      return lower;
+    });
+
+    const sponsorPreferences = {
+      targetInterests,
+      targetSkills: skills_and_interests,
+      sponsorshipObjectives: sponsorship_objectives,
+      preferredEventTypes,
+      targetAudience: target_audience,
+      preferredLocations: preferred_locations || [],
+      maxBudget: budget_range ? Number(budget_range) : null,
+      preferredBenefits: preferred_benefits || [],
+      additionalPreferences: additional_preferences || {},
+    };
 
     const result = await query<IUser>(
       `INSERT INTO users (
         email, password_hash, full_name, role, phone, organization,
         company_name, industry_category, company_phone, company_website,
-        avatar_url, visibility, member_since, is_active, approval_status
+        avatar_url, visibility, member_since, is_active, approval_status,
+        bio, sponsor_preferences
        )
-       VALUES (LOWER($1), $2, $3, 'sponsor', $4, $5, $5, $6, $4, $7, $8, 'public', 'September 2026', FALSE, 'pending')
+       VALUES (LOWER($1), $2, $3, 'sponsor', $4, $5, $5, $6, $4, $7, $8, 'public', 'September 2026', FALSE, 'pending', $9, $10)
        RETURNING *`,
       [
         cleanEmail,
@@ -1159,6 +1375,8 @@ export class AuthService {
         industry_category.trim(),
         company_website ? company_website.trim() : null,
         avatarUrl,
+        company_description.trim(),
+        JSON.stringify(sponsorPreferences),
       ]
     );
 
