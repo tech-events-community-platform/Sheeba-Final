@@ -49,6 +49,17 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS is_exhibitor BOOLEAN NOT NULL DEFAULT
 UPDATE users SET is_exhibitor = TRUE WHERE LOWER(role) = 'exhibitor' AND is_exhibitor = FALSE;
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('attendee', 'organizer', 'admin', 'sponsor', 'exhibitor', 'ATTENDEE', 'ORGANIZER', 'ADMIN', 'SPONSOR', 'EXHIBITOR'));
 
+-- Organizer Formalization Columns
+ALTER TABLE users ADD COLUMN IF NOT EXISTS applicant_type VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_type VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS applicant_position VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_description TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_website VARCHAR(500);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_logo TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_rejection_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_info_requested_notes TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_applied_at TIMESTAMPTZ;
+
 -- Events Table (Single-day tech events only: hackathon, workshop, meetup)
 CREATE TABLE IF NOT EXISTS events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

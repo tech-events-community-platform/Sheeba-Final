@@ -12,34 +12,113 @@ export const registerSchema = z
     full_name: z.string().trim().min(1, 'Please enter your full name.').optional(),
     email: z.string().trim().email('Please enter a valid email address.'),
     password: z.string().min(6, 'Password must be at least 6 characters long.'),
+    confirmPassword: z.string().optional(),
+    confirm_password: z.string().optional(),
     role: z.enum(['ATTENDEE', 'ORGANIZER', 'SPONSOR', 'attendee', 'organizer', 'sponsor']).default('ATTENDEE'),
-    organization: z.string().trim().optional(),
     phone: z.string().trim().optional(),
     bio: z.string().trim().optional(),
+    // Formalization fields
+    applicantType: z.enum(['Individual Organizer', 'Organization / Institution']).default('Individual Organizer'),
+    applicant_type: z.string().trim().optional(),
+    personalIntroduction: z.string().trim().optional(),
+    personal_introduction: z.string().trim().optional(),
+    organization: z.string().trim().optional(),
+    organization_name: z.string().trim().optional(),
+    organizationType: z.string().trim().optional(),
+    organization_type: z.string().trim().optional(),
+    applicantPosition: z.string().trim().optional(),
+    applicant_position: z.string().trim().optional(),
+    position: z.string().trim().optional(),
+    organizationDescription: z.string().trim().optional(),
+    organization_description: z.string().trim().optional(),
+    organizationWebsite: z.string().trim().optional(),
+    organization_website: z.string().trim().optional(),
+    website: z.string().trim().optional(),
+    organizationLogo: z.string().trim().optional(),
+    organization_logo: z.string().trim().optional(),
   })
-  .refine(
-    (data) => {
-      const name = data.fullName || data.full_name;
-      return Boolean(name && name.trim().length > 0);
-    },
-    {
-      message: 'Please enter your full name.',
-      path: ['fullName'],
+  .superRefine((data, ctx) => {
+    const name = data.fullName || data.full_name;
+    if (!name || name.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Please enter your full name.',
+        path: ['fullName'],
+      });
     }
-  )
-  .refine(
-    (data) => {
-      const normRole = (data.role || '').toUpperCase();
-      if (normRole === 'ORGANIZER' && (!data.organization || data.organization.trim() === '')) {
-        return false;
+
+    const confirm = data.confirmPassword || data.confirm_password;
+    if (confirm && confirm !== data.password) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Passwords do not match. Please re-enter.',
+        path: ['confirmPassword'],
+      });
+    }
+
+    const normRole = (data.role || '').toUpperCase();
+    if (normRole === 'ORGANIZER') {
+      if (!data.phone || data.phone.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Phone number is required.',
+          path: ['phone'],
+        });
       }
-      return true;
-    },
-    {
-      message: 'Please specify your organization or community name.',
-      path: ['organization'],
+
+      const applicantType = data.applicantType || data.applicant_type || 'Individual Organizer';
+      if (applicantType === 'Individual Organizer') {
+        const intro = data.personalIntroduction || data.personal_introduction || data.bio;
+        if (!intro || intro.trim().length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Short personal introduction is required.',
+            path: ['personalIntroduction'],
+          });
+        }
+      } else {
+        // Organization / Institution
+        const orgName = data.organization || data.organization_name;
+        if (!orgName || orgName.trim().length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Organization name is required.',
+            path: ['organization'],
+          });
+        }
+        const orgType = data.organizationType || data.organization_type;
+        if (!orgType || orgType.trim().length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Organization type is required.',
+            path: ['organizationType'],
+          });
+        } else if (!ORGANIZATION_TYPES.includes(orgType as any)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Organization type must be one of: ${ORGANIZATION_TYPES.join(', ')}.`,
+            path: ['organizationType'],
+          });
+        }
+        const position = data.applicantPosition || data.applicant_position || data.position;
+        if (!position || position.trim().length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Applicant's position or role is required.",
+            path: ['applicantPosition'],
+          });
+        }
+        const desc = data.organizationDescription || data.organization_description;
+        if (!desc || desc.trim().length === 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Short organization description is required.',
+            path: ['organizationDescription'],
+          });
+        }
+      }
     }
-  );
+  });
 
 export const forgotPasswordSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address.'),
@@ -132,14 +211,82 @@ export const sponsorResetPasswordStep3Schema = z
     path: ['confirmPassword'],
   });
 
-export const applyOrganizerSchema = z.object({
-  organization: z.string().trim().min(1, 'Please provide an organization or community name.'),
-  applyPassword: z.string().optional(),
-  bio: z.string().trim().optional(),
-  phone: z.string().trim().optional(),
-  telegram: z.string().trim().optional(),
-  xHandle: z.string().trim().optional(),
-});
+export const ORGANIZER_APPLICANT_TYPES = [
+  'Individual Organizer',
+  'Organization / Institution',
+] as const;
+
+export const ORGANIZATION_TYPES = [
+  'University / Educational Institution',
+  'Company / Business',
+  'Community / Student Club',
+  'NGO',
+  'Other',
+] as const;
+
+export const applyOrganizerSchema = z
+  .object({
+    applicantType: z.enum(['Individual Organizer', 'Organization / Institution']).default('Individual Organizer'),
+    phone: z.string().trim().min(1, 'Phone number is required.'),
+    applyPassword: z.string().optional(),
+    // Individual Organizer field
+    personalIntroduction: z.string().trim().optional(),
+    // Organization fields
+    organization: z.string().trim().optional(),
+    organizationType: z.string().trim().optional(),
+    applicantPosition: z.string().trim().optional(),
+    organizationDescription: z.string().trim().optional(),
+    organizationWebsite: z.string().trim().optional(),
+    organizationLogo: z.string().trim().optional(),
+    telegram: z.string().trim().optional(),
+    xHandle: z.string().trim().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.applicantType === 'Individual Organizer') {
+      if (!data.personalIntroduction || data.personalIntroduction.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Short personal introduction is required.',
+          path: ['personalIntroduction'],
+        });
+      }
+    } else {
+      if (!data.organization || data.organization.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Organization name is required.',
+          path: ['organization'],
+        });
+      }
+      if (!data.organizationType || data.organizationType.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Organization type is required.',
+          path: ['organizationType'],
+        });
+      } else if (!ORGANIZATION_TYPES.includes(data.organizationType as any)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Organization type must be one of: ${ORGANIZATION_TYPES.join(', ')}.`,
+          path: ['organizationType'],
+        });
+      }
+      if (!data.applicantPosition || data.applicantPosition.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Applicant's position or role is required.",
+          path: ['applicantPosition'],
+        });
+      }
+      if (!data.organizationDescription || data.organizationDescription.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Short organization description is required.',
+          path: ['organizationDescription'],
+        });
+      }
+    }
+  });
 
 export const switchRoleSchema = z.object({
   switchPassword: z.string().optional(),

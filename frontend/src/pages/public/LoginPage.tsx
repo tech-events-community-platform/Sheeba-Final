@@ -380,13 +380,9 @@ export const LoginPage: React.FC = () => {
         <button
           type="button"
           onClick={() => {
-            setAuthMode('signup');
-            setErrorMsg(null);
+            navigate(`/register${redirectTarget ? `?redirect=${encodeURIComponent(redirectTarget)}` : ''}`);
           }}
-          className={`pb-1 cursor-pointer transition-all ${authMode === 'signup'
-              ? 'text-[#63474D] font-bold border-b-2 border-[#63474D]'
-              : 'text-[#756366] hover:text-[#2D1F23]'
-            }`}
+          className="pb-1 cursor-pointer transition-all text-[#756366] hover:text-[#2D1F23]"
         >
           Create Account
         </button>
@@ -658,17 +654,12 @@ export const LoginPage: React.FC = () => {
             {authMode === 'login' ? (
               <>
                 Organizing an event?{' '}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode('signup');
-                    setLoginRole('ORGANIZER');
-                    setErrorMsg(null);
-                  }}
+                <Link
+                  to={`/register?role=organizer${redirectTarget ? `&redirect=${encodeURIComponent(redirectTarget)}` : ''}`}
                   className="font-bold text-[#63474D] hover:underline cursor-pointer"
                 >
                   Register as Organizer
-                </button>
+                </Link>
               </>
             ) : (
               <>
