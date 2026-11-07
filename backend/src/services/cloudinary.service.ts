@@ -28,8 +28,15 @@ export class CloudinaryService {
       const match = fileData.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,/);
       if (match) {
         const mimeType = match[1].toLowerCase();
-        if (!['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'application/pdf'].includes(mimeType)) {
-          throw new Error('Unsupported format. Allowed formats are JPEG, PNG, WebP, and PDF.');
+        const isLogo = folder.toLowerCase().includes('logo');
+        const allowed = isLogo
+          ? ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
+          : ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'application/pdf'];
+        if (!allowed.includes(mimeType)) {
+          throw new Error(isLogo
+            ? 'Unsupported format. Allowed formats for logos are PNG, JPG, and WebP.'
+            : 'Unsupported format. Allowed formats are JPEG, PNG, WebP, and PDF.'
+          );
         }
       }
       if (fileData.length > 7 * 1024 * 1024) {

@@ -6,26 +6,99 @@ export const registerSchema = z
     fullName: z.string().trim().min(1, 'Full name is required.').optional(),
     email: z.string().trim().email('Please provide a valid email address.'),
     password: z.string().min(6, 'Password must be at least 6 characters long.'),
+    confirm_password: z.string().optional(),
+    confirmPassword: z.string().optional(),
     role: z.string().trim().optional(),
     phone: z.string().trim().optional(),
     bio: z.string().trim().optional(),
+    // Formalization fields
+    applicant_type: z.string().trim().optional(),
+    applicantType: z.string().trim().optional(),
+    personal_introduction: z.string().trim().optional(),
+    personalIntroduction: z.string().trim().optional(),
     organization: z.string().trim().optional(),
+    organization_name: z.string().trim().optional(),
+    organizationName: z.string().trim().optional(),
+    organization_type: z.string().trim().optional(),
+    organizationType: z.string().trim().optional(),
+    applicant_position: z.string().trim().optional(),
+    applicantPosition: z.string().trim().optional(),
+    position: z.string().trim().optional(),
+    organization_description: z.string().trim().optional(),
+    organizationDescription: z.string().trim().optional(),
+    organization_website: z.string().trim().optional(),
+    organizationWebsite: z.string().trim().optional(),
+    website: z.string().trim().optional(),
+    organization_logo: z.string().trim().optional(),
+    organizationLogo: z.string().trim().optional(),
+    socials: z.record(z.string(), z.string()).optional(),
   })
-  .transform((data) => ({
-    full_name: (data.full_name || data.fullName || '').trim(),
-    email: data.email.toLowerCase().trim(),
-    password: data.password,
-    role: data.role ? data.role.toUpperCase().trim() : 'ATTENDEE',
-    phone: data.phone?.trim(),
-    bio: data.bio?.trim(),
-    organization: data.organization?.trim(),
-  }))
+  .transform((data) => {
+    let rawType = (data.applicant_type || data.applicantType || '').trim();
+    let normType: 'Individual Organizer' | 'Organization / Institution';
+    if (rawType.toLowerCase() === 'individual' || rawType.toLowerCase() === 'individual organizer') {
+      normType = 'Individual Organizer';
+    } else if (
+      rawType.toLowerCase() === 'organization' ||
+      rawType.toLowerCase() === 'organization / institution' ||
+      rawType.toLowerCase() === 'institution'
+    ) {
+      normType = 'Organization / Institution';
+    } else if (!rawType && (data.organization || data.organization_name || data.organizationName)) {
+      normType = 'Organization / Institution';
+    } else {
+      normType = 'Individual Organizer';
+    }
+
+    const personalIntro = (data.personal_introduction || data.personalIntroduction || data.bio || '').trim();
+    const orgName = (data.organization || data.organization_name || data.organizationName || '').trim();
+    const orgType = (data.organization_type || data.organizationType || '').trim();
+    const position = (data.applicant_position || data.applicantPosition || data.position || '').trim();
+    const orgDesc = (data.organization_description || data.organizationDescription || data.bio || '').trim();
+    const orgWebsite = (data.organization_website || data.organizationWebsite || data.website || '').trim();
+    const orgLogo = (data.organization_logo || data.organizationLogo || '').trim();
+
+    return {
+      full_name: (data.full_name || data.fullName || '').trim(),
+      email: data.email.toLowerCase().trim(),
+      password: data.password,
+      confirm_password: data.confirm_password || data.confirmPassword,
+      role: data.role ? data.role.toUpperCase().trim() : 'ATTENDEE',
+      phone: data.phone?.trim(),
+      bio: normType === 'Individual Organizer' ? personalIntro : (orgDesc || data.bio?.trim()),
+      applicant_type: normType,
+      applicantType: normType,
+      personal_introduction: personalIntro,
+      personalIntroduction: personalIntro,
+      organization: orgName,
+      organizationName: orgName,
+      organization_type: orgType,
+      organizationType: orgType,
+      applicant_position: position,
+      applicantPosition: position,
+      organization_description: orgDesc,
+      organizationDescription: orgDesc,
+      organization_website: orgWebsite || undefined,
+      organizationWebsite: orgWebsite || undefined,
+      organization_logo: orgLogo || undefined,
+      organizationLogo: orgLogo || undefined,
+      socials: data.socials || (orgWebsite ? { website: orgWebsite } : {}),
+    };
+  })
   .superRefine((data, ctx) => {
     if (!data.full_name) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Full name is required.',
         path: ['full_name'],
+      });
+    }
+
+    if (data.confirm_password && data.confirm_password !== data.password) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Passwords do not match.',
+        path: ['confirm_password'],
       });
     }
 
@@ -43,6 +116,62 @@ export const registerSchema = z
           message: 'Role must be ATTENDEE, ORGANIZER, SPONSOR, or EXHIBITOR.',
           path: ['role'],
         });
+      }
+
+      if (norm === 'organizer') {
+        if (!data.phone) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Phone number is required.',
+            path: ['phone'],
+          });
+        }
+
+        if (data.applicant_type === 'Individual Organizer') {
+          if (!data.personal_introduction || data.personal_introduction.length < 10) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Personal introduction is required (minimum 10 characters).',
+              path: ['personal_introduction'],
+            });
+          }
+        } else {
+          // Organization / Institution
+          if (!data.organization || data.organization.length < 2) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Organization name is required.',
+              path: ['organization'],
+            });
+          }
+          if (!data.organization_type) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Organization type is required.',
+              path: ['organization_type'],
+            });
+          } else if (!ORGANIZATION_TYPES.includes(data.organization_type as any)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Organization type must be one of: ${ORGANIZATION_TYPES.join(', ')}.`,
+              path: ['organization_type'],
+            });
+          }
+          if (!data.applicant_position || data.applicant_position.length < 2) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Applicant's position or role in the organization is required.",
+              path: ['applicant_position'],
+            });
+          }
+          if (!data.organization_description || data.organization_description.length < 10) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Organization description is required (minimum 10 characters).',
+              path: ['organization_description'],
+            });
+          }
+        }
       }
     }
   });
@@ -102,12 +231,160 @@ export const googleAuthSchema = z.object({
   ),
 });
 
-export const applyOrganizerSchema = z.object({
-  organization: z.string().trim().min(1, 'Organization / Community name is required.'),
-  password: z.string().optional(),
-  bio: z.string().trim().optional(),
-  phone: z.string().trim().optional(),
-  socials: z.record(z.string(), z.string()).optional(),
+export const ORGANIZER_APPLICANT_TYPES = [
+  'Individual Organizer',
+  'Organization / Institution',
+] as const;
+
+export const ORGANIZATION_TYPES = [
+  'University / Educational Institution',
+  'Company / Business',
+  'Community / Student Club',
+  'NGO',
+  'Other',
+] as const;
+
+export const applyOrganizerSchema = z
+  .object({
+    applicant_type: z.string().trim().optional(),
+    applicantType: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    password: z.string().optional(),
+    applyPassword: z.string().optional(),
+    // Individual fields
+    bio: z.string().trim().optional(),
+    personal_introduction: z.string().trim().optional(),
+    personalIntroduction: z.string().trim().optional(),
+    // Organization fields
+    organization: z.string().trim().optional(),
+    organization_name: z.string().trim().optional(),
+    organizationName: z.string().trim().optional(),
+    organization_type: z.string().trim().optional(),
+    organizationType: z.string().trim().optional(),
+    applicant_position: z.string().trim().optional(),
+    applicantPosition: z.string().trim().optional(),
+    position: z.string().trim().optional(),
+    organization_description: z.string().trim().optional(),
+    organizationDescription: z.string().trim().optional(),
+    organization_website: z.string().trim().optional(),
+    organizationWebsite: z.string().trim().optional(),
+    website: z.string().trim().optional(),
+    organization_logo: z.string().trim().optional(),
+    organizationLogo: z.string().trim().optional(),
+    socials: z.record(z.string(), z.string()).optional(),
+  })
+  .transform((data) => {
+    let rawType = (data.applicant_type || data.applicantType || '').trim();
+    let normType: 'Individual Organizer' | 'Organization / Institution';
+    if (rawType.toLowerCase() === 'individual' || rawType.toLowerCase() === 'individual organizer') {
+      normType = 'Individual Organizer';
+    } else if (
+      rawType.toLowerCase() === 'organization' ||
+      rawType.toLowerCase() === 'organization / institution' ||
+      rawType.toLowerCase() === 'institution'
+    ) {
+      normType = 'Organization / Institution';
+    } else if (!rawType && (data.organization || data.organization_name || data.organizationName)) {
+      normType = 'Organization / Institution';
+    } else {
+      normType = 'Individual Organizer';
+    }
+
+    const phone = (data.phone || '').trim();
+    const password = data.password || data.applyPassword;
+    const personalIntro = (data.personal_introduction || data.personalIntroduction || data.bio || '').trim();
+    const orgName = (data.organization || data.organization_name || data.organizationName || '').trim();
+    const orgType = (data.organization_type || data.organizationType || '').trim();
+    const position = (data.applicant_position || data.applicantPosition || data.position || '').trim();
+    const orgDesc = (data.organization_description || data.organizationDescription || data.bio || '').trim();
+    const orgWebsite = (data.organization_website || data.organizationWebsite || data.website || '').trim();
+    const orgLogo = (data.organization_logo || data.organizationLogo || '').trim();
+
+    return {
+      applicant_type: normType,
+      applicantType: normType,
+      phone,
+      password,
+      personal_introduction: personalIntro,
+      personalIntroduction: personalIntro,
+      organization: orgName,
+      organizationName: orgName,
+      organization_type: orgType,
+      organizationType: orgType,
+      applicant_position: position,
+      applicantPosition: position,
+      organization_description: orgDesc,
+      organizationDescription: orgDesc,
+      organization_website: orgWebsite || undefined,
+      organizationWebsite: orgWebsite || undefined,
+      organization_logo: orgLogo || undefined,
+      organizationLogo: orgLogo || undefined,
+      bio: normType === 'Individual Organizer' ? personalIntro : orgDesc,
+      socials: data.socials || (orgWebsite ? { website: orgWebsite } : {}),
+    };
+  })
+  .superRefine((data, ctx) => {
+    if (!data.phone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Phone number is required.',
+        path: ['phone'],
+      });
+    }
+
+    if (data.applicant_type === 'Individual Organizer') {
+      if (!data.personal_introduction) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Personal introduction is required for individual applicants.',
+          path: ['personal_introduction'],
+        });
+      }
+    } else {
+      // Organization / Institution
+      if (!data.organization) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Organization name is required.',
+          path: ['organization'],
+        });
+      }
+      if (!data.organization_type) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Organization type is required.',
+          path: ['organization_type'],
+        });
+      } else if (!ORGANIZATION_TYPES.includes(data.organization_type as any)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Organization type must be one of: ${ORGANIZATION_TYPES.join(', ')}.`,
+          path: ['organization_type'],
+        });
+      }
+      if (!data.applicant_position) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Applicant's position or role in the organization is required.",
+          path: ['applicant_position'],
+        });
+      }
+      if (!data.organization_description) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Organization description is required.',
+          path: ['organization_description'],
+        });
+      }
+    }
+  });
+
+export const adminRejectOrganizerSchema = z.object({
+  reason: z.string().trim().min(1, 'Please provide a reason for rejecting the application.').optional(),
+});
+
+export const adminRequestOrganizerInfoSchema = z.object({
+  notes: z.string().trim().min(1, 'Please specify the additional information requested from the applicant.'),
 });
 
 export const switchRoleSchema = z.object({

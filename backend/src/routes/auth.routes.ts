@@ -41,6 +41,10 @@ router.post('/change-password', authenticate, validateBody(changePasswordSchema)
 router.post('/logout', authenticate, AuthController.logout);
 router.post('/add-exhibitor-role', authenticate, validateBody(addExhibitorRoleSchema), AuthController.addExhibitorRole);
 
+// Organizer Response Endpoints (Accessible via direct token or session)
+router.get('/organizer-response-details', AuthController.getOrganizerResponseDetails);
+router.post('/submit-organizer-response', AuthController.submitOrganizerResponse);
+
 // Sponsor Auth Endpoints (Completely decoupled role & portal)
 router.post('/sponsor/register', authLimiter, validateBody(sponsorRegisterSchema), AuthController.registerSponsor);
 router.post('/sponsor/login', authLimiter, validateBody(loginSchema), AuthController.loginSponsor);

@@ -365,10 +365,25 @@ export const api = {
     },
 
     applyOrganizer: async (data: {
-      organization: string;
+      applicantType?: string;
+      applicant_type?: string;
+      organization?: string;
+      organizationType?: string;
+      organization_type?: string;
+      applicantPosition?: string;
+      applicant_position?: string;
+      organizationDescription?: string;
+      organization_description?: string;
+      organizationWebsite?: string;
+      organization_website?: string;
+      organizationLogo?: string;
+      organization_logo?: string;
+      personalIntroduction?: string;
+      personal_introduction?: string;
       bio?: string;
       phone?: string;
       password?: string;
+      applyPassword?: string;
       socials?: Record<string, string>;
     }): Promise<{ user: User; message: string }> => {
       const res = await requestApi('/auth/apply-organizer', {
@@ -435,6 +450,25 @@ export const api = {
       organization?: string;
       phone?: string;
       bio?: string;
+      confirm_password?: string;
+      confirmPassword?: string;
+      applicant_type?: string;
+      applicantType?: string;
+      personal_introduction?: string;
+      personalIntroduction?: string;
+      organization_type?: string;
+      organizationType?: string;
+      applicant_position?: string;
+      applicantPosition?: string;
+      position?: string;
+      organization_description?: string;
+      organizationDescription?: string;
+      organization_website?: string;
+      organizationWebsite?: string;
+      website?: string;
+      organization_logo?: string;
+      organizationLogo?: string;
+      socials?: Record<string, string>;
     }): Promise<{ user?: User; token?: string; isPendingApproval?: boolean; requireOtp?: boolean; email?: string; message?: string }> => {
       const res = await requestApi('/auth/register', {
         method: 'POST',
@@ -547,6 +581,19 @@ export const api = {
         body: JSON.stringify(data),
       });
       return res.data || { success: true, message: res.message || 'Password changed successfully.' };
+    },
+
+    getOrganizerResponseDetails: async (token: string): Promise<any> => {
+      const res = await requestApi(`/auth/organizer-response-details?token=${encodeURIComponent(token)}`);
+      return res.data;
+    },
+
+    submitOrganizerResponse: async (payload: any): Promise<any> => {
+      const res = await requestApi('/auth/submit-organizer-response', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return res.data || res;
     },
 
     sponsor: {
@@ -2026,9 +2073,25 @@ export const api = {
       return res.data;
     },
 
-    rejectOrganizer: async (userId: string) => {
+    rejectOrganizer: async (userId: string, reason?: string) => {
       const res = await requestApi(`/admin/users/${userId}/reject`, {
         method: 'PATCH',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    requestOrganizerInfo: async (userId: string, notes: string) => {
+      const res = await requestApi(`/admin/users/${userId}/request-info`, {
+        method: 'PATCH',
+        body: JSON.stringify({ notes }),
+      });
+      return res.data;
+    },
+
+    getOrganizerDetails: async (userId: string) => {
+      const res = await requestApi(`/admin/users/${userId}/organizer-details`, {
+        method: 'GET',
       });
       return res.data;
     },

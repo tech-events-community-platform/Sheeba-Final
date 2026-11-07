@@ -3,7 +3,7 @@ import { Request } from 'express';
 export type UserRole = 'attendee' | 'organizer' | 'admin' | 'sponsor' | 'exhibitor';
 export type ProfileVisibility = 'public' | 'private';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-export type OrganizerApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected';
+export type OrganizerApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected' | 'more_info_needed';
 
 export interface ISponsorRegistration {
   full_name: string;
@@ -49,6 +49,15 @@ export interface IUser {
   organizer_approval_status?: OrganizerApprovalStatus;
   organizer_bio?: string | null;
   organizer_socials?: Record<string, string> | null;
+  applicant_type?: string | null;
+  organization_type?: string | null;
+  applicant_position?: string | null;
+  organization_description?: string | null;
+  organization_website?: string | null;
+  organization_logo?: string | null;
+  organizer_rejection_reason?: string | null;
+  organizer_info_requested_notes?: string | null;
+  organizer_applied_at?: Date | string | null;
   is_exhibitor?: boolean;
   exhibitor_approval_status?: string;
   must_change_password?: boolean;

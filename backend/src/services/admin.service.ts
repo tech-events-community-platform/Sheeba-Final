@@ -1,6 +1,7 @@
 import { query } from '../config/db';
 import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
+import { signAuthToken } from '../utils/jwt.util';
 
 export class AdminService {
   static async getDashboardMetrics() {
@@ -80,6 +81,9 @@ export class AdminService {
       SELECT 
         u.id, u.full_name, u.email, u.phone, u.organization, u.role, u.is_active, u.approval_status,
         u.is_organizer, u.organizer_approval_status, u.created_at,
+        u.applicant_type, u.organization_type, u.applicant_position, u.organization_description,
+        u.organization_website, u.organization_logo, u.organizer_rejection_reason,
+        u.organizer_info_requested_notes, u.organizer_applied_at, u.bio, u.organizer_bio, u.avatar_url,
         COUNT(DISTINCT e.id)::INTEGER AS events_count,
         COUNT(DISTINCT CASE 
           WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
@@ -96,8 +100,8 @@ export class AdminService {
       WHERE (u.role = 'organizer' OR u.is_organizer = TRUE OR (u.organizer_approval_status IS NOT NULL AND u.organizer_approval_status != 'none')) AND u.deleted_at IS NULL
       GROUP BY u.id
       ORDER BY 
-        CASE WHEN (u.organizer_approval_status = 'pending' OR u.approval_status = 'pending') THEN 0 ELSE 1 END,
-        u.created_at DESC
+        CASE WHEN (u.organizer_approval_status = 'pending' OR u.approval_status = 'pending' OR u.organizer_approval_status = 'more_info_needed') THEN 0 ELSE 1 END,
+        COALESCE(u.organizer_applied_at, u.created_at) DESC
     `);
 
     const sponsorsRes = await query(`
@@ -130,21 +134,37 @@ export class AdminService {
         ? o.organizer_approval_status
         : (o.approval_status || 'pending');
 
+      const isIndividual = (o.applicant_type || '').toLowerCase().includes('individual') || (!o.applicant_type && !o.organization);
+      const applicantType = isIndividual ? 'Individual Organizer' : 'Organization / Institution';
+
       return {
         id: o.id,
         name: o.full_name,
         email: o.email,
-        phone: o.phone,
+        phone: o.phone || '',
+        applicantType,
         organization: o.organization || o.full_name,
+        organizationType: o.organization_type || '',
+        applicantPosition: o.applicant_position || '',
+        organizationDescription: o.organization_description || o.organizer_bio || '',
+        organizationWebsite: o.organization_website || '',
+        organizationLogo: o.organization_logo || '',
+        personalIntroduction: o.bio || o.organizer_bio || '',
+        bio: o.bio || o.organizer_bio || '',
         eventsCount: o.events_count || 0,
         totalCheckIns: o.total_check_ins || 0,
         status: effApproval === 'pending'
           ? 'Pending Approval'
+          : effApproval === 'more_info_needed'
+          ? 'More Info Needed'
           : effApproval === 'approved'
           ? 'Active'
           : 'Rejected',
         approvalStatus: effApproval,
         isActive: effApproval === 'approved',
+        rejectionReason: o.organizer_rejection_reason || '',
+        infoRequestedNotes: o.organizer_info_requested_notes || '',
+        appliedAt: o.organizer_applied_at || o.created_at,
         registeredAt: o.created_at,
       };
     });
@@ -183,9 +203,11 @@ export class AdminService {
            organizer_approval_status = 'approved',
            is_organizer = TRUE,
            is_active = TRUE,
+           organizer_rejection_reason = NULL,
+           organizer_info_requested_notes = NULL,
            updated_at = NOW()
        WHERE id = $1 AND (role = 'organizer' OR is_organizer = TRUE OR organizer_approval_status IS NOT NULL)
-       RETURNING id, full_name, email, role, organization, is_active, approval_status, organizer_approval_status`,
+       RETURNING id, full_name, email, role, organization, is_active, approval_status, is_organizer, organizer_approval_status`,
       [userId]
     );
 
@@ -211,17 +233,19 @@ export class AdminService {
     return user;
   }
 
-  static async rejectOrganizer(userId: string) {
+  static async rejectOrganizer(userId: string, reason?: string) {
     const res = await query(
       `UPDATE users
        SET approval_status = 'rejected',
            organizer_approval_status = 'rejected',
            role = 'attendee',
+           is_organizer = FALSE,
            is_active = TRUE,
+           organizer_rejection_reason = COALESCE($2, organizer_rejection_reason),
            updated_at = NOW()
        WHERE id = $1 AND (role = 'organizer' OR is_organizer = TRUE OR organizer_approval_status IS NOT NULL)
-       RETURNING id, full_name, email, role, organization, is_active, approval_status, organizer_approval_status`,
-      [userId]
+       RETURNING id, full_name, email, role, organization, is_active, approval_status, is_organizer, organizer_approval_status, organizer_rejection_reason`,
+      [userId, reason ? reason.trim() : null]
     );
 
     if (!res.rowCount || res.rowCount === 0) {
@@ -235,7 +259,8 @@ export class AdminService {
       await EmailService.sendOrganizerRejectionEmail(
         user.email,
         user.full_name,
-        user.organization || user.full_name
+        user.organization || user.full_name,
+        reason
       );
     } catch (e) {
       console.warn('Failed to dispatch organizer rejection email:', e);
@@ -244,6 +269,111 @@ export class AdminService {
     await CacheService.del('admin:dashboard:metrics');
     await CacheService.delPattern('*http:*/api/admin*');
     return user;
+  }
+
+  static async requestOrganizerInfo(userId: string, notes: string) {
+    if (!notes || !notes.trim()) {
+      const err: any = new Error('Please specify the additional information requested.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const res = await query(
+      `UPDATE users
+       SET organizer_approval_status = 'more_info_needed',
+           is_organizer = FALSE,
+           organizer_info_requested_notes = $2,
+           updated_at = NOW()
+       WHERE id = $1 AND (role = 'organizer' OR is_organizer = TRUE OR organizer_approval_status IS NOT NULL)
+       RETURNING id, full_name, email, role, organization, is_active, approval_status, is_organizer, organizer_approval_status, organizer_info_requested_notes`,
+      [userId, notes.trim()]
+    );
+
+    if (!res.rowCount || res.rowCount === 0) {
+      const err: any = new Error('Organizer account not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const user = res.rows[0];
+    const actionToken = signAuthToken({
+      userId: user.id,
+      email: user.email,
+      role: 'attendee',
+      fullName: user.full_name,
+    });
+
+    try {
+      await EmailService.sendOrganizerInfoRequestedEmail(
+        user.email,
+        user.full_name,
+        user.organization || user.full_name,
+        notes.trim(),
+        actionToken
+      );
+    } catch (e) {
+      console.warn('Failed to dispatch organizer info requested email:', e);
+    }
+
+    await CacheService.del('admin:dashboard:metrics');
+    await CacheService.delPattern('*http:*/api/admin*');
+    return user;
+  }
+
+  static async getOrganizerDetails(userId: string) {
+    const res = await query(
+      `SELECT id, full_name, email, phone, organization, role, is_active, approval_status,
+              is_organizer, organizer_approval_status, created_at,
+              applicant_type, organization_type, applicant_position, organization_description,
+              organization_website, organization_logo, organizer_rejection_reason,
+              organizer_info_requested_notes, organizer_applied_at, bio, organizer_bio, avatar_url
+       FROM users
+       WHERE id = $1 AND (role = 'organizer' OR is_organizer = TRUE OR organizer_approval_status IS NOT NULL) AND deleted_at IS NULL`,
+      [userId]
+    );
+
+    if (!res.rowCount || res.rowCount === 0) {
+      const err: any = new Error('Organizer record not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const o = res.rows[0];
+    const effApproval = (o.organizer_approval_status && o.organizer_approval_status !== 'none')
+      ? o.organizer_approval_status
+      : (o.approval_status || 'pending');
+
+    const isIndividual = (o.applicant_type || '').toLowerCase().includes('individual') || (!o.applicant_type && !o.organization);
+    const applicantType = isIndividual ? 'Individual Organizer' : 'Organization / Institution';
+
+    return {
+      id: o.id,
+      name: o.full_name,
+      email: o.email,
+      phone: o.phone || '',
+      applicantType,
+      organization: o.organization || o.full_name,
+      organizationType: o.organization_type || '',
+      applicantPosition: o.applicant_position || '',
+      organizationDescription: o.organization_description || o.organizer_bio || '',
+      organizationWebsite: o.organization_website || '',
+      organizationLogo: o.organization_logo || '',
+      personalIntroduction: o.bio || o.organizer_bio || '',
+      bio: o.bio || o.organizer_bio || '',
+      status: effApproval === 'pending'
+        ? 'Pending Approval'
+        : effApproval === 'more_info_needed'
+        ? 'More Info Needed'
+        : effApproval === 'approved'
+        ? 'Active'
+        : 'Rejected',
+      approvalStatus: effApproval,
+      isActive: effApproval === 'approved',
+      rejectionReason: o.organizer_rejection_reason || '',
+      infoRequestedNotes: o.organizer_info_requested_notes || '',
+      appliedAt: o.organizer_applied_at || o.created_at,
+      registeredAt: o.created_at,
+    };
   }
 
   static async approveSponsor(userId: string) {

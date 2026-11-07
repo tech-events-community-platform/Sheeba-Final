@@ -45,8 +45,30 @@ export class AdminController {
   static async rejectOrganizer(req: Request, res: Response, next: NextFunction) {
     try {
       const id = req.params.id as string;
-      const updated = await AdminService.rejectOrganizer(id);
+      const reason = req.body?.reason || req.body?.rejectionReason;
+      const updated = await AdminService.rejectOrganizer(id, reason);
       return sendSuccess(res, updated, 'Organizer registration rejected.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async requestOrganizerInfo(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const notes = req.body?.notes || req.body?.message;
+      const updated = await AdminService.requestOrganizerInfo(id, notes);
+      return sendSuccess(res, updated, 'Additional information request dispatched to organizer.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getOrganizerDetails(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const details = await AdminService.getOrganizerDetails(id);
+      return sendSuccess(res, details, 'Organizer details retrieved successfully.');
     } catch (error) {
       next(error);
     }

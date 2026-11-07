@@ -1,7 +1,7 @@
 export type UserRole = 'ATTENDEE' | 'ORGANIZER' | 'ADMIN' | 'SPONSOR' | 'EXHIBITOR';
 export type ProfileVisibility = 'public' | 'private';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-export type OrganizerApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected';
+export type OrganizerApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected' | 'more_info_needed';
 
 export interface AttendeeStats {
   meetupsCount: number;
@@ -38,6 +38,16 @@ export interface User {
   isOrganizer?: boolean;
   isExhibitor?: boolean;
   organizerApprovalStatus?: OrganizerApprovalStatus;
+  applicantType?: 'Individual Organizer' | 'Organization / Institution';
+  organizationType?: string;
+  applicantPosition?: string;
+  organizationDescription?: string;
+  organizationWebsite?: string;
+  organizationLogo?: string;
+  personalIntroduction?: string;
+  organizerRejectionReason?: string;
+  organizerInfoRequestedNotes?: string;
+  organizerAppliedAt?: string;
   hasExhibitorApplications?: boolean;
   roles?: UserRole[];
   isActive?: boolean;

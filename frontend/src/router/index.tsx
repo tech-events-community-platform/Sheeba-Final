@@ -21,6 +21,7 @@ import { VerifyOtpPage } from '../pages/public/VerifyOtpPage';
 import { ForgotPasswordPage } from '../pages/public/ForgotPasswordPage';
 import { ChangePasswordPage } from '../pages/shared/ChangePasswordPage';
 import { ContactPage } from '../pages/public/ContactPage';
+import { OrganizerResponsePage } from '../pages/public/OrganizerResponsePage';
 
 // Sponsor Pages & Layout
 import { SponsorLayout } from '../layouts/SponsorLayout';
@@ -84,12 +85,13 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <LandingPage /> },
       { path: 'login', element: <LoginPage /> },
-      { path: 'register', element: <LoginPage /> },
+      { path: 'register', element: <RegisterPage /> },
       { path: 'verify-otp', element: <VerifyOtpPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
       { path: 'reset-password', element: <ForgotPasswordPage /> },
       { path: 'pending-approval', element: <PendingApprovalPage /> },
       { path: 'contact', element: <ContactPage /> },
+      { path: 'organizer-response', element: <OrganizerResponsePage /> },
       { path: 'search', element: <Navigate to="/" replace /> },
       { path: 'e/:token', element: <PublicRegisterPage /> },
       { path: 'e/:token/register', element: <EventRegistrationCheckoutPage /> },

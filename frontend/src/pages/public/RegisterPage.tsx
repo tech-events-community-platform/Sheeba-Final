@@ -13,10 +13,16 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
+  Globe,
+  Upload,
+  X,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import type { UserRole } from '../../types/user';
-import { registerSchema, validateForm } from '../../schemas';
+import { registerSchema, validateForm, ORGANIZATION_TYPES } from '../../schemas';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -29,16 +35,28 @@ export const RegisterPage: React.FC = () => {
     roleParam?.toUpperCase() === 'ORGANIZER' ? 'ORGANIZER' : 'ATTENDEE'
   );
 
-  // Common fields
+  // Common account fields
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Organizer-specific fields
+  // Organizer Formalization fields
+  const [applicantType, setApplicantType] = useState<'Individual Organizer' | 'Organization / Institution'>('Individual Organizer');
+  // Individual Organizer
+  const [personalIntroduction, setPersonalIntroduction] = useState('');
+  // Organization / Institution
   const [organization, setOrganization] = useState('');
-  const [bio, setBio] = useState('');
+  const [organizationType, setOrganizationType] = useState<string>('University / Educational Institution');
+  const [applicantPosition, setApplicantPosition] = useState('');
+  const [organizationDescription, setOrganizationDescription] = useState('');
+  const [organizationWebsite, setOrganizationWebsite] = useState('');
+  const [organizationLogo, setOrganizationLogo] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -57,18 +75,66 @@ export const RegisterPage: React.FC = () => {
     }
   }, [isAuthenticated, user, navigate, redirectTarget]);
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setLogoUploadError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setLogoUploadError(null);
+    try {
+      const url = await uploadToCloudinary(file, { folder: 'sheeba_organization_logos' });
+      setOrganizationLogo(url);
+    } catch (err: any) {
+      setLogoUploadError(err.message || 'Failed to upload organization logo.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validation = validateForm(registerSchema, {
+    setErrorMsg(null);
+
+    const validationPayload = {
       fullName,
       full_name: fullName,
       email,
       password,
+      confirmPassword,
+      confirm_password: confirmPassword,
       role: selectedRole,
-      organization: selectedRole === 'ORGANIZER' ? organization.trim() : undefined,
       phone: phone.trim() || undefined,
-      bio: selectedRole === 'ORGANIZER' ? bio.trim() : undefined,
-    });
+      applicantType,
+      applicant_type: applicantType,
+      personalIntroduction: applicantType === 'Individual Organizer' ? personalIntroduction.trim() : undefined,
+      personal_introduction: applicantType === 'Individual Organizer' ? personalIntroduction.trim() : undefined,
+      organization: applicantType === 'Organization / Institution' ? organization.trim() : undefined,
+      organization_name: applicantType === 'Organization / Institution' ? organization.trim() : undefined,
+      organizationType: applicantType === 'Organization / Institution' ? organizationType : undefined,
+      organization_type: applicantType === 'Organization / Institution' ? organizationType : undefined,
+      applicantPosition: applicantType === 'Organization / Institution' ? applicantPosition.trim() : undefined,
+      applicant_position: applicantType === 'Organization / Institution' ? applicantPosition.trim() : undefined,
+      organizationDescription: applicantType === 'Organization / Institution' ? organizationDescription.trim() : undefined,
+      organization_description: applicantType === 'Organization / Institution' ? organizationDescription.trim() : undefined,
+      organizationWebsite: applicantType === 'Organization / Institution' ? (organizationWebsite.trim() || undefined) : undefined,
+      organization_website: applicantType === 'Organization / Institution' ? (organizationWebsite.trim() || undefined) : undefined,
+      organizationLogo: applicantType === 'Organization / Institution' ? (organizationLogo || undefined) : undefined,
+      organization_logo: applicantType === 'Organization / Institution' ? (organizationLogo || undefined) : undefined,
+      bio: applicantType === 'Individual Organizer' ? personalIntroduction.trim() : (organizationDescription.trim() || undefined),
+    };
+
+    const validation = validateForm(registerSchema, validationPayload);
 
     if (!validation.success) {
       const firstError = Object.values(validation.errors || {})[0] || 'Please complete all required fields.';
@@ -82,24 +148,39 @@ export const RegisterPage: React.FC = () => {
       const res = await register({
         email: email.trim(),
         password,
+        confirm_password: confirmPassword,
         full_name: fullName.trim(),
         role: selectedRole,
-        organization: selectedRole === 'ORGANIZER' ? organization.trim() : undefined,
         phone: phone.trim() || undefined,
-        bio: selectedRole === 'ORGANIZER' ? bio.trim() : undefined,
+        applicant_type: applicantType,
+        applicantType,
+        personal_introduction: applicantType === 'Individual Organizer' ? personalIntroduction.trim() : undefined,
+        personalIntroduction: applicantType === 'Individual Organizer' ? personalIntroduction.trim() : undefined,
+        organization: applicantType === 'Organization / Institution' ? organization.trim() : (fullName.trim() || undefined),
+        organization_type: applicantType === 'Organization / Institution' ? organizationType : undefined,
+        organizationType: applicantType === 'Organization / Institution' ? organizationType : undefined,
+        applicant_position: applicantType === 'Organization / Institution' ? applicantPosition.trim() : undefined,
+        applicantPosition: applicantType === 'Organization / Institution' ? applicantPosition.trim() : undefined,
+        organization_description: applicantType === 'Organization / Institution' ? organizationDescription.trim() : undefined,
+        organizationDescription: applicantType === 'Organization / Institution' ? organizationDescription.trim() : undefined,
+        organization_website: applicantType === 'Organization / Institution' ? (organizationWebsite.trim() || undefined) : undefined,
+        organizationWebsite: applicantType === 'Organization / Institution' ? (organizationWebsite.trim() || undefined) : undefined,
+        organization_logo: applicantType === 'Organization / Institution' ? (organizationLogo || undefined) : undefined,
+        organizationLogo: applicantType === 'Organization / Institution' ? (organizationLogo || undefined) : undefined,
+        bio: applicantType === 'Individual Organizer' ? personalIntroduction.trim() : (organizationDescription.trim() || undefined),
       });
 
       if (res.isPendingApproval || selectedRole === 'ORGANIZER') {
-        // Redirect to pending approval page with 1-hour wait notice
+        // Redirect to pending approval page with 1-hour review notice
         navigate('/pending-approval', {
           state: {
             email: email.trim(),
             name: fullName.trim(),
-            organization: organization.trim(),
+            organization: applicantType === 'Organization / Institution' ? organization.trim() : fullName.trim(),
           },
         });
       } else {
-        // Attendee registration: ALWAYS navigate to OTP verification page
+        // Attendee registration: Navigate to OTP verification page
         sessionStorage.setItem('sheeba_pending_otp_email', email.trim());
         if (redirectTarget) {
           sessionStorage.setItem('sheeba_pending_otp_redirect', redirectTarget);
@@ -119,7 +200,7 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-[430px] mx-auto px-4 py-2 sm:py-3 space-y-2.5">
+    <div className="w-full max-w-[480px] mx-auto px-4 py-2 sm:py-3 space-y-2.5">
       {/* Header */}
       <div className="text-center space-y-1">
         <h1 className="font-serif text-2xl sm:text-[26px] font-extrabold text-[#2D1F23] tracking-tight leading-tight">
@@ -130,7 +211,7 @@ export const RegisterPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Navigation Links at top (Blue line position) */}
+      {/* Navigation Links at top */}
       <div className="flex items-center justify-center gap-8 text-xs sm:text-sm font-semibold pt-0.5">
         <Link
           to={`/login${redirectTarget ? `?redirect=${encodeURIComponent(redirectTarget)}` : ''}`}
@@ -145,11 +226,14 @@ export const RegisterPage: React.FC = () => {
 
       {/* Registration Form Card */}
       <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E8DDD7] shadow-sm space-y-3 sm:space-y-3.5">
-        {/* Account Type Switcher in top position (Yellow circle position) */}
+        {/* Account Type Switcher */}
         <div className="grid grid-cols-2 bg-[#FAF7F5] p-1 rounded-xl border border-[#E8DDD7] gap-1.5">
           <button
             type="button"
-            onClick={() => setSelectedRole('ATTENDEE')}
+            onClick={() => {
+              setSelectedRole('ATTENDEE');
+              setErrorMsg(null);
+            }}
             className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               selectedRole === 'ATTENDEE'
                 ? 'bg-[#63474D] text-white shadow-xs'
@@ -161,7 +245,10 @@ export const RegisterPage: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setSelectedRole('ORGANIZER')}
+            onClick={() => {
+              setSelectedRole('ORGANIZER');
+              setErrorMsg(null);
+            }}
             className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               selectedRole === 'ORGANIZER'
                 ? 'bg-[#63474D] text-white shadow-xs'
@@ -173,12 +260,12 @@ export const RegisterPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Organizer approval notification note */}
+        {/* Organizer Notice */}
         {selectedRole === 'ORGANIZER' && (
           <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
             <AlertCircle className="w-3.5 h-3.5 text-amber-700 flex-shrink-0 mt-0.5" />
             <p className="text-[11px] text-amber-800 leading-snug">
-              Admin verification required for organizers before hosting events.
+              Admin verification is required for organizers before hosting events. Pending applicants retain full attendee capabilities.
             </p>
           </div>
         )}
@@ -190,10 +277,11 @@ export const RegisterPage: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleRegister} className="space-y-2.5">
+        <form onSubmit={handleRegister} className="space-y-3">
+          {/* Common Field: Full Name */}
           <div>
             <label htmlFor="reg-fullname" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
-              Full Name
+              Full Name <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <User className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
@@ -211,31 +299,10 @@ export const RegisterPage: React.FC = () => {
             </div>
           </div>
 
-          {selectedRole === 'ORGANIZER' && (
-            <div>
-              <label htmlFor="reg-organization" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
-                Community or Organization Name <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Building className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
-                <input
-                  id="reg-organization"
-                  name="organization"
-                  type="text"
-                  required
-                  tabIndex={2}
-                  placeholder="e.g. GDG Addis, ALX Tech Community"
-                  value={organization}
-                  onChange={(e) => setOrganization(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
-                />
-              </div>
-            </div>
-          )}
-
+          {/* Common Field: Email */}
           <div>
             <label htmlFor="reg-email" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
-              Email Address
+              Email Address <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <img
@@ -248,7 +315,7 @@ export const RegisterPage: React.FC = () => {
                 name="email"
                 type="email"
                 required
-                tabIndex={3}
+                tabIndex={2}
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -257,9 +324,242 @@ export const RegisterPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Common Field: Phone */}
+          <div>
+            <label htmlFor="reg-phone" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+              Phone Number {selectedRole === 'ORGANIZER' ? <span className="text-red-500">*</span> : <span className="text-[#756366] font-normal">(Optional)</span>}
+            </label>
+            <div className="relative">
+              <img
+                src="/phone-icon.webp"
+                alt="Phone"
+                className="w-3.5 h-3.5 object-contain absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none select-none"
+              />
+              <input
+                id="reg-phone"
+                name="phone"
+                type="tel"
+                required={selectedRole === 'ORGANIZER'}
+                tabIndex={3}
+                placeholder="+251 9..."
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Organizer Formalization Section */}
+          {selectedRole === 'ORGANIZER' && (
+            <div className="pt-2 border-t border-[#E8DDD7] space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#2D1F23] mb-1.5">
+                  Applicant Type <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setApplicantType('Individual Organizer')}
+                    className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${
+                      applicantType === 'Individual Organizer'
+                        ? 'bg-[#63474D]/10 border-[#63474D] text-[#63474D] font-bold shadow-xs'
+                        : 'bg-[#FAF7F5] border-[#E8DDD7] text-[#756366] hover:text-[#2D1F23]'
+                    }`}
+                  >
+                    Individual Organizer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApplicantType('Organization / Institution')}
+                    className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${
+                      applicantType === 'Organization / Institution'
+                        ? 'bg-[#63474D]/10 border-[#63474D] text-[#63474D] font-bold shadow-xs'
+                        : 'bg-[#FAF7F5] border-[#E8DDD7] text-[#756366] hover:text-[#2D1F23]'
+                    }`}
+                  >
+                    Organization / Institution
+                  </button>
+                </div>
+              </div>
+
+              {/* Individual Organizer Form */}
+              {applicantType === 'Individual Organizer' ? (
+                <div>
+                  <label htmlFor="reg-personal-intro" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+                    Short Personal Introduction <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <FileText className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#756366] pointer-events-none select-none" />
+                    <textarea
+                      id="reg-personal-intro"
+                      name="personalIntroduction"
+                      rows={3}
+                      required
+                      placeholder="Briefly describe your event organizing background and interest..."
+                      value={personalIntroduction}
+                      onChange={(e) => setPersonalIntroduction(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all resize-none"
+                    />
+                  </div>
+                  <p className="text-[11px] text-[#756366] mt-0.5">Minimum 10 characters.</p>
+                </div>
+              ) : (
+                /* Organization / Institution Form */
+                <div className="space-y-2.5">
+                  <div>
+                    <label htmlFor="reg-org-name" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+                      Organization Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Building className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
+                      <input
+                        id="reg-org-name"
+                        name="organization"
+                        type="text"
+                        required
+                        placeholder="e.g. Addis Tech Community"
+                        value={organization}
+                        onChange={(e) => setOrganization(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="reg-org-type" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+                      Organization Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="reg-org-type"
+                      name="organizationType"
+                      value={organizationType}
+                      onChange={(e) => setOrganizationType(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all cursor-pointer"
+                    >
+                      {ORGANIZATION_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="reg-applicant-pos" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+                      Your Position / Role in Organization <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Briefcase className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
+                      <input
+                        id="reg-applicant-pos"
+                        name="applicantPosition"
+                        type="text"
+                        required
+                        placeholder="e.g. Lead Organizer, Community Manager, Director"
+                        value={applicantPosition}
+                        onChange={(e) => setApplicantPosition(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="reg-org-desc" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+                      Short Organization Description <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <FileText className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#756366] pointer-events-none select-none" />
+                      <textarea
+                        id="reg-org-desc"
+                        name="organizationDescription"
+                        rows={2}
+                        required
+                        placeholder="Describe your organization's mission and event focus..."
+                        value={organizationDescription}
+                        onChange={(e) => setOrganizationDescription(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all resize-none"
+                      />
+                    </div>
+                    <p className="text-[11px] text-[#756366] mt-0.5">Minimum 10 characters.</p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="reg-org-website" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+                      Website or Social Link <span className="text-[#756366] font-normal">(Optional)</span>
+                    </label>
+                    <div className="relative">
+                      <Globe className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
+                      <input
+                        id="reg-org-website"
+                        name="organizationWebsite"
+                        type="url"
+                        placeholder="https://example.org or LinkedIn/X profile"
+                        value={organizationWebsite}
+                        onChange={(e) => setOrganizationWebsite(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Organization Logo Upload */}
+                  <div>
+                    <label className="block text-xs font-semibold text-[#2D1F23] mb-1">
+                      Organization Logo <span className="text-[#756366] font-normal">(Optional - PNG, JPG, WebP up to 5MB)</span>
+                    </label>
+                    {organizationLogo ? (
+                      <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                        <img
+                          src={organizationLogo}
+                          alt="Organization Logo"
+                          className="w-10 h-10 rounded-full object-cover border border-[#E8DDD7]"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-[#2D1F23] flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                            <span>Logo uploaded</span>
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setOrganizationLogo('')}
+                          className="p-1 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
+                          title="Remove logo"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-center gap-2 p-3 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
+                        {isUploadingLogo ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
+                        ) : (
+                          <Upload className="w-4 h-4 text-[#756366]" />
+                        )}
+                        <span className="text-xs font-medium text-[#756366]">
+                          {isUploadingLogo ? 'Uploading logo...' : 'Click to upload logo'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          className="hidden"
+                          disabled={isUploadingLogo}
+                          onChange={handleLogoUpload}
+                        />
+                      </label>
+                    )}
+                    {logoUploadError && (
+                      <p className="text-[11px] text-red-600 mt-1">{logoUploadError}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Common Field: Password */}
           <div>
             <label htmlFor="reg-password" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
-              Password
+              Password <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
@@ -292,57 +592,49 @@ export const RegisterPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Common Field: Confirm Password */}
           <div>
-            <label htmlFor="reg-phone" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
-              Phone Number (Optional)
+            <label htmlFor="reg-confirm-password" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
+              Confirm Password <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <img
-                src="/phone-icon.webp"
-                alt="Phone"
-                className="w-3.5 h-3.5 object-contain absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none select-none"
-              />
+              <Lock className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
               <input
-                id="reg-phone"
-                name="phone"
-                type="tel"
+                id="reg-confirm-password"
+                name="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
+                required
                 tabIndex={5}
-                placeholder="+2519..."
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
+                minLength={6}
+                placeholder="Re-enter your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full pl-9 pr-10 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
               />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#756366] hover:text-[#2D1F23] transition-colors p-1 focus:outline-none cursor-pointer"
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                title={showConfirmPassword ? 'Hide password' : 'Show password'}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
 
-          {selectedRole === 'ORGANIZER' && (
-            <div>
-              <label htmlFor="reg-bio" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
-                Organizer Bio (Optional)
-              </label>
-              <div className="relative">
-                <FileText className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#756366] pointer-events-none select-none" />
-                <textarea
-                  id="reg-bio"
-                  name="bio"
-                  rows={2}
-                  tabIndex={6}
-                  placeholder="Tell attendees about your tech community..."
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Red box: Submit Button */}
+          {/* Submit Button */}
           <Button
             type="submit"
             fullWidth
             variant="primary"
             isLoading={isLoading}
-            className="mt-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl shadow-xs hover:shadow-sm transition-all cursor-pointer"
+            className="mt-2 py-2.5 text-xs sm:text-sm font-bold rounded-xl shadow-xs hover:shadow-sm transition-all cursor-pointer"
           >
             {selectedRole === 'ORGANIZER'
               ? 'Submit Organizer Registration'
@@ -350,7 +642,7 @@ export const RegisterPage: React.FC = () => {
           </Button>
         </form>
 
-        {/* Green line position: Continue with Google */}
+        {/* Continue with Google */}
         <div className="space-y-2.5 pt-1">
           <div className="relative text-center">
             <div className="absolute inset-0 flex items-center">
@@ -369,12 +661,16 @@ export const RegisterPage: React.FC = () => {
                     setIsLoading(true);
                     setErrorMsg(null);
                     const loggedUser = await loginWithGoogle(credentialResponse.credential, selectedRole, 'register');
-                    if (redirectTarget) {
+                    if (selectedRole === 'ORGANIZER') {
+                      // Google sign-up creates an active attendee base account.
+                      // Direct user to Settings to complete the organizer formalization application.
+                      navigate('/app/settings', {
+                        state: {
+                          infoMessage: 'Welcome to Sheeba! Your account is active. To become an Event Organizer, please complete the Organizer Application below.',
+                        },
+                      });
+                    } else if (redirectTarget) {
                       navigate(redirectTarget);
-                    } else if (loggedUser.role === 'ORGANIZER') {
-                      navigate('/organizer');
-                    } else if (loggedUser.role === 'ADMIN') {
-                      navigate('/admin');
                     } else {
                       navigate('/app');
                     }

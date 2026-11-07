@@ -18,7 +18,14 @@ interface AuthContextType {
   login: (email: string, password: string, role?: string) => Promise<User>;
   loginWithGoogle: (credential: string, role?: UserRole, mode?: 'login' | 'register') => Promise<User>;
   applyForOrganizer: (data: {
-    organization: string;
+    applicantType?: string;
+    organization?: string;
+    organizationType?: string;
+    applicantPosition?: string;
+    organizationDescription?: string;
+    organizationWebsite?: string;
+    organizationLogo?: string;
+    personalIntroduction?: string;
     bio?: string;
     phone?: string;
     password?: string;
@@ -41,6 +48,25 @@ interface AuthContextType {
     organization?: string;
     phone?: string;
     bio?: string;
+    confirm_password?: string;
+    confirmPassword?: string;
+    applicant_type?: string;
+    applicantType?: string;
+    personal_introduction?: string;
+    personalIntroduction?: string;
+    organization_type?: string;
+    organizationType?: string;
+    applicant_position?: string;
+    applicantPosition?: string;
+    position?: string;
+    organization_description?: string;
+    organizationDescription?: string;
+    organization_website?: string;
+    organizationWebsite?: string;
+    website?: string;
+    organization_logo?: string;
+    organizationLogo?: string;
+    socials?: Record<string, string>;
   }) => Promise<RegisterResult>;
   verifyRegistrationOtp: (email: string, otp: string) => Promise<User>;
   loginSponsor: (email: string, password: string) => Promise<User>;
@@ -117,7 +143,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const applyForOrganizer = async (data: {
-    organization: string;
+    applicantType?: string;
+    organization?: string;
+    organizationType?: string;
+    applicantPosition?: string;
+    organizationDescription?: string;
+    organizationWebsite?: string;
+    organizationLogo?: string;
+    personalIntroduction?: string;
     bio?: string;
     phone?: string;
     password?: string;
@@ -189,6 +222,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     organization?: string;
     phone?: string;
     bio?: string;
+    confirm_password?: string;
+    confirmPassword?: string;
+    applicant_type?: string;
+    applicantType?: string;
+    personal_introduction?: string;
+    personalIntroduction?: string;
+    organization_type?: string;
+    organizationType?: string;
+    applicant_position?: string;
+    applicantPosition?: string;
+    position?: string;
+    organization_description?: string;
+    organizationDescription?: string;
+    organization_website?: string;
+    organizationWebsite?: string;
+    website?: string;
+    organization_logo?: string;
+    organizationLogo?: string;
+    socials?: Record<string, string>;
   }): Promise<RegisterResult> => {
     setIsLoading(true);
     try {
