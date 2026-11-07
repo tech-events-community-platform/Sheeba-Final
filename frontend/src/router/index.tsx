@@ -31,6 +31,8 @@ import { SponsorExplorePage } from '../pages/sponsor/SponsorExplorePage';
 import { SponsorDealsPage } from '../pages/sponsor/SponsorDealsPage';
 import { SponsorDeliverablesPage } from '../pages/sponsor/SponsorDeliverablesPage';
 import { SponsorApplicationDetailPage } from '../pages/sponsor/SponsorApplicationDetailPage';
+import { SponsorEventsPage } from '../pages/sponsor/SponsorEventsPage';
+import { SponsorReportsPage } from '../pages/sponsor/SponsorReportsPage';
 
 // Exhibitor Pages & Layout
 import { ExhibitorLayout } from '../layouts/ExhibitorLayout';
@@ -154,6 +156,7 @@ export const router = createBrowserRouter([
           { path: 'reports/:id', element: <ReportPage /> },
           { path: 'exhibitors', element: <OrganizerExhibitorsPage /> },
           { path: 'exhibitors/:id', element: <OrganizerExhibitorsPage /> },
+          { path: 'sponsors', element: <ApplyToSponsorsPage /> },
           { path: 'apply-sponsors', element: <ApplyToSponsorsPage /> },
           { path: 'recycle-bin', element: <OrganizerRecycleBinPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
@@ -196,6 +199,8 @@ export const router = createBrowserRouter([
           { path: 'explore/:id', element: <SponsorApplicationDetailPage /> },
           { path: 'applications/:id', element: <SponsorApplicationDetailPage /> },
           { path: 'deals', element: <SponsorDealsPage /> },
+          { path: 'events', element: <SponsorEventsPage /> },
+          { path: 'reports', element: <SponsorReportsPage /> },
           { path: 'deliverables', element: <SponsorDeliverablesPage /> },
           { path: 'recycle-bin', element: <SponsorRecycleBinPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },

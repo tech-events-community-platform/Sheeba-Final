@@ -23,6 +23,11 @@ import {
   Handshake,
   Trophy,
   Globe,
+  Building2,
+  Filter,
+  Search,
+  Clock,
+  XCircle,
 } from 'lucide-react';
 import {
   LinkedInIcon,
@@ -43,7 +48,9 @@ import type {
   IEventPastSponsor,
   IEventPartner,
   IApplicationAffiliations,
+  ISponsorRelationshipItem,
 } from '../../types/sponsorship';
+import { SponsorProfileDrawer } from '../../components/organizer/SponsorProfileDrawer';
 import { applyToSponsorsFormSchema, validateForm } from '../../schemas';
 
 interface SocialPlatformDef {
@@ -199,12 +206,23 @@ const EVENT_TYPES = [
 
 export const ApplyToSponsorsPage: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'create' | 'my-pitches'>('create');
+  const [activeTab, setActiveTab] = useState<'my-sponsors' | 'my-pitches' | 'create'>('my-sponsors');
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [myApplications, setMyApplications] = useState<ISponsorshipApplication[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // My Sponsors Pipeline state (Phase 1)
+  const [sponsorsList, setSponsorsList] = useState<ISponsorRelationshipItem[]>([]);
+  const [sponsorsLoading, setSponsorsLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'INTERESTED' | 'DEAL_ACCEPTED' | 'REJECTED' | 'WITHDRAWN'>('ALL');
+  const [appFilter, setAppFilter] = useState<string>('ALL');
+  const [sponsorSearch, setSponsorSearch] = useState<string>('');
+  const [selectedSponsorId, setSelectedSponsorId] = useState<string | null>(null);
+  const [selectedDealItem, setSelectedDealItem] = useState<ISponsorRelationshipItem | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [actionLoadingDealId, setActionLoadingDealId] = useState<string | null>(null);
 
   // Form state for pitch
   const [selectedEventType, setSelectedEventType] = useState('Conference');
@@ -392,9 +410,101 @@ export const ApplyToSponsorsPage: React.FC = () => {
     }
   };
 
+  const loadMySponsors = async () => {
+    try {
+      setSponsorsLoading(true);
+      const sponsors = await api.sponsorship.getOrganizerMySponsors();
+      setSponsorsList(sponsors);
+    } catch (err: any) {
+      console.error('Failed to load organizer sponsors', err);
+    } finally {
+      setSponsorsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadMyApplications();
+    loadMySponsors();
   }, []);
+
+  const handleAcceptDeal = async (dealId: string) => {
+    setActionLoadingDealId(dealId);
+    try {
+      await api.sponsorship.acceptDeal(dealId);
+      setSponsorsList((prev) =>
+        prev.map((item) =>
+          item.deal_id === dealId ? { ...item, deal_status: 'DEAL_ACCEPTED' } : item
+        )
+      );
+      if (selectedDealItem?.deal_id === dealId) {
+        setSelectedDealItem((prev) => (prev ? { ...prev, deal_status: 'DEAL_ACCEPTED' } : null));
+      }
+      setSuccessMessage('Sponsorship deal accepted! Status updated to Deal accepted.');
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to accept deal. Please try again.');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setActionLoadingDealId(null);
+    }
+  };
+
+  const handleRejectDeal = async (dealId: string) => {
+    if (!window.confirm('Are you sure you want to decline this sponsor interest?')) return;
+    setActionLoadingDealId(dealId);
+    try {
+      await api.sponsorship.rejectDeal(dealId);
+      setSponsorsList((prev) =>
+        prev.map((item) =>
+          item.deal_id === dealId ? { ...item, deal_status: 'REJECTED' } : item
+        )
+      );
+      if (selectedDealItem?.deal_id === dealId) {
+        setSelectedDealItem((prev) => (prev ? { ...prev, deal_status: 'REJECTED' } : null));
+      }
+      setSuccessMessage('Sponsor interest declined.');
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to decline sponsor.');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setActionLoadingDealId(null);
+    }
+  };
+
+  const handleOpenSponsorProfile = (item: ISponsorRelationshipItem) => {
+    setSelectedSponsorId(item.sponsor_id);
+    setSelectedDealItem(item);
+    setIsDrawerOpen(true);
+  };
+
+  const handleToggleSharing = async (dealId: string, allowSharing: boolean) => {
+    setActionLoadingDealId(dealId);
+    try {
+      await api.sponsorship.toggleAttendeeSharing(dealId, allowSharing);
+      setSponsorsList((prev) =>
+        prev.map((item) =>
+          item.deal_id === dealId ? { ...item, allow_attendee_sharing: allowSharing } : item
+        )
+      );
+      if (selectedDealItem?.deal_id === dealId) {
+        setSelectedDealItem((prev) =>
+          prev ? { ...prev, allow_attendee_sharing: allowSharing } : null
+        );
+      }
+      setSuccessMessage(
+        allowSharing
+          ? 'Attendee-information sharing enabled for this sponsor.'
+          : 'Attendee-information sharing revoked for this sponsor.'
+      );
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to update attendee-information sharing.');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setActionLoadingDealId(null);
+    }
+  };
 
   const handleAddPackage = () => {
     setPackages((prev) => [
@@ -532,6 +642,28 @@ export const ApplyToSponsorsPage: React.FC = () => {
     }
   };
 
+  // Phase 1: Filtered Sponsors & Summary Metrics
+  const filteredSponsors = sponsorsList.filter((item) => {
+    const matchesStatus = statusFilter === 'ALL' || item.deal_status === statusFilter;
+    const matchesApp = appFilter === 'ALL' || item.application_id === appFilter;
+    const q = sponsorSearch.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      item.sponsor.name.toLowerCase().includes(q) ||
+      item.sponsor.representative_name.toLowerCase().includes(q) ||
+      item.sponsor.email.toLowerCase().includes(q) ||
+      item.application.event_title.toLowerCase().includes(q);
+    return matchesStatus && matchesApp && matchesSearch;
+  });
+
+  const totalInterested = sponsorsList.filter((s) => s.deal_status === 'INTERESTED').length;
+  const totalDealt = sponsorsList.filter((s) => s.deal_status === 'DEAL_ACCEPTED').length;
+  const totalRejected = sponsorsList.filter((s) => s.deal_status === 'REJECTED').length;
+  const totalWithdrawn = sponsorsList.filter((s) => s.deal_status === 'WITHDRAWN').length;
+  const totalPledged = sponsorsList
+    .filter((s) => s.deal_status === 'DEAL_ACCEPTED' || s.deal_status === 'INTERESTED')
+    .reduce((sum, s) => sum + (s.pledged_amount || 0), 0);
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
       {/* Header Banner */}
@@ -539,23 +671,23 @@ export const ApplyToSponsorsPage: React.FC = () => {
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-6 w-64 h-64 bg-white/5 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-white tracking-tight">
-            Apply to Sponsors & Get Funded
+            Sponsors & Event Funding Hub
           </h1>
           <p className="text-white/80 text-sm sm:text-base mt-2 max-w-2xl leading-relaxed">
-            Pitch your upcoming, uncreated events directly to verified corporate sponsors. Once you secure the funding you need, head over to Create Event to publish your live ticketing link.
+            Review verified corporate sponsor interest across your upcoming events, formalize deals, and pitch your uncreated ideas to secure backing.
           </p>
 
           <div className="flex flex-wrap items-center gap-3 mt-6">
             <button
-              onClick={() => setActiveTab('create')}
+              onClick={() => setActiveTab('my-sponsors')}
               className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'create'
+                activeTab === 'my-sponsors'
                   ? 'bg-white text-[#63474D] shadow-md'
                   : 'bg-white/10 hover:bg-white/20 text-white'
               }`}
             >
-              <PlusCircle className="w-4 h-4" />
-              Submit New Event Pitch
+              <Building2 className="w-4 h-4" />
+              <span>My Sponsors ({sponsorsList.length})</span>
             </button>
 
             <button
@@ -567,7 +699,19 @@ export const ApplyToSponsorsPage: React.FC = () => {
               }`}
             >
               <HandCoins className="w-4 h-4" />
-              My Published Pitches ({myApplications.length})
+              <span>My Published Pitches ({myApplications.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('create')}
+              className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === 'create'
+                  ? 'bg-white text-[#63474D] shadow-md'
+                  : 'bg-white/10 hover:bg-white/20 text-white'
+              }`}
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Submit New Pitch</span>
             </button>
 
             <Link
@@ -593,6 +737,352 @@ export const ApplyToSponsorsPage: React.FC = () => {
         <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-start gap-3 shadow-xs">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
           <div className="text-sm font-medium">{errorMessage}</div>
+        </div>
+      )}
+
+      {/* TAB 0: My Sponsors Pipeline (Phase 1 Dedicated Area) */}
+      {activeTab === 'my-sponsors' && (
+        <div className="space-y-6">
+          {/* Summary Metrics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <Clock className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-bold text-gray-400">Interested Sponsors</p>
+                <p className="text-2xl font-serif font-bold text-gray-900">{totalInterested}</p>
+                <p className="text-[11px] text-gray-500">Awaiting your review</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <Handshake className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-bold text-gray-400">Deals Accepted</p>
+                <p className="text-2xl font-serif font-bold text-emerald-700">{totalDealt}</p>
+                <p className="text-[11px] text-gray-500">Partnership formalized</p>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center shrink-0">
+                <DollarSign className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider font-bold text-gray-400">Total Pledged Capital</p>
+                <p className="text-2xl font-serif font-bold text-gray-900">
+                  {totalPledged.toLocaleString()} <span className="text-sm font-sans text-gray-500">ETB</span>
+                </p>
+                <p className="text-[11px] text-gray-500">From interested & dealt sponsors</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Controls */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+              {/* Search */}
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search sponsors or pitches..."
+                  value={sponsorSearch}
+                  onChange={(e) => setSponsorSearch(e.target.value)}
+                  className="w-full pl-9 pr-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
+              </div>
+
+              {/* Event Pitch Filter Dropdown */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Filter className="w-4 h-4 text-gray-400 shrink-0" />
+                <select
+                  value={appFilter}
+                  onChange={(e) => setAppFilter(e.target.value)}
+                  className="w-full sm:w-64 py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                >
+                  <option value="ALL">All Event Pitches ({myApplications.length})</option>
+                  {myApplications.map((app) => (
+                    <option key={app.id} value={app.id}>
+                      {app.event_title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Status Tabs */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100 text-xs">
+              {[
+                { id: 'ALL', label: 'All Sponsors', count: sponsorsList.length },
+                { id: 'INTERESTED', label: 'Interested', count: totalInterested, color: 'text-amber-700 bg-amber-50' },
+                { id: 'DEAL_ACCEPTED', label: 'Deal Accepted', count: totalDealt, color: 'text-emerald-700 bg-emerald-50' },
+                { id: 'REJECTED', label: 'Rejected', count: totalRejected },
+                { id: 'WITHDRAWN', label: 'Withdrawn', count: totalWithdrawn },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    statusFilter === tab.id
+                      ? 'bg-[#63474D] text-white shadow-xs'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                      statusFilter === tab.id ? 'bg-white/25 text-white' : 'bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Sponsors List */}
+          {sponsorsLoading ? (
+            <div className="py-20 text-center bg-white rounded-3xl border border-gray-100">
+              <div className="w-8 h-8 border-3 border-[#63474D] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-xs text-gray-500 font-medium">Loading your sponsors pipeline...</p>
+            </div>
+          ) : sponsorsList.length === 0 ? (
+            <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-gray-300 space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center mx-auto">
+                <Building2 className="w-8 h-8" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="text-lg font-bold text-gray-900 font-serif">No Sponsor Interest Yet</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  When verified sponsors browse the Sheeba Sponsorship Marketplace and mark interest in your published event pitches, they will appear here with deal and attendee-access controls.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('create')}
+                  className="px-4 py-2 bg-[#63474D] text-white rounded-xl text-xs font-bold hover:bg-[#4E373C] transition-all flex items-center gap-1.5"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Submit New Pitch
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('my-pitches')}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all flex items-center gap-1.5"
+                >
+                  <HandCoins className="w-4 h-4" />
+                  View Published Pitches
+                </button>
+              </div>
+            </div>
+          ) : filteredSponsors.length === 0 ? (
+            <div className="p-10 text-center bg-white rounded-3xl border border-gray-200 space-y-2">
+              <p className="text-sm font-semibold text-gray-700">No sponsors found matching current filters.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilter('ALL');
+                  setAppFilter('ALL');
+                  setSponsorSearch('');
+                }}
+                className="text-xs text-[#63474D] underline font-bold"
+              >
+                Clear all filters
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredSponsors.map((item) => {
+                const isInterested = item.deal_status === 'INTERESTED';
+                const isDealt = item.deal_status === 'DEAL_ACCEPTED';
+                const isRejected = item.deal_status === 'REJECTED';
+                const isWithdrawn = item.deal_status === 'WITHDRAWN';
+
+                return (
+                  <div
+                    key={item.deal_id}
+                    className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-5"
+                  >
+                    {/* Left: Sponsor Avatar & Identity (Clickable) */}
+                    <div className="flex items-start gap-3.5 min-w-0">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#63474D] to-[#8C656C] text-white flex items-center justify-center font-serif text-lg font-bold shrink-0 overflow-hidden shadow-xs">
+                        {item.sponsor.avatar_url ? (
+                          <img
+                            src={item.sponsor.avatar_url}
+                            alt={item.sponsor.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          (item.sponsor.name || 'S')[0].toUpperCase()
+                        )}
+                      </div>
+
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSponsorProfile(item)}
+                            className="text-left font-serif font-bold text-base text-[#2D1F23] hover:text-[#63474D] hover:underline flex items-center gap-1.5 cursor-pointer group"
+                            title="Click to view full sponsor profile"
+                          >
+                            <span>{item.sponsor.name}</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#63474D] opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </button>
+
+                          {item.sponsor.industry_category && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700">
+                              {item.sponsor.industry_category}
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                          Contact: <strong className="text-gray-700">{item.sponsor.representative_name}</strong> •{' '}
+                          <a
+                            href={`mailto:${item.sponsor.email}`}
+                            className="text-[#63474D] hover:underline"
+                          >
+                            {item.sponsor.email}
+                          </a>
+                        </p>
+
+                        <p className="text-[11px] text-gray-400">
+                          Interest submitted on {new Date(item.interest_expressed_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Middle: Associated Event Pitch & Package */}
+                    <div className="p-3.5 bg-[#FAF7F5] rounded-xl border border-[#AA767C]/15 min-w-[220px] max-w-sm space-y-1">
+                      <p className="text-[10px] uppercase tracking-wider font-bold text-[#756366]">
+                        Interested In Pitch
+                      </p>
+                      <p className="text-xs font-bold text-[#2D1F23] truncate" title={item.application.event_title}>
+                        {item.application.event_title}
+                      </p>
+                      <div className="flex items-center gap-2 text-[11px] text-gray-600 pt-0.5">
+                        {item.package_name && <span>Tier: <strong className="text-gray-900">{item.package_name}</strong></span>}
+                        {item.pledged_amount ? (
+                          <span>
+                            • Pledged:{' '}
+                            <strong className="text-emerald-700">
+                              {item.pledged_amount.toLocaleString()} {item.application.currency || 'ETB'}
+                            </strong>
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Right: Status Pill & Actions */}
+                    <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                      {isInterested && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={actionLoadingDealId === item.deal_id}
+                            onClick={() => handleRejectDeal(item.deal_id)}
+                            className="px-3.5 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            title="Decline this sponsor's interest"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Reject</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={actionLoadingDealId === item.deal_id}
+                            onClick={() => handleAcceptDeal(item.deal_id)}
+                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            title="Formalize sponsorship deal with this sponsor"
+                          >
+                            <Handshake className="w-4 h-4" />
+                            <span>Deal</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {isDealt && (
+                        <div className="flex flex-col items-end gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-xs">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              Deal Accepted
+                            </span>
+
+                            {item.allow_attendee_sharing ? (
+                              <button
+                                type="button"
+                                disabled={actionLoadingDealId === item.deal_id}
+                                onClick={() => handleToggleSharing(item.deal_id, false)}
+                                className="px-2.5 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-[11px] font-semibold transition-all cursor-pointer disabled:opacity-50"
+                                title="Revoke sponsor's access to checked-in attendee list"
+                              >
+                                Revoke Sharing
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={actionLoadingDealId === item.deal_id}
+                                onClick={() => handleToggleSharing(item.deal_id, true)}
+                                className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-black text-white text-xs font-bold shadow-xs hover:shadow transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                title="Authorize sponsor to view checked-in attendee names"
+                              >
+                                <span>Allow Sharing Attendee Info</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-[10px]">
+                            {item.allow_attendee_sharing ? (
+                              <span className="text-emerald-700 font-medium flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Attendee sharing active
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">
+                                Attendee sharing not enabled
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {isRejected && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200">
+                          <XCircle className="w-3.5 h-3.5 text-red-500" />
+                          Interest Declined
+                        </span>
+                      )}
+
+                      {isWithdrawn && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                          Withdrawn by Sponsor
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Sponsor Profile Drawer */}
+          <SponsorProfileDrawer
+            isOpen={isDrawerOpen}
+            onClose={() => setIsDrawerOpen(false)}
+            sponsorId={selectedSponsorId}
+            dealItem={selectedDealItem}
+            onAcceptDeal={handleAcceptDeal}
+            onRejectDeal={handleRejectDeal}
+            onToggleSharing={handleToggleSharing}
+          />
         </div>
       )}
 

@@ -3,9 +3,12 @@ import { z } from 'zod';
 /**
  * Deal status enum for sponsorship deals pipeline
  */
-export const dealStatusEnum = z.enum(['INTERESTED', 'DECLINED'], {
-  message: "Status must be either 'INTERESTED' or 'DECLINED'.",
-});
+export const dealStatusEnum = z.enum(
+  ['INTERESTED', 'DECLINED', 'DEAL_ACCEPTED', 'REJECTED', 'WITHDRAWN'],
+  {
+    message: "Status must be 'INTERESTED', 'DECLINED', 'DEAL_ACCEPTED', 'REJECTED', or 'WITHDRAWN'.",
+  }
+);
 
 export type DealStatusInput = z.infer<typeof dealStatusEnum>;
 

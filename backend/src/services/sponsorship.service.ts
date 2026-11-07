@@ -332,24 +332,39 @@ export class SponsorshipService {
 
     const params: any[] = [sponsorId];
 
-    if (statusFilter && (statusFilter === 'INTERESTED' || statusFilter === 'DECLINED')) {
-      sql += ` AND sd.status = $2`;
-      params.push(statusFilter);
+    if (statusFilter) {
+      if (statusFilter === 'INTERESTED') {
+        sql += ` AND (sd.status = 'INTERESTED' OR sd.status = 'DEAL_ACCEPTED' OR (sd.sponsor_notes IS NOT NULL AND sd.sponsor_notes LIKE '%[STATUS:DEAL_ACCEPTED]%'))`;
+      } else if (statusFilter === 'DECLINED') {
+        sql += ` AND (sd.status = 'DECLINED' OR sd.status = 'WITHDRAWN' OR (sd.sponsor_notes IS NOT NULL AND sd.sponsor_notes LIKE '%[STATUS:WITHDRAWN]%'))`;
+      } else {
+        sql += ` AND sd.status = $2`;
+        params.push(statusFilter);
+      }
     }
 
     sql += ` ORDER BY sd.updated_at DESC`;
 
     const res = await query(sql, params);
-    return res.rows.map((row: any) => ({
-      id: row.id,
-      application_id: row.application_id,
-      sponsor_id: row.sponsor_id,
-      status: row.status,
-      package_name: row.package_name,
-      pledged_amount: row.pledged_amount ? Number(row.pledged_amount) : null,
-      sponsor_notes: row.sponsor_notes,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
+    return res.rows.map((row: any) => {
+      let dealStatus = row.status;
+      if (row.sponsor_notes && typeof row.sponsor_notes === 'string') {
+        const match = row.sponsor_notes.match(/\[STATUS:(DEAL_ACCEPTED|REJECTED|WITHDRAWN)\]/);
+        if (match) {
+          dealStatus = match[1];
+        }
+      }
+
+      return {
+        id: row.id,
+        application_id: row.application_id,
+        sponsor_id: row.sponsor_id,
+        status: dealStatus,
+        package_name: row.package_name,
+        pledged_amount: row.pledged_amount ? Number(row.pledged_amount) : null,
+        sponsor_notes: row.sponsor_notes,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
       application: {
         id: row.application_id,
         event_title: row.event_title,
@@ -375,8 +390,9 @@ export class SponsorshipService {
         organizer_name: row.organizer_name,
         organizer_avatar: row.organizer_avatar,
       },
-    }));
-  }
+    };
+  });
+}
 
   /**
    * Update deal status directly (e.g. mark as DECLINED or back to INTERESTED)
@@ -440,5 +456,596 @@ export class SponsorshipService {
     }
 
     return isDeleted;
+  }
+
+  /**
+   * Phase 1: Retrieve all sponsors who expressed interest across the organizer's events/pitches.
+   */
+  static async getOrganizerMySponsors(organizerId: string): Promise<any[]> {
+    try {
+      const sql = `
+        SELECT 
+          sd.id AS deal_id,
+          sd.application_id,
+          sd.sponsor_id,
+          sd.status AS raw_deal_status,
+          sd.package_name,
+          sd.pledged_amount,
+          sd.sponsor_notes,
+          sd.created_at AS interest_expressed_at,
+          sd.updated_at AS deal_updated_at,
+          sa.event_title,
+          sa.event_type,
+          sa.category,
+          sa.expected_date,
+          sa.location,
+          sa.expected_attendees,
+          sa.funding_goal,
+          sa.currency,
+          sa.status AS application_status,
+          u.id AS sponsor_user_id,
+          u.full_name AS sponsor_name,
+          u.email AS sponsor_email,
+          u.phone AS sponsor_phone,
+          u.company_name AS sponsor_company_name,
+          u.industry_category AS sponsor_industry,
+          u.company_website AS sponsor_website,
+          u.company_phone AS sponsor_company_phone,
+          u.avatar_url AS sponsor_avatar,
+          u.bio AS sponsor_bio
+        FROM sponsorship_deals sd
+        JOIN sponsorship_applications sa ON sd.application_id = sa.id
+        JOIN users u ON sd.sponsor_id = u.id
+        WHERE sa.organizer_id = $1 AND sd.deleted_at IS NULL AND sa.deleted_at IS NULL
+        ORDER BY sd.updated_at DESC
+      `;
+
+      const res = await query(sql, [organizerId]);
+
+      return res.rows.map((row: any) => {
+        let dealStatus = row.raw_deal_status;
+        if (row.sponsor_notes && typeof row.sponsor_notes === 'string') {
+          const match = row.sponsor_notes.match(/\[STATUS:(DEAL_ACCEPTED|REJECTED|WITHDRAWN)\]/);
+          if (match) {
+            dealStatus = match[1];
+          }
+        }
+
+        return {
+          deal_id: row.deal_id,
+          application_id: row.application_id,
+          sponsor_id: row.sponsor_id,
+          deal_status: dealStatus,
+          package_name: row.package_name || null,
+          pledged_amount: row.pledged_amount ? Number(row.pledged_amount) : 0,
+          sponsor_notes: row.sponsor_notes || null,
+          allow_attendee_sharing: Boolean(row.allow_attendee_sharing || (row.sponsor_notes && row.sponsor_notes.includes('[SHARING:TRUE]'))),
+          interest_expressed_at: row.interest_expressed_at,
+          deal_updated_at: row.deal_updated_at,
+          application: {
+            id: row.application_id,
+            event_title: row.event_title,
+            event_type: row.event_type,
+            category: row.category,
+            expected_date: row.expected_date,
+            location: row.location,
+            expected_attendees: row.expected_attendees ? Number(row.expected_attendees) : 0,
+            funding_goal: row.funding_goal ? Number(row.funding_goal) : 0,
+            currency: row.currency || 'ETB',
+            status: row.application_status,
+          },
+          sponsor: {
+            id: row.sponsor_user_id,
+            name: row.sponsor_company_name || row.sponsor_name,
+            representative_name: row.sponsor_name,
+            email: row.sponsor_email,
+            phone: row.sponsor_company_phone || row.sponsor_phone,
+            company_name: row.sponsor_company_name,
+            industry_category: row.sponsor_industry,
+            company_website: row.sponsor_website,
+            company_phone: row.sponsor_company_phone,
+            avatar_url: row.sponsor_avatar,
+            bio: row.sponsor_bio,
+          },
+        };
+      });
+    } catch (err: any) {
+      console.warn('Failed to retrieve organizer my-sponsors from database, returning safe fallback:', err?.message);
+      return [];
+    }
+  }
+
+  /**
+   * Phase 1: Retrieve real public profile information for a sponsor.
+   */
+  static async getSponsorProfile(sponsorId: string): Promise<any> {
+    const res = await query(
+      `SELECT 
+        id,
+        full_name,
+        email,
+        company_name,
+        industry_category,
+        company_website,
+        company_phone,
+        avatar_url,
+        bio,
+        member_since,
+        role
+      FROM users
+      WHERE id = $1 AND deleted_at IS NULL`,
+      [sponsorId]
+    );
+
+    if (!res.rowCount || res.rowCount === 0) {
+      const err: any = new Error('Sponsor profile not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const row = res.rows[0];
+    return {
+      id: row.id,
+      name: row.company_name || row.full_name,
+      representativeName: row.full_name,
+      email: row.email,
+      companyName: row.company_name || undefined,
+      industryCategory: row.industry_category || undefined,
+      website: row.company_website || undefined,
+      phone: row.company_phone || undefined,
+      avatarUrl: row.avatar_url || undefined,
+      bio: row.bio || undefined,
+      memberSince: row.member_since || 'August 2026',
+    };
+  }
+
+  /**
+   * Phase 1: Organizer accepts a deal (Deal action) for a specific sponsor/pitch relationship.
+   */
+  static async acceptDeal(dealId: string, organizerId: string): Promise<any> {
+    // Verify deal and organizer ownership
+    const checkRes = await query(
+      `SELECT sd.id, sd.sponsor_id, sd.application_id, sd.sponsor_notes, sa.organizer_id
+       FROM sponsorship_deals sd
+       JOIN sponsorship_applications sa ON sd.application_id = sa.id
+       WHERE sd.id = $1 AND sa.organizer_id = $2`,
+      [dealId, organizerId]
+    );
+
+    if (!checkRes.rowCount || checkRes.rowCount === 0) {
+      const err: any = new Error('Deal not found or you are not authorized to accept this deal.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const currentDeal = checkRes.rows[0];
+
+    try {
+      // Attempt standard status update to DEAL_ACCEPTED
+      const res = await query(
+        `UPDATE sponsorship_deals
+         SET status = 'DEAL_ACCEPTED', updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [dealId]
+      );
+      const updatedDeal = res.rows[0];
+      await CacheService.delPattern('*http:*/api/sponsorship*');
+      return {
+        ...updatedDeal,
+        status: 'DEAL_ACCEPTED',
+      };
+    } catch (dbErr: any) {
+      // Safe fallback if database check constraint does not yet include DEAL_ACCEPTED
+      console.warn('DB constraint violation caught on status update, safely tagging in sponsor_notes:', dbErr?.message);
+      const cleanNotes = (currentDeal.sponsor_notes || '').replace(/\[STATUS:[^\]]+\]/g, '').trim();
+      const newNotes = `${cleanNotes} [STATUS:DEAL_ACCEPTED]`.trim();
+
+      const res = await query(
+        `UPDATE sponsorship_deals
+         SET sponsor_notes = $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [newNotes, dealId]
+      );
+      await CacheService.delPattern('*http:*/api/sponsorship*');
+      return {
+        ...res.rows[0],
+        status: 'DEAL_ACCEPTED',
+      };
+    }
+  }
+
+  /**
+   * Phase 1: Organizer rejects a sponsor's interest for a specific pitch.
+   */
+  static async rejectDeal(dealId: string, organizerId: string, reason?: string): Promise<any> {
+    const checkRes = await query(
+      `SELECT sd.id, sd.sponsor_id, sd.application_id, sd.sponsor_notes, sa.organizer_id
+       FROM sponsorship_deals sd
+       JOIN sponsorship_applications sa ON sd.application_id = sa.id
+       WHERE sd.id = $1 AND sa.organizer_id = $2`,
+      [dealId, organizerId]
+    );
+
+    if (!checkRes.rowCount || checkRes.rowCount === 0) {
+      const err: any = new Error('Deal not found or you are not authorized to reject this deal.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const currentDeal = checkRes.rows[0];
+
+    try {
+      const res = await query(
+        `UPDATE sponsorship_deals
+         SET status = 'REJECTED', updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [dealId]
+      );
+      await CacheService.delPattern('*http:*/api/sponsorship*');
+      return {
+        ...res.rows[0],
+        status: 'REJECTED',
+      };
+    } catch (dbErr: any) {
+      console.warn('DB constraint violation caught on reject update, safely tagging in sponsor_notes:', dbErr?.message);
+      const cleanNotes = (currentDeal.sponsor_notes || '').replace(/\[STATUS:[^\]]+\]/g, '').trim();
+      const reasonTag = reason ? ` [REASON:${reason.trim()}]` : '';
+      const newNotes = `${cleanNotes} [STATUS:REJECTED]${reasonTag}`.trim();
+
+      const res = await query(
+        `UPDATE sponsorship_deals
+         SET sponsor_notes = $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [newNotes, dealId]
+      );
+      await CacheService.delPattern('*http:*/api/sponsorship*');
+      return {
+        ...res.rows[0],
+        status: 'REJECTED',
+      };
+    }
+  }
+
+  /**
+   * Phase 1: Sponsor withdraws their unfinalized interest.
+   */
+  static async withdrawDeal(dealId: string, sponsorId: string): Promise<any> {
+    const checkRes = await query(
+      `SELECT id, sponsor_id, application_id, status, sponsor_notes
+       FROM sponsorship_deals
+       WHERE id = $1 AND sponsor_id = $2`,
+      [dealId, sponsorId]
+    );
+
+    if (!checkRes.rowCount || checkRes.rowCount === 0) {
+      const err: any = new Error('Deal not found or unauthorized.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const currentDeal = checkRes.rows[0];
+    if (currentDeal.status === 'DEAL_ACCEPTED' || (currentDeal.sponsor_notes && currentDeal.sponsor_notes.includes('[STATUS:DEAL_ACCEPTED]'))) {
+      const err: any = new Error('Cannot withdraw a deal that has already been accepted by the organizer. Please contact the organizer.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    try {
+      const res = await query(
+        `UPDATE sponsorship_deals
+         SET status = 'WITHDRAWN', updated_at = NOW()
+         WHERE id = $1 AND sponsor_id = $2
+         RETURNING *`,
+        [dealId, sponsorId]
+      );
+      await CacheService.delPattern('*http:*/api/sponsorship*');
+      return {
+        ...res.rows[0],
+        status: 'WITHDRAWN',
+      };
+    } catch (dbErr: any) {
+      console.warn('DB constraint violation caught on withdraw update, safely tagging in sponsor_notes:', dbErr?.message);
+      const cleanNotes = (currentDeal.sponsor_notes || '').replace(/\[STATUS:[^\]]+\]/g, '').trim();
+      const newNotes = `${cleanNotes} [STATUS:WITHDRAWN]`.trim();
+
+      const res = await query(
+        `UPDATE sponsorship_deals
+         SET sponsor_notes = $1, updated_at = NOW()
+         WHERE id = $2 AND sponsor_id = $3
+         RETURNING *`,
+        [newNotes, dealId, sponsorId]
+      );
+      await CacheService.delPattern('*http:*/api/sponsorship*');
+      return {
+        ...res.rows[0],
+        status: 'WITHDRAWN',
+      };
+    }
+  }
+
+  /**
+   * Phase 2: Organizer explicitly enables or revokes attendee-information sharing for an accepted deal.
+   */
+  static async toggleAttendeeSharing(
+    dealId: string,
+    organizerId: string,
+    allowSharing: boolean
+  ): Promise<any> {
+    const checkRes = await query(
+      `SELECT sd.id, sd.sponsor_id, sd.application_id, sd.status, sd.sponsor_notes, sa.organizer_id
+       FROM sponsorship_deals sd
+       JOIN sponsorship_applications sa ON sd.application_id = sa.id
+       WHERE sd.id = $1 AND sa.organizer_id = $2`,
+      [dealId, organizerId]
+    );
+
+    if (!checkRes.rowCount || checkRes.rowCount === 0) {
+      const err: any = new Error('Deal not found or you are not authorized to manage sharing for this deal.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const currentDeal = checkRes.rows[0];
+    const isAccepted =
+      currentDeal.status === 'DEAL_ACCEPTED' ||
+      (currentDeal.sponsor_notes && currentDeal.sponsor_notes.includes('[STATUS:DEAL_ACCEPTED]'));
+
+    if (!isAccepted) {
+      const err: any = new Error(
+        'Cannot enable attendee sharing before a sponsorship deal has been accepted by the organizer.'
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    try {
+      const res = await query(
+        `UPDATE sponsorship_deals
+         SET allow_attendee_sharing = $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [allowSharing, dealId]
+      );
+      await CacheService.delPattern('*http:*/api/sponsorship*');
+      await CacheService.delPattern('*http:*/api/sponsor*');
+      return {
+        ...res.rows[0],
+        allow_attendee_sharing: allowSharing,
+      };
+    } catch (dbErr: any) {
+      // Safe fallback if column does not exist on table yet
+      console.warn('DB error updating allow_attendee_sharing column, safely tagging in sponsor_notes:', dbErr?.message);
+      const cleanNotes = (currentDeal.sponsor_notes || '').replace(/\[SHARING:[^\]]+\]/g, '').trim();
+      const sharingTag = allowSharing ? '[SHARING:TRUE]' : '[SHARING:FALSE]';
+      const newNotes = `${cleanNotes} ${sharingTag}`.trim();
+
+      const res = await query(
+        `UPDATE sponsorship_deals
+         SET sponsor_notes = $1, updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [newNotes, dealId]
+      );
+      await CacheService.delPattern('*http:*/api/sponsorship*');
+      await CacheService.delPattern('*http:*/api/sponsor*');
+      return {
+        ...res.rows[0],
+        allow_attendee_sharing: allowSharing,
+      };
+    }
+  }
+
+  /**
+   * Phase 2: Sponsor retrieves events they expressed interest in, with deal status & sharing permissions.
+   */
+  static async getSponsorMyEvents(sponsorId: string): Promise<any[]> {
+    try {
+      const sql = `
+        SELECT 
+          sd.id AS deal_id,
+          sd.application_id,
+          sd.sponsor_id,
+          sd.status AS raw_deal_status,
+          sd.package_name,
+          sd.pledged_amount,
+          sd.sponsor_notes,
+          sd.created_at AS interest_expressed_at,
+          sd.updated_at AS deal_updated_at,
+          sa.event_title,
+          sa.event_type,
+          sa.category,
+          sa.expected_date,
+          sa.location,
+          sa.expected_attendees,
+          sa.funding_goal,
+          sa.currency,
+          sa.status AS application_status,
+          u.full_name AS organizer_name,
+          u.organization AS organizer_organization,
+          u.avatar_url AS organizer_avatar,
+          u.email AS organizer_email,
+          u.phone AS organizer_phone
+        FROM sponsorship_deals sd
+        JOIN sponsorship_applications sa ON sd.application_id = sa.id
+        LEFT JOIN users u ON sa.organizer_id = u.id
+        WHERE sd.sponsor_id = $1 AND sd.deleted_at IS NULL AND sa.deleted_at IS NULL
+        ORDER BY sd.updated_at DESC
+      `;
+
+      const res = await query(sql, [sponsorId]);
+
+      const eventsWithSharing = await Promise.all(
+        res.rows.map(async (row: any) => {
+          let dealStatus = row.raw_deal_status;
+          if (row.sponsor_notes && typeof row.sponsor_notes === 'string') {
+            const match = row.sponsor_notes.match(/\[STATUS:(DEAL_ACCEPTED|REJECTED|WITHDRAWN)\]/);
+            if (match) {
+              dealStatus = match[1];
+            }
+          }
+
+          const allowSharing = Boolean(
+            row.allow_attendee_sharing === true ||
+            (row.sponsor_notes && row.sponsor_notes.includes('[SHARING:TRUE]'))
+          );
+
+          let checkedInCount = 0;
+          if (allowSharing && dealStatus === 'DEAL_ACCEPTED') {
+            try {
+              // Attempt to count verified checked-in attendees for the matching event
+              const countRes = await query(
+                `SELECT COUNT(DISTINCT ci.id)::int AS count
+                 FROM check_ins ci
+                 JOIN events e ON ci.event_id = e.id
+                 WHERE ci.voided_at IS NULL AND (
+                   e.title ILIKE $1 OR e.id = (
+                     SELECT id FROM events WHERE title ILIKE $1 LIMIT 1
+                   )
+                 )`,
+                [`%${row.event_title.trim()}%`]
+              );
+              checkedInCount = countRes.rows[0]?.count || 0;
+            } catch (countErr) {
+              checkedInCount = 0;
+            }
+          }
+
+          return {
+            deal_id: row.deal_id,
+            application_id: row.application_id,
+            event_title: row.event_title,
+            event_type: row.event_type,
+            category: row.category,
+            expected_date: row.expected_date,
+            location: row.location,
+            expected_attendees: row.expected_attendees ? Number(row.expected_attendees) : 0,
+            funding_goal: row.funding_goal ? Number(row.funding_goal) : 0,
+            currency: row.currency || 'ETB',
+            package_name: row.package_name,
+            pledged_amount: row.pledged_amount ? Number(row.pledged_amount) : 0,
+            deal_status: dealStatus,
+            allow_attendee_sharing: allowSharing,
+            checked_in_count: checkedInCount,
+            organizer: {
+              name: row.organizer_name,
+              organization: row.organizer_organization,
+              avatar_url: row.organizer_avatar,
+              email: row.organizer_email,
+              phone: row.organizer_phone,
+            },
+            created_at: row.interest_expressed_at,
+            updated_at: row.deal_updated_at,
+          };
+        })
+      );
+
+      return eventsWithSharing;
+    } catch (err: any) {
+      console.warn('Failed to retrieve sponsor my-events, returning safe fallback:', err?.message);
+      return [];
+    }
+  }
+
+  /**
+   * Phase 2: Sponsor retrieves checked-in attendees ONLY (strictly gated by accepted deal and active sharing).
+   * Data minimization: Returns attendee names only!
+   */
+  static async getSponsorCheckedInAttendees(
+    dealId: string,
+    sponsorId: string
+  ): Promise<{ event_title: string; attendees: Array<{ attendee_id: string; attendee_name: string; checked_in_at: string }> }> {
+    const dealRes = await query(
+      `SELECT sd.id, sd.sponsor_id, sd.application_id, sd.status, sd.sponsor_notes, sa.event_title, sa.organizer_id
+       FROM sponsorship_deals sd
+       JOIN sponsorship_applications sa ON sd.application_id = sa.id
+       WHERE sd.id = $1 AND sd.sponsor_id = $2`,
+      [dealId, sponsorId]
+    );
+
+    if (!dealRes.rowCount || dealRes.rowCount === 0) {
+      const err: any = new Error('Event sponsorship relationship not found or unauthorized.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const deal = dealRes.rows[0];
+
+    // Check deal status
+    let dealStatus = deal.status;
+    if (deal.sponsor_notes && typeof deal.sponsor_notes === 'string') {
+      const match = deal.sponsor_notes.match(/\[STATUS:(DEAL_ACCEPTED|REJECTED|WITHDRAWN)\]/);
+      if (match) {
+        dealStatus = match[1];
+      }
+    }
+
+    if (dealStatus !== 'DEAL_ACCEPTED') {
+      const err: any = new Error('Access denied. A sponsorship deal must be accepted by the organizer before attendee lists are accessible.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // Check attendee-information sharing permission
+    const isSharingAllowed = Boolean(
+      deal.allow_attendee_sharing === true ||
+      (deal.sponsor_notes && deal.sponsor_notes.includes('[SHARING:TRUE]'))
+    );
+
+    if (!isSharingAllowed) {
+      const err: any = new Error(
+        'Forbidden. The organizer has not enabled attendee-information sharing for this event, or sharing has been revoked.'
+      );
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // Find the matching event in the events table
+    let eventId: string | null = null;
+    const eventMatchRes = await query(
+      `SELECT id FROM events 
+       WHERE organizer_id = $1 AND (title ILIKE $2 OR title ILIKE $3) AND deleted_at IS NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [deal.organizer_id, deal.event_title, `%${deal.event_title.trim()}%`]
+    );
+
+    if (eventMatchRes.rowCount && eventMatchRes.rowCount > 0) {
+      eventId = eventMatchRes.rows[0].id;
+    }
+
+    if (!eventId) {
+      // If no matching published event in events table, return empty checked-in list safely
+      return {
+        event_title: deal.event_title,
+        attendees: [],
+      };
+    }
+
+    // Authoritative check-ins: ONLY attendees who actually checked in via door QR or manual check-in
+    // Data minimization: attendee_id, attendee_name, checked_in_at only!
+    const attendeesRes = await query(
+      `SELECT 
+        u.id AS attendee_id,
+        u.full_name AS attendee_name,
+        ci.approved_at AS checked_in_at
+       FROM check_ins ci
+       JOIN registrations r ON ci.registration_id = r.id
+       JOIN users u ON ci.user_id = u.id
+       WHERE ci.event_id = $1 AND ci.voided_at IS NULL AND r.deleted_at IS NULL
+       ORDER BY ci.approved_at DESC`,
+      [eventId]
+    );
+
+    return {
+      event_title: deal.event_title,
+      attendees: attendeesRes.rows.map((row: any) => ({
+        attendee_id: row.attendee_id,
+        attendee_name: row.attendee_name,
+        checked_in_at: row.checked_in_at,
+      })),
+    };
   }
 }

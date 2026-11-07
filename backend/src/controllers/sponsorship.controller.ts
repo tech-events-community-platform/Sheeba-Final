@@ -164,4 +164,160 @@ export class SponsorshipController {
       next(error);
     }
   }
+
+  /**
+   * Phase 1: Organizer views incoming sponsors and deals across their pitches/events
+   */
+  static async getOrganizerMySponsors(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizerId = req.user?.userId;
+      if (!organizerId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const sponsors = await SponsorshipService.getOrganizerMySponsors(organizerId);
+      sendSuccess(res, sponsors, 'Organizer sponsors and deals retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 1: Retrieve real public profile of a sponsor
+   */
+  static async getSponsorProfile(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.params.sponsorId as string;
+      if (!sponsorId) {
+        sendError(res, 'Sponsor ID is required.', 400);
+        return;
+      }
+
+      const profile = await SponsorshipService.getSponsorProfile(sponsorId);
+      sendSuccess(res, profile, 'Sponsor profile retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 1: Organizer accepts a deal (green Deal action)
+   */
+  static async acceptDeal(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizerId = req.user?.userId;
+      const dealId = req.params.id as string;
+      if (!organizerId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const deal = await SponsorshipService.acceptDeal(dealId, organizerId);
+      sendSuccess(res, deal, 'Sponsorship deal accepted successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 1: Organizer rejects a sponsor deal
+   */
+  static async rejectDeal(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizerId = req.user?.userId;
+      const dealId = req.params.id as string;
+      const reason = req.body?.reason;
+      if (!organizerId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const deal = await SponsorshipService.rejectDeal(dealId, organizerId, reason);
+      sendSuccess(res, deal, 'Sponsorship interest rejected.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 1: Sponsor withdraws unfinalized interest
+   */
+  static async withdrawDeal(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      const dealId = req.params.id as string;
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const deal = await SponsorshipService.withdrawDeal(dealId, sponsorId);
+      sendSuccess(res, deal, 'Sponsorship interest withdrawn successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 2: Organizer explicitly toggles attendee-information sharing for an accepted deal
+   */
+  static async toggleAttendeeSharing(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizerId = req.user?.userId;
+      const dealId = req.params.id as string;
+      const allowSharing = Boolean(req.body?.allow_sharing);
+
+      if (!organizerId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const result = await SponsorshipService.toggleAttendeeSharing(dealId, organizerId, allowSharing);
+      const msg = allowSharing
+        ? 'Attendee-information sharing successfully enabled for this sponsor.'
+        : 'Attendee-information sharing revoked for this sponsor.';
+      sendSuccess(res, result, msg);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 2: Sponsor retrieves events they expressed interest in, with deal status & sharing permissions
+   */
+  static async getSponsorMyEvents(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const events = await SponsorshipService.getSponsorMyEvents(sponsorId);
+      sendSuccess(res, events, 'Sponsor events retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 2: Sponsor retrieves checked-in attendees ONLY (data minimization: names only)
+   */
+  static async getSponsorCheckedInAttendees(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      const dealId = req.params.id as string;
+
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const result = await SponsorshipService.getSponsorCheckedInAttendees(dealId, sponsorId);
+      sendSuccess(res, result, 'Checked-in attendees retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
 }

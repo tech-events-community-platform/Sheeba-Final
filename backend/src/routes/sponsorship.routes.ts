@@ -33,6 +33,21 @@ router.get(
   SponsorshipController.getMyApplications
 );
 
+// Phase 1: Organizer My Sponsors Management
+router.get(
+  '/organizer/my-sponsors',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  SponsorshipController.getOrganizerMySponsors
+);
+
+// Phase 1: Sponsor Profile Lookup
+router.get(
+  '/sponsor-profile/:sponsorId',
+  authenticate,
+  SponsorshipController.getSponsorProfile
+);
+
 router.delete(
   ['/applications/:id', '/applications'],
   authenticate,
@@ -76,6 +91,58 @@ router.patch(
   validateParams(idParamSchema),
   validateBody(updateDealSchema),
   SponsorshipController.updateDeal
+);
+
+// Phase 1: Organizer Deal Actions (Accept and Reject)
+router.patch(
+  '/deals/:id/accept',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.acceptDeal
+);
+
+router.patch(
+  '/deals/:id/reject',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.rejectDeal
+);
+
+// Phase 1: Sponsor Withdraw Action
+router.patch(
+  '/deals/:id/withdraw',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.withdrawDeal
+);
+
+// Phase 2: Organizer Controls Attendee-Information Sharing (Enable or Revoke)
+router.patch(
+  '/deals/:id/sharing',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.toggleAttendeeSharing
+);
+
+// Phase 2: Sponsor My Events Pipeline
+router.get(
+  '/sponsor/my-events',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  SponsorshipController.getSponsorMyEvents
+);
+
+// Phase 2: Sponsor Checked-In Attendees (Strictly Gated by Accepted Deal + Active Sharing)
+router.get(
+  '/sponsor/events/:id/attendees',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.getSponsorCheckedInAttendees
 );
 
 // AI-Powered Sponsor-Event Matching & Recommendations

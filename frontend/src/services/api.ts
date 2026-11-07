@@ -19,6 +19,13 @@ import type {
   IRejectBoothReceiptPayload,
 } from '../types/exhibitor';
 import type { RecycleBinItem, RecycleBinStats, RecycleBinAuditLog, RecycleBinEntityType } from '../types/recycleBin';
+import type {
+  ISponsorRelationshipItem,
+  ISponsorPublicProfile,
+  SponsorshipDealStatus,
+  ISponsorEventItem,
+  ISponsorCheckedInAttendeeItem,
+} from '../types/sponsorship';
 import { getEndOfEventDay } from '../utils/date';
 
 /**
@@ -711,12 +718,82 @@ export const api = {
       return res.data || [];
     },
 
-    updateDeal: async (dealId: string, data: { status: 'INTERESTED' | 'DECLINED'; sponsor_notes?: string }) => {
+    updateDeal: async (dealId: string, data: { status: SponsorshipDealStatus; sponsor_notes?: string }) => {
       const res = await requestApi(`/sponsorships/deals/${dealId}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       });
       return res.data;
+    },
+
+    // Phase 1: Organizer My Sponsors Management
+    getOrganizerMySponsors: async (): Promise<ISponsorRelationshipItem[]> => {
+      try {
+        const res = await requestApi('/sponsorships/organizer/my-sponsors');
+        return res.data || [];
+      } catch (err) {
+        console.warn('Backend getOrganizerMySponsors fallback:', err);
+        return [];
+      }
+    },
+
+    // Phase 1: Real Sponsor Profile Lookup
+    getSponsorProfile: async (sponsorId: string): Promise<ISponsorPublicProfile> => {
+      const res = await requestApi(`/sponsorships/sponsor-profile/${sponsorId}`);
+      return res.data;
+    },
+
+    // Phase 1: Organizer Accept Deal (green Deal action)
+    acceptDeal: async (dealId: string): Promise<any> => {
+      const res = await requestApi(`/sponsorships/deals/${dealId}/accept`, {
+        method: 'PATCH',
+      });
+      return res.data;
+    },
+
+    // Phase 1: Organizer Reject Deal
+    rejectDeal: async (dealId: string, reason?: string): Promise<any> => {
+      const res = await requestApi(`/sponsorships/deals/${dealId}/reject`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    // Phase 1: Sponsor Withdraw Interest
+    withdrawDeal: async (dealId: string): Promise<any> => {
+      const res = await requestApi(`/sponsorships/deals/${dealId}/withdraw`, {
+        method: 'PATCH',
+      });
+      return res.data;
+    },
+
+    // Phase 2: Organizer Toggle Attendee Sharing (Enable or Revoke)
+    toggleAttendeeSharing: async (dealId: string, allowSharing: boolean): Promise<any> => {
+      const res = await requestApi(`/sponsorships/deals/${dealId}/sharing`, {
+        method: 'PATCH',
+        body: JSON.stringify({ allow_sharing: allowSharing }),
+      });
+      return res.data;
+    },
+
+    // Phase 2: Sponsor My Events Pipeline
+    getSponsorMyEvents: async (): Promise<ISponsorEventItem[]> => {
+      try {
+        const res = await requestApi('/sponsorships/sponsor/my-events');
+        return res.data || [];
+      } catch (err) {
+        console.warn('Backend getSponsorMyEvents fallback:', err);
+        return [];
+      }
+    },
+
+    // Phase 2: Sponsor Checked-in Attendees (Strictly Gated by Accepted Deal + Active Sharing)
+    getSponsorCheckedInAttendees: async (
+      dealId: string
+    ): Promise<{ event_title: string; attendees: ISponsorCheckedInAttendeeItem[] }> => {
+      const res = await requestApi(`/sponsorships/sponsor/events/${dealId}/attendees`);
+      return res.data || { event_title: '', attendees: [] };
     },
 
     // AI-Powered Sponsor-Event Matching & Recommendations

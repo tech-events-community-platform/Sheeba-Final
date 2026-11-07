@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   HandCoins,
   CheckCircle2,
@@ -14,6 +15,7 @@ import {
   ExternalLink,
   Edit3,
   Save,
+  ArrowRight,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { ISponsorshipDeal } from '../../types/sponsorship';
@@ -183,12 +185,22 @@ export const SponsorDealsPage: React.FC = () => {
                       </span>
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          deal.status === 'INTERESTED'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-stone-200 text-stone-700'
+                          deal.status === 'DEAL_ACCEPTED'
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : deal.status === 'INTERESTED'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : deal.status === 'REJECTED'
+                                ? 'bg-red-50 text-red-700 border border-red-200'
+                                : 'bg-stone-200 text-stone-700'
                         }`}
                       >
-                        {deal.status}
+                        {deal.status === 'DEAL_ACCEPTED'
+                          ? 'Deal Accepted ✓'
+                          : deal.status === 'REJECTED'
+                            ? 'Declined by Organizer'
+                            : deal.status === 'WITHDRAWN'
+                              ? 'Withdrawn'
+                              : deal.status}
                       </span>
                     </div>
 
@@ -200,15 +212,31 @@ export const SponsorDealsPage: React.FC = () => {
 
                   {/* Status Toggle Actions */}
                   <div className="flex items-center gap-2 self-start sm:self-auto">
-                    {deal.status === 'INTERESTED' ? (
+                    {deal.status === 'DEAL_ACCEPTED' ? (
+                      <div className="flex items-center gap-2">
+                        <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Deal Confirmed</span>
+                        </div>
+                        <Link
+                          to="/sponsor/events"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 transition-colors shadow-xs"
+                          title="Open My Events to view granted activations and attendees"
+                        >
+                          <span>Go to My Events</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    ) : deal.status === 'INTERESTED' ? (
                       <button
                         type="button"
                         disabled={updatingId === deal.id}
                         onClick={() => handleUpdateStatus(deal.id, 'DECLINED')}
                         className="px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        title="Withdraw your interest in sponsoring this pitch"
                       >
                         <XCircle className="w-3.5 h-3.5 text-gray-400" />
-                        <span>Move to Declined</span>
+                        <span>Withdraw Interest</span>
                       </button>
                     ) : (
                       <button
