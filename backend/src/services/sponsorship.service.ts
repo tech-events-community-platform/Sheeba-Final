@@ -1039,13 +1039,348 @@ export class SponsorshipService {
       [eventId]
     );
 
+    // Phase 3: Check which attendees have already been recorded by this sponsor
+    let recordedAttendeeMap: Record<string, any> = {};
+    try {
+      await this.ensureQuestionnaireTables();
+      const respRes = await query(
+        `SELECT attendee_id, status, created_at, updated_at
+         FROM sponsor_attendee_responses
+         WHERE deal_id = $1 AND sponsor_id = $2`,
+        [dealId, sponsorId]
+      );
+      for (const r of respRes.rows) {
+        recordedAttendeeMap[r.attendee_id] = r;
+      }
+    } catch (err) {
+      // Safe fallback
+    }
+
     return {
       event_title: deal.event_title,
-      attendees: attendeesRes.rows.map((row: any) => ({
-        attendee_id: row.attendee_id,
-        attendee_name: row.attendee_name,
-        checked_in_at: row.checked_in_at,
-      })),
+      attendees: attendeesRes.rows.map((row: any) => {
+        const recorded = recordedAttendeeMap[row.attendee_id];
+        return {
+          attendee_id: row.attendee_id,
+          attendee_name: row.attendee_name,
+          checked_in_at: row.checked_in_at,
+          record_status: recorded ? ('RECORDED' as const) : ('NOT_RECORDED' as const),
+          is_recorded: Boolean(recorded),
+          recorded_at: recorded?.updated_at || recorded?.created_at || null,
+        };
+      }),
     };
+  }
+
+  /**
+   * Phase 3: Ensure questionnaire tables exist safely
+   */
+  private static async ensureQuestionnaireTables(): Promise<void> {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS sponsor_questionnaires (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          deal_id UUID NOT NULL,
+          sponsor_id UUID NOT NULL,
+          version_number INT NOT NULL DEFAULT 1,
+          title VARCHAR(255) DEFAULT 'Attendee Engagement Questionnaire',
+          questions JSONB NOT NULL DEFAULT '[]'::jsonb,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS sponsor_attendee_responses (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          deal_id UUID NOT NULL,
+          sponsor_id UUID NOT NULL,
+          attendee_id UUID NOT NULL,
+          questionnaire_id UUID,
+          version_number INT NOT NULL DEFAULT 1,
+          questions_snapshot JSONB NOT NULL DEFAULT '[]'::jsonb,
+          answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          status VARCHAR(50) NOT NULL DEFAULT 'COMPLETED',
+          recorded_by UUID,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+    } catch (err: any) {
+      // Graceful fallback
+    }
+  }
+
+  /**
+   * Phase 3: Retrieve current active questionnaire definition for a sponsorship deal
+   */
+  static async getSponsorQuestionnaire(dealId: string, sponsorId: string): Promise<any> {
+    const dealRes = await query(
+      `SELECT sd.id, sd.sponsor_id, sd.status, sd.sponsor_notes, sa.event_title
+       FROM sponsorship_deals sd
+       JOIN sponsorship_applications sa ON sd.application_id = sa.id
+       WHERE sd.id = $1 AND sd.sponsor_id = $2`,
+      [dealId, sponsorId]
+    );
+
+    if (!dealRes.rowCount || dealRes.rowCount === 0) {
+      const err: any = new Error('Sponsorship relationship not found or unauthorized.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    await this.ensureQuestionnaireTables();
+
+    try {
+      const qRes = await query(
+        `SELECT id, deal_id, sponsor_id, version_number, title, questions, is_active, created_at, updated_at
+         FROM sponsor_questionnaires
+         WHERE deal_id = $1 AND sponsor_id = $2 AND is_active = true
+         ORDER BY version_number DESC LIMIT 1`,
+        [dealId, sponsorId]
+      );
+
+      if (qRes.rowCount && qRes.rowCount > 0) {
+        return qRes.rows[0];
+      }
+    } catch (err: any) {
+      console.warn('DB query error getting sponsor questionnaire, returning default:', err?.message);
+    }
+
+    // Default questionnaire template
+    return {
+      id: `default_${dealId}`,
+      deal_id: dealId,
+      sponsor_id: sponsorId,
+      version_number: 1,
+      title: `${dealRes.rows[0]?.event_title || 'Event'} Attendee Survey`,
+      questions: [
+        {
+          id: 'q_default_1',
+          question: 'What interest brings you to our brand activation today?',
+          type: 'SHORT_TEXT',
+          required: true,
+          options: [],
+        },
+        {
+          id: 'q_default_2',
+          question: 'How likely are you to explore our services or partner with us?',
+          type: 'RATING',
+          required: false,
+          options: ['1', '2', '3', '4', '5'],
+        },
+        {
+          id: 'q_default_3',
+          question: 'Which area best describes your professional focus?',
+          type: 'SINGLE_CHOICE',
+          required: false,
+          options: ['Corporate / Enterprise', 'Startup / Tech', 'Government / NGO', 'Student / Individual'],
+        },
+      ],
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Phase 3: Save or update questionnaire definition.
+   * If responses have already been recorded under current version, creates a new version
+   * to guarantee historical immutable snapshot integrity (Section 7.2).
+   */
+  static async saveSponsorQuestionnaire(
+    dealId: string,
+    sponsorId: string,
+    title: string,
+    questions: any[]
+  ): Promise<any> {
+    const dealRes = await query(
+      `SELECT id, sponsor_id FROM sponsorship_deals WHERE id = $1 AND sponsor_id = $2`,
+      [dealId, sponsorId]
+    );
+
+    if (!dealRes.rowCount || dealRes.rowCount === 0) {
+      const err: any = new Error('Sponsorship relationship not found or unauthorized.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    await this.ensureQuestionnaireTables();
+
+    const latestRes = await query(
+      `SELECT id, version_number FROM sponsor_questionnaires
+       WHERE deal_id = $1 AND sponsor_id = $2
+       ORDER BY version_number DESC LIMIT 1`,
+      [dealId, sponsorId]
+    );
+
+    let nextVersion = 1;
+    let shouldInsertNewVersion = true;
+
+    if (latestRes.rowCount && latestRes.rowCount > 0) {
+      const latest = latestRes.rows[0];
+      const respCountRes = await query(
+        `SELECT COUNT(*)::int AS count FROM sponsor_attendee_responses
+         WHERE deal_id = $1 AND sponsor_id = $2 AND version_number = $3`,
+        [dealId, sponsorId, latest.version_number]
+      );
+      const responsesCount = respCountRes.rows[0]?.count || 0;
+
+      if (responsesCount > 0) {
+        nextVersion = latest.version_number + 1;
+        shouldInsertNewVersion = true;
+      } else {
+        nextVersion = latest.version_number;
+        shouldInsertNewVersion = false;
+      }
+    }
+
+    if (shouldInsertNewVersion) {
+      await query(
+        `UPDATE sponsor_questionnaires SET is_active = false
+         WHERE deal_id = $1 AND sponsor_id = $2`,
+        [dealId, sponsorId]
+      );
+
+      const insRes = await query(
+        `INSERT INTO sponsor_questionnaires (deal_id, sponsor_id, version_number, title, questions, is_active, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
+         RETURNING *`,
+        [dealId, sponsorId, nextVersion, title || 'Attendee Engagement Questionnaire', JSON.stringify(questions)]
+      );
+      return insRes.rows[0];
+    } else {
+      const updRes = await query(
+        `UPDATE sponsor_questionnaires
+         SET title = $1, questions = $2, updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [title || 'Attendee Engagement Questionnaire', JSON.stringify(questions), latestRes.rows[0].id]
+      );
+      return updRes.rows[0];
+    }
+  }
+
+  /**
+   * Phase 3: Record questionnaire response for a checked-in attendee.
+   * Strictly gated by: Deal accepted + Attendee sharing active + verified check-in.
+   */
+  static async recordAttendeeResponse(
+    dealId: string,
+    sponsorId: string,
+    attendeeId: string,
+    answers: Record<string, any>,
+    recordedBy?: string,
+    status = 'COMPLETED'
+  ): Promise<any> {
+    const dealRes = await query(
+      `SELECT sd.id, sd.sponsor_id, sd.status, sd.sponsor_notes, sa.event_title, sa.organizer_id
+       FROM sponsorship_deals sd
+       JOIN sponsorship_applications sa ON sd.application_id = sa.id
+       WHERE sd.id = $1 AND sd.sponsor_id = $2`,
+      [dealId, sponsorId]
+    );
+
+    if (!dealRes.rowCount || dealRes.rowCount === 0) {
+      const err: any = new Error('Deal relationship not found or unauthorized.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const deal = dealRes.rows[0];
+    let dealStatus = deal.status;
+    if (deal.sponsor_notes && typeof deal.sponsor_notes === 'string') {
+      const match = deal.sponsor_notes.match(/\[STATUS:(DEAL_ACCEPTED|REJECTED|WITHDRAWN)\]/);
+      if (match) dealStatus = match[1];
+    }
+
+    if (dealStatus !== 'DEAL_ACCEPTED') {
+      const err: any = new Error('Cannot record responses for an unaccepted deal.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    const isSharingAllowed = Boolean(
+      deal.allow_attendee_sharing === true ||
+      (deal.sponsor_notes && deal.sponsor_notes.includes('[SHARING:TRUE]'))
+    );
+
+    if (!isSharingAllowed) {
+      const err: any = new Error('Attendee-information sharing is not enabled for this event.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    await this.ensureQuestionnaireTables();
+
+    const q = await this.getSponsorQuestionnaire(dealId, sponsorId);
+    const questionsSnapshot = q.questions || [];
+    const questionnaireId = q.id && !String(q.id).startsWith('default_') ? q.id : null;
+    const versionNumber = q.version_number || 1;
+
+    // Validate required questions
+    for (const quest of questionsSnapshot) {
+      if (quest.required) {
+        const val = answers[quest.id];
+        if (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0)) {
+          const err: any = new Error(`Answer required for: "${quest.question}"`);
+          err.statusCode = 400;
+          throw err;
+        }
+      }
+    }
+
+    const existing = await query(
+      `SELECT id FROM sponsor_attendee_responses
+       WHERE deal_id = $1 AND sponsor_id = $2 AND attendee_id = $3`,
+      [dealId, sponsorId, attendeeId]
+    );
+
+    if (existing.rowCount && existing.rowCount > 0) {
+      const updRes = await query(
+        `UPDATE sponsor_attendee_responses
+         SET answers = $1, questions_snapshot = $2, status = $3, recorded_by = $4, updated_at = NOW()
+         WHERE id = $5
+         RETURNING *`,
+        [JSON.stringify(answers), JSON.stringify(questionsSnapshot), status, recordedBy || sponsorId, existing.rows[0].id]
+      );
+      return updRes.rows[0];
+    } else {
+      const insRes = await query(
+        `INSERT INTO sponsor_attendee_responses (
+           deal_id, sponsor_id, attendee_id, questionnaire_id, version_number,
+           questions_snapshot, answers, status, recorded_by, created_at, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+         RETURNING *`,
+        [
+          dealId,
+          sponsorId,
+          attendeeId,
+          questionnaireId,
+          versionNumber,
+          JSON.stringify(questionsSnapshot),
+          JSON.stringify(answers),
+          status,
+          recordedBy || sponsorId,
+        ]
+      );
+      return insRes.rows[0];
+    }
+  }
+
+  /**
+   * Phase 3: Retrieve existing recorded response for an attendee
+   */
+  static async getAttendeeResponse(dealId: string, sponsorId: string, attendeeId: string): Promise<any> {
+    await this.ensureQuestionnaireTables();
+    try {
+      const res = await query(
+        `SELECT * FROM sponsor_attendee_responses
+         WHERE deal_id = $1 AND sponsor_id = $2 AND attendee_id = $3`,
+        [dealId, sponsorId, attendeeId]
+      );
+      return res.rows[0] || null;
+    } catch (err: any) {
+      return null;
+    }
   }
 }

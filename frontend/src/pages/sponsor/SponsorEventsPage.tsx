@@ -17,10 +17,12 @@ import {
   RefreshCw,
   ExternalLink,
   XCircle,
+  Sliders,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { ISponsorEventItem, ISponsorCheckedInAttendeeItem } from '../../types/sponsorship';
 import { SponsorCheckedInAttendeesModal } from '../../components/sponsor/SponsorCheckedInAttendeesModal';
+import { SponsorQuestionnaireBuilderModal } from '../../components/sponsor/SponsorQuestionnaireBuilderModal';
 
 export const SponsorEventsPage: React.FC = () => {
   const [events, setEvents] = useState<ISponsorEventItem[]>([]);
@@ -30,6 +32,8 @@ export const SponsorEventsPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [selectedEventForAttendees, setSelectedEventForAttendees] = useState<ISponsorEventItem | null>(null);
   const [isAttendeesModalOpen, setIsAttendeesModalOpen] = useState(false);
+  const [selectedEventForQuestionnaire, setSelectedEventForQuestionnaire] = useState<ISponsorEventItem | null>(null);
+  const [isQuestionnaireOpen, setIsQuestionnaireOpen] = useState(false);
   const [actionLoadingDealId, setActionLoadingDealId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
@@ -432,6 +436,22 @@ export const SponsorEventsPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-center">
+                    {/* Setup Questionnaire (Available once deal is accepted) */}
+                    {isDealt && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedEventForQuestionnaire(item);
+                          setIsQuestionnaireOpen(true);
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                        title="Configure custom survey questions for this event"
+                      >
+                        <Sliders className="w-3.5 h-3.5 text-stone-600" />
+                        <span>Questionnaire</span>
+                      </button>
+                    )}
+
                     {/* View Checked-In Attendees (Strictly gated to Deal Accepted + Sharing Active) */}
                     {isSharingActive && (
                       <button
@@ -479,6 +499,22 @@ export const SponsorEventsPage: React.FC = () => {
         onClose={() => setIsAttendeesModalOpen(false)}
         eventItem={selectedEventForAttendees}
       />
+
+      {/* Questionnaire Builder Modal */}
+      {selectedEventForQuestionnaire && (
+        <SponsorQuestionnaireBuilderModal
+          isOpen={isQuestionnaireOpen}
+          onClose={() => {
+            setIsQuestionnaireOpen(false);
+            setSelectedEventForQuestionnaire(null);
+          }}
+          dealId={selectedEventForQuestionnaire.deal_id}
+          eventTitle={selectedEventForQuestionnaire.event_title}
+          onSaved={() => {
+            loadEvents(true);
+          }}
+        />
+      )}
     </div>
   );
 };

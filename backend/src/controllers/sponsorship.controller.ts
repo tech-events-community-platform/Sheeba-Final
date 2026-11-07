@@ -320,4 +320,95 @@ export class SponsorshipController {
       next(error);
     }
   }
+
+  /**
+   * Phase 3: Retrieve current active questionnaire definition for a sponsorship deal
+   */
+  static async getSponsorQuestionnaire(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      const dealId = (req.params.dealId || req.params.id) as string;
+
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const questionnaire = await SponsorshipService.getSponsorQuestionnaire(dealId, sponsorId);
+      sendSuccess(res, questionnaire, 'Sponsor questionnaire retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 3: Save or update sponsor questionnaire definition
+   */
+  static async saveSponsorQuestionnaire(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      const dealId = (req.params.dealId || req.params.id) as string;
+      const { title, questions } = req.body;
+
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const saved = await SponsorshipService.saveSponsorQuestionnaire(dealId, sponsorId, title, questions);
+      sendSuccess(res, saved, 'Sponsor questionnaire saved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 3: Record an attendee's questionnaire answers
+   */
+  static async recordAttendeeResponse(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      const dealId = (req.params.dealId || req.params.id) as string;
+      const attendeeId = req.params.attendeeId as string;
+      const { answers, status } = req.body;
+
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const recorded = await SponsorshipService.recordAttendeeResponse(
+        dealId,
+        sponsorId,
+        attendeeId,
+        answers,
+        sponsorId,
+        status || 'COMPLETED'
+      );
+      sendSuccess(res, recorded, 'Attendee response recorded successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 3: Get an attendee's questionnaire response
+   */
+  static async getAttendeeResponse(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      const dealId = (req.params.dealId || req.params.id) as string;
+      const attendeeId = req.params.attendeeId as string;
+
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const response = await SponsorshipService.getAttendeeResponse(dealId, sponsorId, attendeeId);
+      sendSuccess(res, response, 'Attendee response retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
 }

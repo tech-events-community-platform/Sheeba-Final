@@ -9,9 +9,12 @@ import {
   ClipboardEdit,
   AlertCircle,
   RefreshCw,
+  Sliders,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { ISponsorEventItem, ISponsorCheckedInAttendeeItem } from '../../types/sponsorship';
+import { SponsorRecordAttendeeModal } from './SponsorRecordAttendeeModal';
+import { SponsorQuestionnaireBuilderModal } from './SponsorQuestionnaireBuilderModal';
 
 interface SponsorCheckedInAttendeesModalProps {
   isOpen: boolean;
@@ -31,6 +34,12 @@ export const SponsorCheckedInAttendeesModal: React.FC<SponsorCheckedInAttendeesM
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Phase 3 Modal States
+  const [selectedAttendeeForRecording, setSelectedAttendeeForRecording] =
+    useState<ISponsorCheckedInAttendeeItem | null>(null);
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [isQuestionnaireBuilderOpen, setIsQuestionnaireBuilderOpen] = useState(false);
 
   const loadAttendees = async (isManualRefresh = false) => {
     if (!eventItem) return;
@@ -111,6 +120,15 @@ export const SponsorCheckedInAttendeesModal: React.FC<SponsorCheckedInAttendeesM
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsQuestionnaireBuilderOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Customize survey questions for attendees"
+            >
+              <Sliders className="w-3.5 h-3.5 text-[#FFA686]" />
+              <span className="hidden sm:inline">Questionnaire</span>
+            </button>
             <button
               type="button"
               disabled={refreshing || loading}
@@ -237,16 +255,39 @@ export const SponsorCheckedInAttendeesModal: React.FC<SponsorCheckedInAttendeesM
                     </div>
                   </div>
 
-                  {/* Record Button (Phase 2 visible & interactive; connects to questionnaire in Phase 3) */}
-                  <div className="shrink-0">
+                  {/* Record Button & Status Badge (Phase 3) */}
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    {attendee.is_recorded || attendee.record_status === 'RECORDED' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Recorded ✓</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-stone-100 text-stone-500">
+                        Not Recorded
+                      </span>
+                    )}
+
                     <button
                       type="button"
-                      onClick={() => onRecordAttendee && onRecordAttendee(attendee)}
-                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                      onClick={() => {
+                        setSelectedAttendeeForRecording(attendee);
+                        setIsRecordModalOpen(true);
+                        if (onRecordAttendee) onRecordAttendee(attendee);
+                      }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                        attendee.is_recorded || attendee.record_status === 'RECORDED'
+                          ? 'bg-stone-900 hover:bg-black text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
                       title="Record questionnaire responses for this attendee"
                     >
                       <ClipboardEdit className="w-3.5 h-3.5" />
-                      <span>Record</span>
+                      <span>
+                        {attendee.is_recorded || attendee.record_status === 'RECORDED'
+                          ? 'Edit Record'
+                          : 'Record'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -270,6 +311,38 @@ export const SponsorCheckedInAttendeesModal: React.FC<SponsorCheckedInAttendeesM
           </button>
         </div>
       </div>
+
+      {/* Record Attendee Questionnaire Modal */}
+      <SponsorRecordAttendeeModal
+        isOpen={isRecordModalOpen}
+        onClose={() => {
+          setIsRecordModalOpen(false);
+          setSelectedAttendeeForRecording(null);
+        }}
+        dealId={eventItem.deal_id}
+        eventTitle={eventItem.event_title}
+        attendee={selectedAttendeeForRecording}
+        onRecordedSuccess={(attendeeId) => {
+          setAttendees((prev) =>
+            prev.map((a) =>
+              a.attendee_id === attendeeId
+                ? { ...a, is_recorded: true, record_status: 'RECORDED' }
+                : a
+            )
+          );
+        }}
+      />
+
+      {/* Questionnaire Builder Modal */}
+      <SponsorQuestionnaireBuilderModal
+        isOpen={isQuestionnaireBuilderOpen}
+        onClose={() => setIsQuestionnaireBuilderOpen(false)}
+        dealId={eventItem.deal_id}
+        eventTitle={eventItem.event_title}
+        onSaved={() => {
+          loadAttendees(true);
+        }}
+      />
     </div>
   );
 };

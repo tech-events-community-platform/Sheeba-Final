@@ -796,6 +796,41 @@ export const api = {
       return res.data || { event_title: '', attendees: [] };
     },
 
+    // Phase 3: Sponsor Questionnaire Management
+    getSponsorQuestionnaire: async (dealId: string): Promise<any> => {
+      const res = await requestApi(`/sponsorships/deals/${dealId}/questionnaire`);
+      return res.data;
+    },
+
+    saveSponsorQuestionnaire: async (
+      dealId: string,
+      data: { title?: string; questions: any[] }
+    ): Promise<any> => {
+      const res = await requestApi(`/sponsorships/deals/${dealId}/questionnaire`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+      return res.data;
+    },
+
+    // Phase 3: Attendee Response Recording & Retrieval
+    getAttendeeResponse: async (dealId: string, attendeeId: string): Promise<any> => {
+      const res = await requestApi(`/sponsorships/deals/${dealId}/attendees/${attendeeId}/response`);
+      return res.data;
+    },
+
+    recordAttendeeResponse: async (
+      dealId: string,
+      attendeeId: string,
+      data: { answers: Record<string, any>; status?: 'COMPLETED' | 'DRAFT' }
+    ): Promise<any> => {
+      const res = await requestApi(`/sponsorships/deals/${dealId}/attendees/${attendeeId}/record`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      return res.data;
+    },
+
     // AI-Powered Sponsor-Event Matching & Recommendations
     getRecommendations: async (params?: {
       limit?: number;

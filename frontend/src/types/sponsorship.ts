@@ -172,4 +172,49 @@ export interface ISponsorCheckedInAttendeeItem {
   attendee_name: string;
   checked_in_at: string;
   record_status?: 'NOT_RECORDED' | 'RECORDED';
+  is_recorded?: boolean;
+  recorded_at?: string | null;
+}
+
+// Phase 3: Sponsor Attendee Questionnaire & Response Types
+export type SponsorQuestionType =
+  | 'SHORT_TEXT'
+  | 'LONG_TEXT'
+  | 'SINGLE_CHOICE'
+  | 'MULTIPLE_CHOICE'
+  | 'RATING';
+
+export interface ISponsorQuestionnaireQuestion {
+  id: string;
+  question: string;
+  type: SponsorQuestionType;
+  options?: string[];
+  required: boolean;
+}
+
+export interface ISponsorQuestionnaire {
+  id: string;
+  deal_id: string;
+  sponsor_id: string;
+  version_number: number;
+  title: string;
+  questions: ISponsorQuestionnaireQuestion[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ISponsorAttendeeResponse {
+  id?: string;
+  deal_id: string;
+  sponsor_id: string;
+  attendee_id: string;
+  questionnaire_id?: string;
+  version_number?: number;
+  questions_snapshot?: ISponsorQuestionnaireQuestion[];
+  answers: Record<string, any>;
+  status?: 'COMPLETED' | 'DRAFT';
+  recorded_by?: string;
+  created_at?: string;
+  updated_at?: string;
 }

@@ -11,6 +11,8 @@ import {
   createDealSchema,
   sponsorDealsQuerySchema,
   updateDealSchema,
+  saveSponsorQuestionnaireSchema,
+  recordAttendeeResponseSchema,
 } from '../schemas/sponsorship.schema';
 import {
   updateSponsorPreferencesSchema,
@@ -143,6 +145,42 @@ router.get(
   authorizeRoles('sponsor', 'admin'),
   validateParams(idParamSchema),
   SponsorshipController.getSponsorCheckedInAttendees
+);
+
+// Phase 3: Sponsor Questionnaire Management
+router.get(
+  '/deals/:id/questionnaire',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.getSponsorQuestionnaire
+);
+
+router.put(
+  '/deals/:id/questionnaire',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  validateBody(saveSponsorQuestionnaireSchema),
+  SponsorshipController.saveSponsorQuestionnaire
+);
+
+// Phase 3: In-Person Attendee Response Recording
+router.get(
+  '/deals/:id/attendees/:attendeeId/response',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.getAttendeeResponse
+);
+
+router.post(
+  '/deals/:id/attendees/:attendeeId/record',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  validateBody(recordAttendeeResponseSchema),
+  SponsorshipController.recordAttendeeResponse
 );
 
 // AI-Powered Sponsor-Event Matching & Recommendations
