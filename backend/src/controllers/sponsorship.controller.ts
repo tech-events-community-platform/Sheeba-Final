@@ -152,8 +152,9 @@ export class SponsorshipController {
         return;
       }
 
-      const id = req.params.id as string;
-      const deleted = await SponsorshipService.deleteApplication(id, organizerId);
+      const id = String(req.params.id || req.body?.id || '').trim();
+      const isAdmin = req.user?.role === 'admin';
+      const deleted = await SponsorshipService.deleteApplication(id, organizerId, isAdmin);
       if (!deleted) {
         sendError(res, 'Application not found or you do not have permission to delete it.', 404);
         return;

@@ -255,11 +255,11 @@ export class SponsorshipService {
       throw err;
     }
 
-    // Check if deal already exists for this application and sponsor
+    // Check if deal already exists for this application and sponsor (including any soft-deleted)
     const existingRes = await query(
       `SELECT id, status, package_name, pledged_amount, sponsor_notes
        FROM sponsorship_deals
-       WHERE application_id = $1 AND sponsor_id = $2 AND deleted_at IS NULL
+       WHERE application_id = $1 AND sponsor_id = $2
        LIMIT 1`,
       [applicationId, sponsorId]
     );
@@ -274,6 +274,8 @@ export class SponsorshipService {
              package_name = COALESCE($2, package_name),
              pledged_amount = COALESCE($3, pledged_amount),
              sponsor_notes = COALESCE($4, sponsor_notes),
+             deleted_at = NULL,
+             deleted_by = NULL,
              updated_at = NOW()
          WHERE id = $5
          RETURNING *`,
@@ -455,14 +457,31 @@ export class SponsorshipService {
   }
 
   /**
-   * Delete or close an application (Organizer)
+   * Delete or close an application (Organizer or Admin)
    */
-  static async deleteApplication(applicationId: string, organizerId: string): Promise<boolean> {
-    const titleRes = await query('SELECT event_title FROM sponsorship_applications WHERE id = $1 AND organizer_id = $2', [applicationId, organizerId]);
-    const eventTitle = titleRes.rows[0]?.event_title || 'Sponsorship Application';
+  static async deleteApplication(applicationId: string, organizerId: string, isAdmin = false): Promise<boolean> {
+    const appRes = await query(
+      'SELECT id, event_title, organizer_id FROM sponsorship_applications WHERE id = $1',
+      [applicationId]
+    );
+
+    if (!appRes.rowCount || appRes.rowCount === 0) {
+      return false;
+    }
+
+    const app = appRes.rows[0];
+
+    // Check permission: organizer matches OR user is admin
+    if (!isAdmin && String(app.organizer_id) !== String(organizerId)) {
+      return false;
+    }
+
+    const eventTitle = app.event_title || 'Sponsorship Application';
 
     const res = await query(
-      `UPDATE sponsorship_applications SET deleted_at = NOW(), deleted_by = $2 WHERE id = $1 AND organizer_id = $2`,
+      `UPDATE sponsorship_applications 
+       SET deleted_at = NOW(), deleted_by = $2, status = 'CLOSED', updated_at = NOW() 
+       WHERE id = $1`,
       [applicationId, organizerId]
     );
 
@@ -478,6 +497,7 @@ export class SponsorshipService {
       await CacheService.delPattern('sponsorship:explore*');
       await CacheService.delPattern(`sponsorship:app:${applicationId}*`);
       await CacheService.delPattern(`sponsorship:organizer:${organizerId}*`);
+      await CacheService.delPattern(`sponsorship:organizer:${app.organizer_id}*`);
       await CacheService.delPattern('*http:*/api/sponsorship*');
       await CacheService.delPattern('matching:recommendations:*');
     }

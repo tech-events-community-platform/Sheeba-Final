@@ -18,6 +18,7 @@ import {
   ExternalLink,
   XCircle,
   Sliders,
+  Handshake,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import type { ISponsorEventItem, ISponsorCheckedInAttendeeItem } from '../../types/sponsorship';
@@ -28,7 +29,7 @@ export const SponsorEventsPage: React.FC = () => {
   const [events, setEvents] = useState<ISponsorEventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<'ALL' | 'SHARING_GRANTED' | 'DEAL_ACCEPTED' | 'PENDING'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'INTERESTED' | 'DEAL_ACCEPTED' | 'DECLINED' | 'SHARING_GRANTED'>('ALL');
   const [search, setSearch] = useState('');
   const [selectedEventForAttendees, setSelectedEventForAttendees] = useState<ISponsorEventItem | null>(null);
   const [isAttendeesModalOpen, setIsAttendeesModalOpen] = useState(false);
@@ -36,6 +37,8 @@ export const SponsorEventsPage: React.FC = () => {
   const [isQuestionnaireOpen, setIsQuestionnaireOpen] = useState(false);
   const [actionLoadingDealId, setActionLoadingDealId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [eventToWithdraw, setEventToWithdraw] = useState<ISponsorEventItem | null>(null);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const loadEvents = async (isManualRefresh = false) => {
     if (isManualRefresh) {
@@ -59,18 +62,46 @@ export const SponsorEventsPage: React.FC = () => {
     loadEvents();
   }, []);
 
-  const handleWithdraw = async (dealId: string) => {
-    if (!window.confirm('Are you sure you want to withdraw your interest in this event?')) return;
-    setActionLoadingDealId(dealId);
+  const handleWithdraw = (eventItem: ISponsorEventItem) => {
+    setEventToWithdraw(eventItem);
+  };
+
+  const confirmWithdraw = async () => {
+    if (!eventToWithdraw) return;
     try {
-      await api.sponsorship.withdrawDeal(dealId);
+      setIsWithdrawing(true);
+      await api.sponsorship.withdrawDeal(eventToWithdraw.deal_id);
       setEvents((prev) =>
-        prev.map((e) => (e.deal_id === dealId ? { ...e, deal_status: 'WITHDRAWN' } : e))
+        prev.map((e) => (e.deal_id === eventToWithdraw.deal_id ? { ...e, deal_status: 'WITHDRAWN' } : e))
       );
+      setEventToWithdraw(null);
       setFeedbackMessage('Interest withdrawn successfully.');
       setTimeout(() => setFeedbackMessage(null), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to withdraw interest.');
+      setFeedbackMessage(err.message || 'Failed to withdraw interest.');
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
+  const handleReExpressInterest = async (eventItem: ISponsorEventItem) => {
+    try {
+      setActionLoadingDealId(eventItem.deal_id);
+      await api.sponsorship.expressInterestOrDecline({
+        applicationId: eventItem.application_id,
+        status: 'INTERESTED',
+        package_name: eventItem.package_name || undefined,
+        pledged_amount: eventItem.pledged_amount != null ? Number(eventItem.pledged_amount) : undefined,
+      });
+      setEvents((prev) =>
+        prev.map((e) =>
+          e.deal_id === eventItem.deal_id ? { ...e, deal_status: 'INTERESTED' } : e
+        )
+      );
+      setFeedbackMessage('Marked as interested! The organizer will review your interest.');
+      setTimeout(() => setFeedbackMessage(null), 4000);
+    } catch (err: any) {
+      setFeedbackMessage(err.message || 'Failed to update interest.');
     } finally {
       setActionLoadingDealId(null);
     }
@@ -87,6 +118,9 @@ export const SponsorEventsPage: React.FC = () => {
     (e) => e.deal_status === 'DEAL_ACCEPTED' && e.allow_attendee_sharing
   ).length;
   const pendingCount = events.filter((e) => e.deal_status === 'INTERESTED').length;
+  const declinedCount = events.filter(
+    (e) => e.deal_status === 'DECLINED' || e.deal_status === 'REJECTED'
+  ).length;
   const totalCheckedIn = events.reduce((sum, e) => sum + (e.checked_in_count || 0), 0);
 
   // Filtered Events
@@ -97,7 +131,10 @@ export const SponsorEventsPage: React.FC = () => {
     if (filter === 'DEAL_ACCEPTED' && e.deal_status !== 'DEAL_ACCEPTED') {
       return false;
     }
-    if (filter === 'PENDING' && e.deal_status !== 'INTERESTED') {
+    if (filter === 'INTERESTED' && e.deal_status !== 'INTERESTED') {
+      return false;
+    }
+    if (filter === 'DECLINED' && e.deal_status !== 'DECLINED' && e.deal_status !== 'REJECTED') {
       return false;
     }
 
@@ -216,21 +253,21 @@ export const SponsorEventsPage: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setFilter('SHARING_GRANTED')}
+            onClick={() => setFilter('INTERESTED')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              filter === 'SHARING_GRANTED'
-                ? 'bg-emerald-600 text-white shadow-xs'
+              filter === 'INTERESTED'
+                ? 'bg-amber-600 text-white shadow-xs'
                 : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
             }`}
           >
-            Attendee Sharing Active ({sharingGrantedCount})
+            Interested ({pendingCount})
           </button>
           <button
             type="button"
             onClick={() => setFilter('DEAL_ACCEPTED')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
               filter === 'DEAL_ACCEPTED'
-                ? 'bg-stone-900 text-white shadow-xs'
+                ? 'bg-[#63474D] text-white shadow-xs'
                 : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
             }`}
           >
@@ -238,14 +275,25 @@ export const SponsorEventsPage: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setFilter('PENDING')}
+            onClick={() => setFilter('DECLINED')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              filter === 'PENDING'
-                ? 'bg-amber-600 text-white shadow-xs'
+              filter === 'DECLINED'
+                ? 'bg-red-600 text-white shadow-xs'
                 : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
             }`}
           >
-            Pending Review ({pendingCount})
+            Declined ({declinedCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('SHARING_GRANTED')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              filter === 'SHARING_GRANTED'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+            }`}
+          >
+            Attendee Access Active ({sharingGrantedCount})
           </button>
         </div>
 
@@ -344,10 +392,10 @@ export const SponsorEventsPage: React.FC = () => {
                           Pending Review
                         </span>
                       )}
-                      {isRejected && (
+                      {(item.deal_status === 'DECLINED' || isRejected) && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-200">
                           <XCircle className="w-3.5 h-3.5 text-red-500" />
-                          Declined by Organizer
+                          Declined
                         </span>
                       )}
                       {isWithdrawn && (
@@ -470,11 +518,25 @@ export const SponsorEventsPage: React.FC = () => {
                       <button
                         type="button"
                         disabled={actionLoadingDealId === item.deal_id}
-                        onClick={() => handleWithdraw(item.deal_id)}
+                        onClick={() => handleWithdraw(item)}
                         className="px-3 py-1.5 rounded-xl border border-stone-200 text-stone-600 hover:bg-stone-50 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
                         title="Withdraw your interest in this event"
                       >
                         Withdraw Interest
+                      </button>
+                    )}
+
+                    {/* Re-express interest if previously declined */}
+                    {(item.deal_status === 'DECLINED' || isRejected) && (
+                      <button
+                        type="button"
+                        disabled={actionLoadingDealId === item.deal_id}
+                        onClick={() => handleReExpressInterest(item)}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        title="Re-express interest in this event"
+                      >
+                        <Handshake className="w-3.5 h-3.5" />
+                        <span>Mark as Interested</span>
                       </button>
                     )}
 
@@ -490,6 +552,48 @@ export const SponsorEventsPage: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Withdraw Interest Confirmation Modal */}
+      {eventToWithdraw && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-gray-100 space-y-5 animate-scale-in">
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Clock className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-xl text-gray-900">Withdraw Interest</h3>
+              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                Are you sure you want to withdraw your interest in <strong className="text-gray-800">{eventToWithdraw.event_title}</strong>? The organizer will no longer see your pending pledge.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isWithdrawing}
+                onClick={() => setEventToWithdraw(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isWithdrawing}
+                onClick={confirmWithdraw}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-stone-900 hover:bg-black text-white shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isWithdrawing ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Withdrawing...</span>
+                  </>
+                ) : (
+                  <span>Confirm Withdraw</span>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

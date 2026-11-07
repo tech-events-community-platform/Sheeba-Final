@@ -198,7 +198,7 @@ export const router = createBrowserRouter([
           { path: 'explore', element: <SponsorExplorePage /> },
           { path: 'explore/:id', element: <SponsorApplicationDetailPage /> },
           { path: 'applications/:id', element: <SponsorApplicationDetailPage /> },
-          { path: 'deals', element: <SponsorDealsPage /> },
+          { path: 'deals', element: <Navigate to="/sponsor/events" replace /> },
           { path: 'events', element: <SponsorEventsPage /> },
           { path: 'reports', element: <SponsorReportsPage /> },
           { path: 'deliverables', element: <SponsorDeliverablesPage /> },

@@ -206,17 +206,19 @@ const EVENT_TYPES = [
 
 export const ApplyToSponsorsPage: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'my-sponsors' | 'my-pitches' | 'create'>('my-sponsors');
+  const [activeTab, setActiveTab] = useState<'create' | 'my-pitches' | 'my-sponsors'>('create');
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [myApplications, setMyApplications] = useState<ISponsorshipApplication[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pitchToDelete, setPitchToDelete] = useState<ISponsorshipApplication | null>(null);
+  const [isDeletingPitch, setIsDeletingPitch] = useState(false);
 
   // My Sponsors Pipeline state (Phase 1)
   const [sponsorsList, setSponsorsList] = useState<ISponsorRelationshipItem[]>([]);
   const [sponsorsLoading, setSponsorsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'INTERESTED' | 'DEAL_ACCEPTED' | 'REJECTED' | 'WITHDRAWN'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'INTERESTED' | 'DEAL_ACCEPTED'>('INTERESTED');
   const [appFilter, setAppFilter] = useState<string>('ALL');
   const [sponsorSearch, setSponsorSearch] = useState<string>('');
   const [selectedSponsorId, setSelectedSponsorId] = useState<string | null>(null);
@@ -632,34 +634,43 @@ export const ApplyToSponsorsPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to withdraw this pitch from the marketplace?')) return;
+  const handleDelete = (app: ISponsorshipApplication) => {
+    setPitchToDelete(app);
+  };
+
+  const confirmDeletePitch = async () => {
+    if (!pitchToDelete) return;
     try {
-      await api.sponsorship.deleteApplication(id);
-      setMyApplications((prev) => prev.filter((app) => app.id !== id));
+      setIsDeletingPitch(true);
+      await api.sponsorship.deleteApplication(pitchToDelete.id);
+      setMyApplications((prev) => prev.filter((app) => app.id !== pitchToDelete.id));
+      setPitchToDelete(null);
+      setSuccessMessage('Pitch has been withdrawn and removed from the sponsorship marketplace.');
+      setTimeout(() => setSuccessMessage(null), 4000);
     } catch (err: any) {
-      alert(err.message || 'Failed to delete application.');
+      setErrorMessage(err.message || 'Failed to delete application.');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsDeletingPitch(false);
     }
   };
 
-  // Phase 1: Filtered Sponsors & Summary Metrics
+  // Phase 1: Filtered Sponsors & Summary Metrics (Interested & Deals Accepted only)
   const filteredSponsors = sponsorsList.filter((item) => {
-    const matchesStatus = statusFilter === 'ALL' || item.deal_status === statusFilter;
+    const matchesStatus = item.deal_status === statusFilter;
     const matchesApp = appFilter === 'ALL' || item.application_id === appFilter;
     const q = sponsorSearch.toLowerCase().trim();
     const matchesSearch =
       !q ||
       item.sponsor.name.toLowerCase().includes(q) ||
-      item.sponsor.representative_name.toLowerCase().includes(q) ||
-      item.sponsor.email.toLowerCase().includes(q) ||
+      (item.sponsor.representative_name && item.sponsor.representative_name.toLowerCase().includes(q)) ||
+      (item.sponsor.email && item.sponsor.email.toLowerCase().includes(q)) ||
       item.application.event_title.toLowerCase().includes(q);
     return matchesStatus && matchesApp && matchesSearch;
   });
 
   const totalInterested = sponsorsList.filter((s) => s.deal_status === 'INTERESTED').length;
   const totalDealt = sponsorsList.filter((s) => s.deal_status === 'DEAL_ACCEPTED').length;
-  const totalRejected = sponsorsList.filter((s) => s.deal_status === 'REJECTED').length;
-  const totalWithdrawn = sponsorsList.filter((s) => s.deal_status === 'WITHDRAWN').length;
   const totalPledged = sponsorsList
     .filter((s) => s.deal_status === 'DEAL_ACCEPTED' || s.deal_status === 'INTERESTED')
     .reduce((sum, s) => sum + (s.pledged_amount || 0), 0);
@@ -679,15 +690,15 @@ export const ApplyToSponsorsPage: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-3 mt-6">
             <button
-              onClick={() => setActiveTab('my-sponsors')}
+              onClick={() => setActiveTab('create')}
               className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'my-sponsors'
+                activeTab === 'create'
                   ? 'bg-white text-[#63474D] shadow-md'
                   : 'bg-white/10 hover:bg-white/20 text-white'
               }`}
             >
-              <Building2 className="w-4 h-4" />
-              <span>My Sponsors ({sponsorsList.length})</span>
+              <PlusCircle className="w-4 h-4" />
+              <span>Submit New Pitch</span>
             </button>
 
             <button
@@ -703,15 +714,15 @@ export const ApplyToSponsorsPage: React.FC = () => {
             </button>
 
             <button
-              onClick={() => setActiveTab('create')}
+              onClick={() => setActiveTab('my-sponsors')}
               className={`px-5 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-                activeTab === 'create'
+                activeTab === 'my-sponsors'
                   ? 'bg-white text-[#63474D] shadow-md'
                   : 'bg-white/10 hover:bg-white/20 text-white'
               }`}
             >
-              <PlusCircle className="w-4 h-4" />
-              <span>Submit New Pitch</span>
+              <Building2 className="w-4 h-4" />
+              <span>My Sponsors ({sponsorsList.length})</span>
             </button>
 
             <Link
@@ -743,12 +754,10 @@ export const ApplyToSponsorsPage: React.FC = () => {
       {/* TAB 0: My Sponsors Pipeline (Phase 1 Dedicated Area) */}
       {activeTab === 'my-sponsors' && (
         <div className="space-y-6">
-          {/* Summary Metrics Cards */}
+          {/* Summary Metrics Cards (Clean bare icons without square background boxes) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Clock className="w-6 h-6" />
-              </div>
+              <Clock className="w-8 h-8 text-amber-600 shrink-0" />
               <div>
                 <p className="text-xs uppercase tracking-wider font-bold text-gray-400">Interested Sponsors</p>
                 <p className="text-2xl font-serif font-bold text-gray-900">{totalInterested}</p>
@@ -757,9 +766,7 @@ export const ApplyToSponsorsPage: React.FC = () => {
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <Handshake className="w-6 h-6" />
-              </div>
+              <Handshake className="w-8 h-8 text-emerald-600 shrink-0" />
               <div>
                 <p className="text-xs uppercase tracking-wider font-bold text-gray-400">Deals Accepted</p>
                 <p className="text-2xl font-serif font-bold text-emerald-700">{totalDealt}</p>
@@ -768,9 +775,7 @@ export const ApplyToSponsorsPage: React.FC = () => {
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center shrink-0">
-                <DollarSign className="w-6 h-6" />
-              </div>
+              <DollarSign className="w-8 h-8 text-[#63474D] shrink-0" />
               <div>
                 <p className="text-xs uppercase tracking-wider font-bold text-gray-400">Total Pledged Capital</p>
                 <p className="text-2xl font-serif font-bold text-gray-900">
@@ -781,9 +786,10 @@ export const ApplyToSponsorsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Search & Filter Controls */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+          {/* Unified Sponsors Table Container (Incorporating Search, Filters & List) */}
+          <div className="bg-white rounded-3xl border border-gray-200/80 shadow-xs overflow-hidden">
+            {/* Table Controls Bar */}
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row gap-3 items-center justify-between bg-white">
               {/* Search */}
               <div className="relative w-full sm:max-w-xs">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -796,276 +802,276 @@ export const ApplyToSponsorsPage: React.FC = () => {
                 />
               </div>
 
-              {/* Event Pitch Filter Dropdown */}
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Filter className="w-4 h-4 text-gray-400 shrink-0" />
-                <select
-                  value={appFilter}
-                  onChange={(e) => setAppFilter(e.target.value)}
-                  className="w-full sm:w-64 py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                >
-                  <option value="ALL">All Event Pitches ({myApplications.length})</option>
-                  {myApplications.map((app) => (
-                    <option key={app.id} value={app.id}>
-                      {app.event_title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                {/* Event Pitch Filter Dropdown */}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Filter className="w-4 h-4 text-gray-400 shrink-0" />
+                  <select
+                    value={appFilter}
+                    onChange={(e) => setAppFilter(e.target.value)}
+                    className="w-full sm:w-60 py-2 px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  >
+                    <option value="ALL">All Event Pitches ({myApplications.length})</option>
+                    {myApplications.map((app) => (
+                      <option key={app.id} value={app.id}>
+                        {app.event_title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Status Tabs */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100 text-xs">
-              {[
-                { id: 'ALL', label: 'All Sponsors', count: sponsorsList.length },
-                { id: 'INTERESTED', label: 'Interested', count: totalInterested, color: 'text-amber-700 bg-amber-50' },
-                { id: 'DEAL_ACCEPTED', label: 'Deal Accepted', count: totalDealt, color: 'text-emerald-700 bg-emerald-50' },
-                { id: 'REJECTED', label: 'Rejected', count: totalRejected },
-                { id: 'WITHDRAWN', label: 'Withdrawn', count: totalWithdrawn },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setStatusFilter(tab.id as any)}
-                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                    statusFilter === tab.id
-                      ? 'bg-[#63474D] text-white shadow-xs'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                      statusFilter === tab.id ? 'bg-white/25 text-white' : 'bg-gray-200 text-gray-700'
+                {/* Status Toggle: Only Interested and Deal Accepted */}
+                <div className="flex items-center gap-1 p-1 bg-stone-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('INTERESTED')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      statusFilter === 'INTERESTED'
+                        ? 'bg-white text-gray-900 shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    {tab.count}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+                    <span>Interested</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                        statusFilter === 'INTERESTED'
+                          ? 'bg-amber-100 text-amber-800 font-bold'
+                          : 'bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {totalInterested}
+                    </span>
+                  </button>
 
-          {/* Sponsors List */}
-          {sponsorsLoading ? (
-            <div className="py-20 text-center bg-white rounded-3xl border border-gray-100">
-              <div className="w-8 h-8 border-3 border-[#63474D] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-xs text-gray-500 font-medium">Loading your sponsors pipeline...</p>
-            </div>
-          ) : sponsorsList.length === 0 ? (
-            <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-gray-300 space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center mx-auto">
-                <Building2 className="w-8 h-8" />
-              </div>
-              <div className="max-w-md mx-auto space-y-1">
-                <h3 className="text-lg font-bold text-gray-900 font-serif">No Sponsor Interest Yet</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  When verified sponsors browse the Sheeba Sponsorship Marketplace and mark interest in your published event pitches, they will appear here with deal and attendee-access controls.
-                </p>
-              </div>
-              <div className="flex items-center justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('create')}
-                  className="px-4 py-2 bg-[#63474D] text-white rounded-xl text-xs font-bold hover:bg-[#4E373C] transition-all flex items-center gap-1.5"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  Submit New Pitch
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('my-pitches')}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all flex items-center gap-1.5"
-                >
-                  <HandCoins className="w-4 h-4" />
-                  View Published Pitches
-                </button>
-              </div>
-            </div>
-          ) : filteredSponsors.length === 0 ? (
-            <div className="p-10 text-center bg-white rounded-3xl border border-gray-200 space-y-2">
-              <p className="text-sm font-semibold text-gray-700">No sponsors found matching current filters.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setStatusFilter('ALL');
-                  setAppFilter('ALL');
-                  setSponsorSearch('');
-                }}
-                className="text-xs text-[#63474D] underline font-bold"
-              >
-                Clear all filters
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Column Titles Header Row (Aligned with columns below) */}
-              <div className="hidden md:grid md:grid-cols-12 gap-4 px-6 py-2 text-xs font-bold uppercase tracking-wider text-gray-400 select-none">
-                <div className="md:col-span-5">Sponsors</div>
-                <div className="md:col-span-4">Interested In</div>
-                <div className="md:col-span-3 text-right">Actions</div>
-              </div>
-
-              {filteredSponsors.map((item) => {
-                const isInterested = item.deal_status === 'INTERESTED';
-                const isDealt = item.deal_status === 'DEAL_ACCEPTED';
-                const isRejected = item.deal_status === 'REJECTED';
-                const isWithdrawn = item.deal_status === 'WITHDRAWN';
-
-                return (
-                  <div
-                    key={item.deal_id}
-                    className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs hover:shadow-md transition-shadow grid grid-cols-1 md:grid-cols-12 items-center gap-4"
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('DEAL_ACCEPTED')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      statusFilter === 'DEAL_ACCEPTED'
+                        ? 'bg-white text-emerald-800 shadow-xs'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
                   >
-                    {/* Left: Sponsor Avatar & Identity (Circular profile, Clickable) */}
-                    <div className="md:col-span-5 flex items-center gap-3.5 min-w-0">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#63474D] to-[#8C656C] text-white flex items-center justify-center font-serif text-lg font-bold shrink-0 overflow-hidden shadow-xs">
-                        {item.sponsor.avatar_url ? (
-                          <img
-                            src={item.sponsor.avatar_url}
-                            alt={item.sponsor.name}
-                            className="w-full h-full object-cover rounded-full"
-                          />
-                        ) : (
-                          (item.sponsor.name || 'S')[0].toUpperCase()
-                        )}
-                      </div>
+                    <span>Deals Accepted</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                        statusFilter === 'DEAL_ACCEPTED'
+                          ? 'bg-emerald-100 text-emerald-800 font-bold'
+                          : 'bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {totalDealt}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
 
-                      <div className="space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenSponsorProfile(item)}
-                            className="text-left font-serif font-bold text-base text-[#2D1F23] hover:text-[#63474D] hover:underline flex items-center gap-1.5 cursor-pointer group"
-                            title="Click to view full sponsor profile"
-                          >
-                            <span className="truncate">{item.sponsor.name}</span>
-                            <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#63474D] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                          </button>
+            {/* Table Column Titles Header Row */}
+            <div className="hidden md:grid md:grid-cols-12 gap-4 px-6 py-3 bg-gray-50/80 border-b border-gray-100 text-xs font-bold uppercase tracking-wider text-gray-500 select-none">
+              <div className="md:col-span-5">Sponsors</div>
+              <div className="md:col-span-4">Interested In</div>
+              <div className="md:col-span-3 text-right">Actions</div>
+            </div>
 
-                          {item.sponsor.industry_category && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700 shrink-0">
-                              {item.sponsor.industry_category}
-                            </span>
+            {/* Table Body */}
+            {sponsorsLoading ? (
+              <div className="py-20 text-center">
+                <div className="w-8 h-8 border-3 border-[#63474D] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-xs text-gray-500 font-medium">Loading your sponsors pipeline...</p>
+              </div>
+            ) : sponsorsList.length === 0 ? (
+              <div className="p-12 text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center mx-auto">
+                  <Building2 className="w-8 h-8" />
+                </div>
+                <div className="max-w-md mx-auto space-y-1">
+                  <h3 className="text-lg font-bold text-gray-900 font-serif">No Sponsor Interest Yet</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    When verified sponsors browse the Sheeba Sponsorship Marketplace and mark interest in your published event pitches, they will appear here with deal and attendee-access controls.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('create')}
+                    className="px-4 py-2 bg-[#63474D] text-white rounded-xl text-xs font-bold hover:bg-[#4E373C] transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    Submit New Pitch
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('my-pitches')}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <HandCoins className="w-4 h-4" />
+                    View Published Pitches
+                  </button>
+                </div>
+              </div>
+            ) : filteredSponsors.length === 0 ? (
+              <div className="p-10 text-center space-y-2">
+                <p className="text-sm font-semibold text-gray-700">No sponsors found matching current filters.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter('INTERESTED');
+                    setAppFilter('ALL');
+                    setSponsorSearch('');
+                  }}
+                  className="text-xs text-[#63474D] underline font-bold cursor-pointer"
+                >
+                  Reset filters
+                </button>
+              </div>
+            ) : (
+              <div>
+                {filteredSponsors.map((item) => {
+                  const isInterested = item.deal_status === 'INTERESTED';
+                  const isDealt = item.deal_status === 'DEAL_ACCEPTED';
+
+                  return (
+                    <div
+                      key={item.deal_id}
+                      className="px-6 py-4.5 border-b border-gray-100 last:border-b-0 hover:bg-stone-50/40 transition-colors grid grid-cols-1 md:grid-cols-12 items-center gap-4"
+                    >
+                      {/* Left: Sponsor Avatar & Identity (Circular profile, Clickable) */}
+                      <div className="md:col-span-5 flex items-center gap-3.5 min-w-0">
+                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#63474D] to-[#8C656C] text-white flex items-center justify-center font-serif text-base font-bold shrink-0 overflow-hidden shadow-xs">
+                          {item.sponsor.avatar_url ? (
+                            <img
+                              src={item.sponsor.avatar_url}
+                              alt={item.sponsor.name}
+                              className="w-full h-full object-cover rounded-full"
+                            />
+                          ) : (
+                            (item.sponsor.name || 'S')[0].toUpperCase()
                           )}
                         </div>
 
-                        <p className="text-xs text-gray-500 truncate">
-                          Contact: <strong className="text-gray-700">{item.sponsor.representative_name}</strong> •{' '}
-                          <a
-                            href={`mailto:${item.sponsor.email}`}
-                            className="text-[#63474D] hover:underline"
-                          >
-                            {item.sponsor.email}
-                          </a>
-                        </p>
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenSponsorProfile(item)}
+                              className="text-left font-serif font-bold text-base text-[#2D1F23] hover:text-[#63474D] hover:underline flex items-center gap-1.5 cursor-pointer group"
+                              title="Click to view full sponsor profile"
+                            >
+                              <span className="truncate">{item.sponsor.name}</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#63474D] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            </button>
 
-                        <p className="text-[11px] text-gray-400">
-                          Interest submitted on {new Date(item.interest_expressed_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Middle: Associated Event Pitch & Package (Strictly Aligned) */}
-                    <div className="md:col-span-4 p-3.5 bg-[#FAF7F5] rounded-xl border border-[#AA767C]/15 space-y-1">
-                      <p className="text-[10px] uppercase tracking-wider font-bold text-[#756366]">
-                        Interested In Pitch
-                      </p>
-                      <p className="text-xs font-bold text-[#2D1F23] truncate" title={item.application.event_title}>
-                        {item.application.event_title}
-                      </p>
-                      <div className="flex items-center gap-2 text-[11px] text-gray-600 pt-0.5 truncate">
-                        {item.package_name && <span>Tier: <strong className="text-gray-900">{item.package_name}</strong></span>}
-                        {item.pledged_amount ? (
-                          <span>
-                            • Pledged:{' '}
-                            <strong className="text-emerald-700">
-                              {item.pledged_amount.toLocaleString()} {item.application.currency || 'ETB'}
-                            </strong>
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {/* Right: Actions (Green Deal only when interested, sharing toggle when dealt) */}
-                    <div className="md:col-span-3 flex items-center justify-end">
-                      {isInterested && (
-                        <button
-                          type="button"
-                          disabled={actionLoadingDealId === item.deal_id}
-                          onClick={() => handleAcceptDeal(item.deal_id)}
-                          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          title="Formalize sponsorship deal with this sponsor"
-                        >
-                          <Handshake className="w-4 h-4" />
-                          <span>Deal</span>
-                        </button>
-                      )}
-
-                      {isDealt && (
-                        <div className="flex flex-col items-end gap-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-xs">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                              Deal Accepted
-                            </span>
-
-                            {item.allow_attendee_sharing ? (
-                              <button
-                                type="button"
-                                disabled={actionLoadingDealId === item.deal_id}
-                                onClick={() => handleToggleSharing(item.deal_id, false)}
-                                className="px-2.5 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-[11px] font-semibold transition-all cursor-pointer disabled:opacity-50"
-                                title="Revoke sponsor's access to checked-in attendee list"
-                              >
-                                Revoke Sharing
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={actionLoadingDealId === item.deal_id}
-                                onClick={() => handleToggleSharing(item.deal_id, true)}
-                                className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-black text-white text-xs font-bold shadow-xs hover:shadow transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                title="Authorize sponsor to view checked-in attendee names"
-                              >
-                                <span>Allow Sharing Attendee Info</span>
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-1.5 text-[10px]">
-                            {item.allow_attendee_sharing ? (
-                              <span className="text-emerald-700 font-medium flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                Attendee sharing active
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">
-                                Attendee sharing not enabled
+                            {item.sponsor.industry_category && (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700 shrink-0">
+                                {item.sponsor.industry_category}
                               </span>
                             )}
                           </div>
+
+                          <p className="text-xs text-gray-500 truncate">
+                            Contact: <strong className="text-gray-700 font-medium">{item.sponsor.representative_name}</strong> •{' '}
+                            <a
+                              href={`mailto:${item.sponsor.email}`}
+                              className="text-[#63474D] hover:underline"
+                            >
+                              {item.sponsor.email}
+                            </a>
+                          </p>
+
+                          <p className="text-[11px] text-gray-400">
+                            Interest submitted on {new Date(item.interest_expressed_at).toLocaleDateString()}
+                          </p>
                         </div>
-                      )}
+                      </div>
 
-                      {isRejected && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-red-50 text-red-700 border border-red-200">
-                          <XCircle className="w-3.5 h-3.5 text-red-500" />
-                          Interest Declined
-                        </span>
-                      )}
+                      {/* Middle: Associated Event Pitch & Package (Bare typography, NO BOX) */}
+                      <div className="md:col-span-4 space-y-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate" title={item.application.event_title}>
+                          {item.application.event_title}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-gray-600 truncate">
+                          {item.package_name && (
+                            <span>Tier: <strong className="text-gray-800 font-semibold">{item.package_name}</strong></span>
+                          )}
+                          {item.pledged_amount ? (
+                            <span>
+                              • Pledged:{' '}
+                              <strong className="text-emerald-700 font-bold">
+                                {item.pledged_amount.toLocaleString()} {item.application.currency || 'ETB'}
+                              </strong>
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
 
-                      {isWithdrawn && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
-                          Withdrawn by Sponsor
-                        </span>
-                      )}
+                      {/* Right: Actions (Smaller button fonts, spacious layout) */}
+                      <div className="md:col-span-3 flex items-center justify-end">
+                        {isInterested && (
+                          <button
+                            type="button"
+                            disabled={actionLoadingDealId === item.deal_id}
+                            onClick={() => handleAcceptDeal(item.deal_id)}
+                            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs hover:shadow transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            title="Formalize sponsorship deal with this sponsor"
+                          >
+                            <Handshake className="w-3.5 h-3.5" />
+                            <span>Deal</span>
+                          </button>
+                        )}
+
+                        {isDealt && (
+                          <div className="flex flex-col items-end gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Deal Accepted</span>
+                              </span>
+
+                              {item.allow_attendee_sharing ? (
+                                <button
+                                  type="button"
+                                  disabled={actionLoadingDealId === item.deal_id}
+                                  onClick={() => handleToggleSharing(item.deal_id, false)}
+                                  className="px-2 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-[10px] font-semibold transition-all cursor-pointer disabled:opacity-50"
+                                  title="Revoke sponsor's access to checked-in attendee list"
+                                >
+                                  Revoke Sharing
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={actionLoadingDealId === item.deal_id}
+                                  onClick={() => handleToggleSharing(item.deal_id, true)}
+                                  className="px-2.5 py-1 rounded-lg bg-stone-900 hover:bg-black text-white text-[11px] font-medium shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                  title="Authorize sponsor to view checked-in attendee names"
+                                >
+                                  <span>Allow Sharing Attendee Info</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 text-[10px]">
+                              {item.allow_attendee_sharing ? (
+                                <span className="text-emerald-700 font-medium flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  Attendee sharing active
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">
+                                  Attendee sharing not enabled
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Sponsor Profile Drawer */}
           <SponsorProfileDrawer
@@ -2134,9 +2140,9 @@ export const ApplyToSponsorsPage: React.FC = () => {
 
                       <button
                         type="button"
-                        onClick={() => handleDelete(app.id)}
+                        onClick={() => handleDelete(app)}
                         className="p-2 text-gray-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors cursor-pointer"
-                        title="Withdraw pitch"
+                        title="Withdraw pitch from marketplace"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -2326,6 +2332,67 @@ export const ApplyToSponsorsPage: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Delete / Withdraw Pitch Confirmation Modal */}
+      {pitchToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-gray-100 space-y-5 animate-scale-in">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-xl text-gray-900">Withdraw Pitch from Marketplace</h3>
+              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                Are you sure you want to withdraw <strong className="text-gray-800">{pitchToDelete.event_title}</strong>? It will be completely removed from the public sponsorship marketplace and your dashboard.
+              </p>
+            </div>
+            <div className="p-3 bg-stone-50 rounded-xl border border-stone-200/60 text-xs text-stone-600 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-stone-500">Category:</span>
+                <span className="font-bold text-stone-800">{pitchToDelete.category}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-stone-500">Goal:</span>
+                <span className="font-bold text-stone-900">
+                  {pitchToDelete.funding_goal.toLocaleString()} {pitchToDelete.currency}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-stone-500">Interested Sponsors:</span>
+                <span className="font-bold text-stone-900">{pitchToDelete.interested_sponsors_count || 0}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingPitch}
+                onClick={() => setPitchToDelete(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingPitch}
+                onClick={confirmDeletePitch}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isDeletingPitch ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Withdrawing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Withdraw Pitch</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
