@@ -40,6 +40,29 @@ export const SponsorProfileDrawer: React.FC<SponsorProfileDrawerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  // Graceful slide-in & slide-out transition states
+  const [isMounted, setIsMounted] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsMounted(true);
+      const timer = setTimeout(() => setIsVisible(true), 20);
+      return () => clearTimeout(timer);
+    } else {
+      setIsVisible(false);
+      const timer = setTimeout(() => setIsMounted(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  const handleGracefulClose = () => {
+    setIsVisible(false);
+    setTimeout(() => {
+      onClose();
+    }, 300);
+  };
+
   useEffect(() => {
     if (!isOpen || !sponsorId) {
       setProfile(null);
@@ -47,22 +70,21 @@ export const SponsorProfileDrawer: React.FC<SponsorProfileDrawerProps> = ({
       return;
     }
 
-    let isMounted = true;
+    let active = true;
     setLoading(true);
     setError(null);
 
     api.sponsorship
       .getSponsorProfile(sponsorId)
       .then((data) => {
-        if (isMounted) {
+        if (active) {
           setProfile(data);
           setLoading(false);
         }
       })
       .catch((err: any) => {
-        if (isMounted) {
+        if (active) {
           console.warn('Could not fetch sponsor profile, falling back to dealItem data:', err);
-          // Fallback to dealItem details if already available
           if (dealItem?.sponsor) {
             setProfile({
               id: dealItem.sponsor.id,
@@ -85,38 +107,28 @@ export const SponsorProfileDrawer: React.FC<SponsorProfileDrawerProps> = ({
       });
 
     return () => {
-      isMounted = false;
+      active = false;
     };
   }, [isOpen, sponsorId, dealItem]);
 
   // Handle escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
+      if (e.key === 'Escape' && isVisible) {
+        handleGracefulClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isVisible]);
 
-  if (!isOpen) return null;
+  if (!isMounted) return null;
 
   const handleAccept = async () => {
     if (!dealItem || !onAcceptDeal) return;
     setActionLoading(true);
     try {
       await onAcceptDeal(dealItem.deal_id);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!dealItem || !onRejectDeal) return;
-    setActionLoading(true);
-    try {
-      await onRejectDeal(dealItem.deal_id);
     } finally {
       setActionLoading(false);
     }
@@ -133,17 +145,23 @@ export const SponsorProfileDrawer: React.FC<SponsorProfileDrawerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden animate-fade-in">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      {/* Backdrop with smooth fade transition */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity cursor-pointer"
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity duration-300 ease-in-out cursor-pointer ${
+          isVisible ? 'opacity-100' : 'opacity-0'
+        }`}
+        onClick={handleGracefulClose}
         aria-hidden="true"
       />
 
       {/* Drawer Container */}
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-gray-100">
+        <div
+          className={`w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-gray-100 transform transition-transform duration-300 ease-out ${
+            isVisible ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
           {/* Header */}
           <div className="px-6 py-5 bg-[#FAF7F5] border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -157,7 +175,7 @@ export const SponsorProfileDrawer: React.FC<SponsorProfileDrawerProps> = ({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleGracefulClose}
               className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 transition-all cursor-pointer"
               title="Close drawer"
             >
@@ -389,23 +407,12 @@ export const SponsorProfileDrawer: React.FC<SponsorProfileDrawerProps> = ({
           )}
 
           {dealItem && dealItem.deal_status === 'INTERESTED' && onAcceptDeal && (
-            <div className="p-5 bg-white border-t border-gray-100 flex items-center gap-3">
-              {onRejectDeal && (
-                <button
-                  type="button"
-                  disabled={actionLoading}
-                  onClick={handleReject}
-                  className="flex-1 py-3 px-4 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  <XCircle className="w-4 h-4" />
-                  <span>Reject</span>
-                </button>
-              )}
+            <div className="p-5 bg-white border-t border-gray-100 flex items-center">
               <button
                 type="button"
                 disabled={actionLoading}
                 onClick={handleAccept}
-                className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="w-full py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 <Handshake className="w-4 h-4" />
                 <span>Deal</span>

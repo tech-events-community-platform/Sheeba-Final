@@ -899,6 +899,13 @@ export const ApplyToSponsorsPage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Column Titles Header Row (Aligned with columns below) */}
+              <div className="hidden md:grid md:grid-cols-12 gap-4 px-6 py-2 text-xs font-bold uppercase tracking-wider text-gray-400 select-none">
+                <div className="md:col-span-5">Sponsors</div>
+                <div className="md:col-span-4">Interested In</div>
+                <div className="md:col-span-3 text-right">Actions</div>
+              </div>
+
               {filteredSponsors.map((item) => {
                 const isInterested = item.deal_status === 'INTERESTED';
                 const isDealt = item.deal_status === 'DEAL_ACCEPTED';
@@ -908,23 +915,23 @@ export const ApplyToSponsorsPage: React.FC = () => {
                 return (
                   <div
                     key={item.deal_id}
-                    className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-5"
+                    className="bg-white rounded-2xl p-5 border border-gray-100 shadow-xs hover:shadow-md transition-shadow grid grid-cols-1 md:grid-cols-12 items-center gap-4"
                   >
-                    {/* Left: Sponsor Avatar & Identity (Clickable) */}
-                    <div className="flex items-start gap-3.5 min-w-0">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#63474D] to-[#8C656C] text-white flex items-center justify-center font-serif text-lg font-bold shrink-0 overflow-hidden shadow-xs">
+                    {/* Left: Sponsor Avatar & Identity (Circular profile, Clickable) */}
+                    <div className="md:col-span-5 flex items-center gap-3.5 min-w-0">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#63474D] to-[#8C656C] text-white flex items-center justify-center font-serif text-lg font-bold shrink-0 overflow-hidden shadow-xs">
                         {item.sponsor.avatar_url ? (
                           <img
                             src={item.sponsor.avatar_url}
                             alt={item.sponsor.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover rounded-full"
                           />
                         ) : (
                           (item.sponsor.name || 'S')[0].toUpperCase()
                         )}
                       </div>
 
-                      <div className="space-y-1 min-w-0">
+                      <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <button
                             type="button"
@@ -932,18 +939,18 @@ export const ApplyToSponsorsPage: React.FC = () => {
                             className="text-left font-serif font-bold text-base text-[#2D1F23] hover:text-[#63474D] hover:underline flex items-center gap-1.5 cursor-pointer group"
                             title="Click to view full sponsor profile"
                           >
-                            <span>{item.sponsor.name}</span>
-                            <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#63474D] opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <span className="truncate">{item.sponsor.name}</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#63474D] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           </button>
 
                           {item.sponsor.industry_category && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-700 shrink-0">
                               {item.sponsor.industry_category}
                             </span>
                           )}
                         </div>
 
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 truncate">
                           Contact: <strong className="text-gray-700">{item.sponsor.representative_name}</strong> •{' '}
                           <a
                             href={`mailto:${item.sponsor.email}`}
@@ -959,15 +966,15 @@ export const ApplyToSponsorsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Middle: Associated Event Pitch & Package */}
-                    <div className="p-3.5 bg-[#FAF7F5] rounded-xl border border-[#AA767C]/15 min-w-[220px] max-w-sm space-y-1">
+                    {/* Middle: Associated Event Pitch & Package (Strictly Aligned) */}
+                    <div className="md:col-span-4 p-3.5 bg-[#FAF7F5] rounded-xl border border-[#AA767C]/15 space-y-1">
                       <p className="text-[10px] uppercase tracking-wider font-bold text-[#756366]">
                         Interested In Pitch
                       </p>
                       <p className="text-xs font-bold text-[#2D1F23] truncate" title={item.application.event_title}>
                         {item.application.event_title}
                       </p>
-                      <div className="flex items-center gap-2 text-[11px] text-gray-600 pt-0.5">
+                      <div className="flex items-center gap-2 text-[11px] text-gray-600 pt-0.5 truncate">
                         {item.package_name && <span>Tier: <strong className="text-gray-900">{item.package_name}</strong></span>}
                         {item.pledged_amount ? (
                           <span>
@@ -980,32 +987,19 @@ export const ApplyToSponsorsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Right: Status Pill & Actions */}
-                    <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                    {/* Right: Actions (Green Deal only when interested, sharing toggle when dealt) */}
+                    <div className="md:col-span-3 flex items-center justify-end">
                       {isInterested && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={actionLoadingDealId === item.deal_id}
-                            onClick={() => handleRejectDeal(item.deal_id)}
-                            className="px-3.5 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            title="Decline this sponsor's interest"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span>Reject</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={actionLoadingDealId === item.deal_id}
-                            onClick={() => handleAcceptDeal(item.deal_id)}
-                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            title="Formalize sponsorship deal with this sponsor"
-                          >
-                            <Handshake className="w-4 h-4" />
-                            <span>Deal</span>
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          disabled={actionLoadingDealId === item.deal_id}
+                          onClick={() => handleAcceptDeal(item.deal_id)}
+                          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          title="Formalize sponsorship deal with this sponsor"
+                        >
+                          <Handshake className="w-4 h-4" />
+                          <span>Deal</span>
+                        </button>
                       )}
 
                       {isDealt && (

@@ -255,34 +255,61 @@ export class SponsorshipService {
       throw err;
     }
 
-    const res = await query<ISponsorshipDeal>(
-      `INSERT INTO sponsorship_deals (
-        application_id,
-        sponsor_id,
-        status,
-        package_name,
-        pledged_amount,
-        sponsor_notes,
-        updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      ON CONFLICT (application_id, sponsor_id) DO UPDATE SET
-        status = EXCLUDED.status,
-        package_name = COALESCE(EXCLUDED.package_name, sponsorship_deals.package_name),
-        pledged_amount = COALESCE(EXCLUDED.pledged_amount, sponsorship_deals.pledged_amount),
-        sponsor_notes = COALESCE(EXCLUDED.sponsor_notes, sponsorship_deals.sponsor_notes),
-        updated_at = NOW()
-      RETURNING *`,
-      [
-        applicationId,
-        sponsorId,
-        status,
-        data?.package_name || null,
-        data?.pledged_amount ? Number(data.pledged_amount) : null,
-        data?.sponsor_notes || null,
-      ]
+    // Check if deal already exists for this application and sponsor
+    const existingRes = await query(
+      `SELECT id, status, package_name, pledged_amount, sponsor_notes
+       FROM sponsorship_deals
+       WHERE application_id = $1 AND sponsor_id = $2 AND deleted_at IS NULL
+       LIMIT 1`,
+      [applicationId, sponsorId]
     );
 
-    const deal = res.rows[0];
+    let deal: ISponsorshipDeal;
+
+    if (existingRes.rowCount && existingRes.rowCount > 0) {
+      const existingId = existingRes.rows[0].id;
+      const updateRes = await query<ISponsorshipDeal>(
+        `UPDATE sponsorship_deals
+         SET status = $1,
+             package_name = COALESCE($2, package_name),
+             pledged_amount = COALESCE($3, pledged_amount),
+             sponsor_notes = COALESCE($4, sponsor_notes),
+             updated_at = NOW()
+         WHERE id = $5
+         RETURNING *`,
+        [
+          status,
+          data?.package_name || null,
+          data?.pledged_amount ? Number(data.pledged_amount) : null,
+          data?.sponsor_notes || null,
+          existingId,
+        ]
+      );
+      deal = updateRes.rows[0];
+    } else {
+      const insertRes = await query<ISponsorshipDeal>(
+        `INSERT INTO sponsorship_deals (
+          application_id,
+          sponsor_id,
+          status,
+          package_name,
+          pledged_amount,
+          sponsor_notes,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+        RETURNING *`,
+        [
+          applicationId,
+          sponsorId,
+          status,
+          data?.package_name || null,
+          data?.pledged_amount ? Number(data.pledged_amount) : null,
+          data?.sponsor_notes || null,
+        ]
+      );
+      deal = insertRes.rows[0];
+    }
 
     await CacheService.delPattern(`sponsorship:deals:${sponsorId}*`);
     await CacheService.delPattern(`sponsorship:app:${applicationId}*`);

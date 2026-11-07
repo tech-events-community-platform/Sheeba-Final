@@ -41,7 +41,7 @@ export const SponsorApplicationDetailPage: React.FC = () => {
   // Interaction State
   const [selectedPackage, setSelectedPackage] = useState<string>('');
   const [pledgedAmount, setPledgedAmount] = useState<number | undefined>(undefined);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [activeAction, setActiveAction] = useState<'INTERESTED' | 'DECLINED' | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
@@ -94,7 +94,7 @@ export const SponsorApplicationDetailPage: React.FC = () => {
     }
 
     try {
-      setActionLoading(true);
+      setActiveAction(status);
       setFeedbackMessage(null);
 
       await api.sponsorship.expressInterestOrDecline({
@@ -107,12 +107,20 @@ export const SponsorApplicationDetailPage: React.FC = () => {
       // Navigate to deals and pledges tab
       navigate('/sponsor/deals');
     } catch (err: any) {
+      console.error('Failed to express interest or decline:', err);
+      const isConstraintErr =
+        err.message?.includes('constraint') ||
+        err.message?.includes('ON CONFLICT') ||
+        err.message?.includes('specification');
+
       setFeedbackMessage({
         type: 'error',
-        text: err.message || 'Failed to update deal status.',
+        text: isConstraintErr
+          ? 'Unable to record your interest. Please refresh and try again.'
+          : err.message || 'Failed to update deal status.',
       });
     } finally {
-      setActionLoading(false);
+      setActiveAction(null);
     }
   };
 
@@ -716,22 +724,34 @@ export const SponsorApplicationDetailPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
         <button
           type="button"
-          disabled={actionLoading}
+          disabled={activeAction !== null}
           onClick={() => handleExpressInterestOrDecline('DECLINED')}
-          className="w-full sm:w-56 py-3.5 px-6 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          className={`w-full sm:w-56 py-3.5 px-6 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeAction === 'DECLINED'
+              ? 'opacity-80 cursor-wait ring-2 ring-red-400'
+              : activeAction === 'INTERESTED'
+              ? 'pointer-events-none'
+              : ''
+          }`}
         >
-          <XCircle className="w-5 h-5" />
-          <span>Decline</span>
+          <XCircle className={`w-5 h-5 ${activeAction === 'DECLINED' ? 'animate-spin' : ''}`} />
+          <span>{activeAction === 'DECLINED' ? 'Declining...' : 'Decline'}</span>
         </button>
 
         <button
           type="button"
-          disabled={actionLoading}
+          disabled={activeAction !== null}
           onClick={() => handleExpressInterestOrDecline('INTERESTED')}
-          className="w-full sm:w-56 py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          className={`w-full sm:w-56 py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeAction === 'INTERESTED'
+              ? 'opacity-80 cursor-wait ring-2 ring-emerald-400'
+              : activeAction === 'DECLINED'
+              ? 'pointer-events-none'
+              : ''
+          }`}
         >
-          <CheckCircle2 className="w-5 h-5" />
-          <span>Mark as Interested</span>
+          <CheckCircle2 className={`w-5 h-5 ${activeAction === 'INTERESTED' ? 'animate-spin' : ''}`} />
+          <span>{activeAction === 'INTERESTED' ? 'Submitting...' : 'Mark as Interested'}</span>
         </button>
       </div>
     </div>
