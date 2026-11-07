@@ -6,16 +6,7 @@ import { AuthRequest } from '../types';
 export class AuthController {
   static async register(req: Request, res: Response, next: NextFunction) {
     try {
-      const { email, password, full_name, role, phone, bio, organization } = req.body;
-      const result = await AuthService.registerUser({
-        email,
-        password,
-        full_name,
-        role,
-        phone,
-        bio,
-        organization,
-      });
+      const result = await AuthService.registerUser(req.body);
 
       const statusCode = result.requireOtp ? 200 : 201;
       return sendSuccess(res, result, result.message || 'User registered successfully.', statusCode);
@@ -58,14 +49,7 @@ export class AuthController {
   static async applyForOrganizer(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.userId;
-      const { organization, bio, phone, password, socials } = req.body;
-      const result = await AuthService.applyForOrganizer(userId, {
-        organization,
-        bio,
-        phone,
-        password,
-        socials,
-      });
+      const result = await AuthService.applyForOrganizer(userId, req.body);
 
       return sendSuccess(res, result, result.message);
     } catch (error) {
@@ -159,17 +143,7 @@ export class AuthController {
 
   static async registerSponsor(req: Request, res: Response, next: NextFunction) {
     try {
-      const { full_name, email, password, company_name, industry_category, company_phone, company_website } = req.body;
-      const result = await AuthService.registerSponsor({
-        full_name,
-        email,
-        password,
-        company_name,
-        industry_category,
-        company_phone,
-        company_website,
-      });
-
+      const result = await AuthService.registerSponsor(req.body);
       return sendSuccess(res, result, result.message, 201);
     } catch (error) {
       next(error);
@@ -225,6 +199,48 @@ export class AuthController {
     try {
       const { email, otp, newPassword } = req.body;
       const result = await AuthService.verifyOtpAndResetPassword(email, otp, newPassword);
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async addExhibitorRole(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { companyName, industryCategory, companyPhone, companyWebsite, exhibitorDescription, password } = req.body;
+      const result = await AuthService.addExhibitorRole(userId, {
+        companyName,
+        industryCategory,
+        companyPhone,
+        companyWebsite,
+        exhibitorDescription,
+        password,
+      });
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getOrganizerResponseDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const token = (req.query.token as string) || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/, '') : undefined);
+      const authenticatedUserId = (req as AuthRequest).user?.userId;
+      const result = await AuthService.getOrganizerResponseDetails(token, authenticatedUserId);
+      sendSuccess(res, result, 'Organizer response details retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async submitOrganizerResponse(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const authenticatedUserId = (req as AuthRequest).user?.userId;
+      const result = await AuthService.submitOrganizerResponse({
+        ...req.body,
+        authenticatedUserId,
+      });
       sendSuccess(res, result, result.message);
     } catch (error) {
       next(error);

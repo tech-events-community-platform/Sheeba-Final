@@ -1,8 +1,8 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../types';
 import { SponsorshipService } from '../services/sponsorship.service';
-import { CacheService } from '../services/cache.service';
 import { sendSuccess, sendError } from '../utils/apiResponse';
+import { CacheService } from '../services/cache.service';
 
 export class SponsorshipController {
   /**
@@ -42,29 +42,17 @@ export class SponsorshipController {
   }
 
   /**
-   * Admin retrieves all marketplace sponsorship pitches for oversight and take-down
-   */
-  static async getApplicationsForAdmin(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-    try {
-      if (req.user?.role !== 'admin') {
-        sendError(res, 'Admin authorization required.', 403);
-        return;
-      }
-      const applications = await SponsorshipService.getAllApplicationsForAdmin();
-      sendSuccess(res, applications, 'Sponsorship pitches retrieved for admin.');
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
    * Sponsors explore open applications in the marketplace
    */
   static async exploreApplications(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { category, search, minBudget, maxBudget, refresh } = req.query;
+
+      // Invalidate explore cache on manual refresh
       if (refresh === 'true') {
-        await CacheService.delPattern('sponsorship:explore*');
+        try {
+          await CacheService.delPattern('sponsorship:explore:*');
+        } catch {}
       }
 
       const applications = await SponsorshipService.getAllOpenApplications({
@@ -94,6 +82,24 @@ export class SponsorshipController {
   }
 
   /**
+   * Stage 2: Sponsor submits formal sponsorship application to a pitch
+   */
+  static async submitFormalApplication(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const deal = await SponsorshipService.submitFormalApplication(sponsorId, req.body);
+      sendSuccess(res, deal, 'Sponsorship application submitted successfully. It is now pending administrator review.', 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Sponsor marks an application as INTERESTED or DECLINED
    */
   static async expressInterestOrDecline(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
@@ -104,17 +110,33 @@ export class SponsorshipController {
         return;
       }
 
-      const { applicationId, status, package_name, pledged_amount, sponsor_notes } = req.body;
+      const { applicationId, status = 'INTERESTED', package_name, pledged_amount, sponsor_notes, proposal_message } = req.body;
+
+      if (proposal_message && proposal_message.trim()) {
+        const deal = await SponsorshipService.submitFormalApplication(sponsorId, {
+          applicationId,
+          package_name: package_name || 'Standard',
+          pledged_amount: pledged_amount ? Number(pledged_amount) : 0,
+          proposal_message: proposal_message.trim(),
+          sponsor_notes,
+        });
+        sendSuccess(res, deal, 'Formal sponsorship application submitted and pending review.', 201);
+        return;
+      }
 
       const deal = await SponsorshipService.expressInterestOrDecline(sponsorId, applicationId, status, {
         package_name,
         pledged_amount,
         sponsor_notes,
+        proposal_message,
       });
 
-      const message = status === 'INTERESTED'
-        ? 'Application added to your Deals & Pledges as Interested.'
-        : 'Application marked as Declined.';
+      const message =
+        status === 'INTERESTED'
+          ? 'Application marked as Interested.'
+          : status === 'DECLINED'
+          ? 'Application marked as Declined.'
+          : 'Deal status updated.';
 
       sendSuccess(res, deal, message);
     } catch (error) {
@@ -142,7 +164,7 @@ export class SponsorshipController {
   }
 
   /**
-   * Sponsor updates deal status (e.g. toggle between INTERESTED and DECLINED)
+   * Sponsor updates deal notes or status
    */
   static async updateDeal(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -153,9 +175,9 @@ export class SponsorshipController {
       }
 
       const dealId = req.params.id as string;
-      const { status, sponsor_notes } = req.body;
+      const { status, sponsor_notes, proposal_message } = req.body;
 
-      const deal = await SponsorshipService.updateDealStatus(dealId, sponsorId, status, sponsor_notes);
+      const deal = await SponsorshipService.updateDealStatus(dealId, sponsorId, status, sponsor_notes, proposal_message);
       sendSuccess(res, deal, `Deal status updated to ${status}.`);
     } catch (error) {
       next(error);
@@ -163,7 +185,27 @@ export class SponsorshipController {
   }
 
   /**
-   * Organizer deletes or closes their pitch
+   * Stage 2: Organizer views approved sponsors for a specific pitch
+   */
+  static async getApprovedSponsorsForPitch(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const organizerId = req.user?.userId;
+      if (!organizerId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const pitchId = req.params.id as string;
+      const userRole = req.user?.role;
+      const data = await SponsorshipService.getApprovedSponsorsForPitch(pitchId, organizerId, userRole);
+      sendSuccess(res, data, 'Approved sponsors for pitch retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Organizer deletes or closes their pitch (or Admin moderation takedown)
    */
   static async deleteApplication(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -181,7 +223,7 @@ export class SponsorshipController {
         return;
       }
 
-      sendSuccess(res, { deleted: true }, 'Application deleted successfully.');
+      sendSuccess(res, { id, deleted: true }, 'Sponsorship application deleted successfully.');
     } catch (error) {
       next(error);
     }
@@ -282,7 +324,7 @@ export class SponsorshipController {
   }
 
   /**
-   * Phase 2: Organizer explicitly toggles attendee-information sharing for an accepted deal
+   * Phase 1: Organizer explicitly allows or revokes attendee sharing
    */
   static async toggleAttendeeSharing(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -435,7 +477,7 @@ export class SponsorshipController {
   }
 
   /**
-   * Phase 4: Retrieve sponsor reports summary (genuine counts only)
+   * Phase 4: Retrieve sponsor reports summary
    */
   static async getSponsorReportsSummary(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -447,6 +489,109 @@ export class SponsorshipController {
 
       const summary = await SponsorshipService.getSponsorReportsSummary(sponsorId);
       sendSuccess(res, summary, 'Sponsor reports summary retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 4: Retrieve deal responses for CSV export
+   */
+  static async getDealResponsesExport(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      const dealId = req.params.dealId as string;
+
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const data = await SponsorshipService.getDealResponsesForExport(dealId, sponsorId);
+      sendSuccess(res, data, 'Deal responses retrieved.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Admin: List all applications for moderation oversight
+   */
+  static async getApplicationsForAdmin(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const applications = await SponsorshipService.getAllApplicationsForAdmin();
+      sendSuccess(res, applications, 'Admin applications retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Save or update a deliverable (Sponsor)
+   */
+  static async saveDeliverable(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+      const data = await SponsorshipService.saveDeliverable(sponsorId, req.body);
+      sendSuccess(res, data, 'Deliverable saved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * List all deliverables for current sponsor
+   */
+  static async getMyDeliverables(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+      const data = await SponsorshipService.getDeliverablesForSponsor(sponsorId);
+      sendSuccess(res, data, 'Sponsor deliverables retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get deliverable for a specific deal
+   */
+  static async getDealDeliverable(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      const userRole = req.user?.role || '';
+      if (!userId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+      const dealId = (req.params.dealId || req.params.id) as string;
+      const data = await SponsorshipService.getDeliverableForDeal(dealId, userId, userRole);
+      sendSuccess(res, data, 'Deal deliverable retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Delete deliverable
+   */
+  static async deleteDeliverable(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+      const id = req.params.id as string;
+      await SponsorshipService.deleteDeliverable(id, sponsorId);
+      sendSuccess(res, { id }, 'Deliverable deleted successfully.');
     } catch (error) {
       next(error);
     }

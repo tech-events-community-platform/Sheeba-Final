@@ -401,25 +401,23 @@ export class EmailService {
             <p style="margin: 6px 0; font-size: 14px;"><strong>Ticket Code:</strong> <span style="font-family: monospace; font-weight: bold; color: #63474D;">${ticketCode}</span></p>
           </div>
 
-          ${
-            qrDataUrl
-              ? `
+          ${qrDataUrl
+        ? `
           <div style="text-align: center; margin: 24px 0; padding: 16px; background-color: #FAF7F5; border-radius: 16px; border: 1px solid #E8DDD7;">
             <p style="font-size: 12px; font-weight: bold; color: #63474D; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Your QR Entry Pass</p>
             <img src="cid:${qrCid}" alt="QR Ticket Code" width="180" height="180" style="width: 180px; height: 180px; max-width: 100%; display: inline-block; border-radius: 8px; aspect-ratio: 1/1;" />
             <p style="font-size: 11px; color: #756366; margin-top: 8px;">Present this QR code at the event door for scan verification & check-in.</p>
           </div>
           `
-              : ''
-          }
+        : ''
+      }
 
           <div style="background-color: #FFF8F6; border-left: 4px solid #63474D; padding: 14px 16px; border-radius: 6px; margin: 24px 0;">
             <p style="margin: 0; font-size: 13px; color: #63474D; line-height: 1.5;">
-              ${
-                isExistingUser
-                  ? `<strong>Account Ready:</strong> Sign in with your registered email <strong>${toEmail}</strong> to view your ticket and pass anytime on your dashboard.`
-                  : `<strong>Account Setup Required:</strong> Use your registered email <strong>${toEmail}</strong> to create/finish setting up your Sheeba account and access your dashboard pass.`
-              }
+              ${isExistingUser
+        ? `<strong>Account Ready:</strong> Sign in with your registered email <strong>${toEmail}</strong> to view your ticket and pass anytime on your dashboard.`
+        : `<strong>Account Setup Required:</strong> Use your registered email <strong>${toEmail}</strong> to create/finish setting up your Sheeba account and access your dashboard pass.`
+      }
             </p>
           </div>
 
@@ -497,15 +495,14 @@ export class EmailService {
             </a>
           </div>
 
-          ${
-            isPaymentPending
-              ? `<div style="background-color: #FFFBEB; border-left: 4px solid #D97706; padding: 14px 16px; border-radius: 6px; margin: 20px 0;">
+          ${isPaymentPending
+        ? `<div style="background-color: #FFFBEB; border-left: 4px solid #D97706; padding: 14px 16px; border-radius: 6px; margin: 20px 0;">
                    <p style="margin: 0; font-size: 13px; color: #92400E; line-height: 1.5;">
                      <strong>Payment Status: Pending.</strong> Your registration has been recorded. Once your payment is verified or settled through an authorized channel, your active dynamic entrance QR pass will be unlocked in your Sheeba dashboard.
                    </p>
                  </div>`
-              : !isPaymentPending && qrDataUrl
-              ? `
+        : !isPaymentPending && qrDataUrl
+          ? `
           <div style="text-align: center; margin: 24px 0; padding: 20px; background-color: #FAF7F5; border-radius: 16px; border: 1px solid #E8DDD7;">
             <p style="font-size: 12px; font-weight: bold; color: #63474D; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Your Entrance Pass</p>
             <img src="cid:${qrCid}" alt="QR Ticket Code" width="180" height="180" style="width: 180px; height: 180px; max-width: 100%; display: inline-block; border-radius: 8px; aspect-ratio: 1/1;" />
@@ -513,8 +510,8 @@ export class EmailService {
             <p style="font-size: 11px; color: #756366; margin-top: 8px;">Present this QR code on event day for instant check-in verification.</p>
           </div>
           `
-              : ''
-          }
+          : ''
+      }
 
           <p style="color: #555; line-height: 1.6; margin: 20px 0 0 0; font-size: 14px;">
             We look forward to seeing you there!
@@ -591,21 +588,20 @@ export class EmailService {
             <p style="margin: 0 0 10px 0; font-size: 14px; color: #2D1F23;">
               <strong>Email:</strong> <span style="font-family: monospace; color: #63474D;">${toEmail}</span>
             </p>
-            ${
-              initialPassword
-                ? `
+            ${initialPassword
+        ? `
             <p style="margin: 0; font-size: 14px; color: #2D1F23;">
               <strong>Initial password:</strong> <code style="font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 15px; font-weight: bold; background-color: #FFFFFF; padding: 4px 10px; border-radius: 6px; border: 1px solid #E8DDD7; color: #63474D; display: inline-block;">${initialPassword}</code>
             </p>
             `
-                : passwordSetupLink
-                ? `
+        : passwordSetupLink
+          ? `
             <p style="margin: 0; font-size: 13px; color: #63474D;">
               <a href="${passwordSetupLink}" style="color: #63474D; font-weight: bold;">Set your password here</a>
             </p>
             `
-                : ''
-            }
+          : ''
+      }
           </div>
 
           <div style="margin: 24px 0; text-align: center;">
@@ -627,15 +623,14 @@ export class EmailService {
             Once logged in, you can view your account and event registration. Your QR ticket will be available according to the event's registration, approval, and payment rules.
           </p>
 
-          ${
-            isPaymentPending
-              ? `<div style="background-color: #FFFBEB; border-left: 4px solid #D97706; padding: 14px 16px; border-radius: 6px; margin: 20px 0;">
+          ${isPaymentPending
+        ? `<div style="background-color: #FFFBEB; border-left: 4px solid #D97706; padding: 14px 16px; border-radius: 6px; margin: 20px 0;">
                    <p style="margin: 0; font-size: 13px; color: #92400E; line-height: 1.5;">
                      <strong>Registration Status: Pending Payment / Review.</strong> Your registration has been recorded. Once your payment is verified or settled by the organizer, your active entrance QR ticket will be unlocked in your Sheeba dashboard.
                    </p>
                  </div>`
-              : !isPaymentPending && qrDataUrl
-              ? `
+        : !isPaymentPending && qrDataUrl
+          ? `
           <div style="text-align: center; margin: 24px 0; padding: 20px; background-color: #FAF7F5; border-radius: 16px; border: 1px solid #E8DDD7;">
             <p style="font-size: 12px; font-weight: bold; color: #63474D; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Your QR Entrance Pass</p>
             <img src="cid:${qrCid}" alt="QR Ticket Code" width="180" height="180" style="width: 180px; height: 180px; max-width: 100%; display: inline-block; border-radius: 8px; aspect-ratio: 1/1;" />
@@ -643,8 +638,8 @@ export class EmailService {
             <p style="font-size: 11px; color: #756366; margin-top: 8px;">Present this QR code on event day for instant check-in verification.</p>
           </div>
           `
-              : ''
-          }
+          : ''
+      }
 
           <p style="color: #2D1F23; font-weight: bold; margin: 24px 0 0 0; font-size: 15px;">
             Welcome to Sheeba!
@@ -788,6 +783,175 @@ export class EmailService {
    * Organizer Account Approved Email
    * Dispatched by AdminService.approveOrganizer() after the DB update succeeds.
    */
+
+  /**
+   * Formal Sponsorship Application Submitted Email (Confirmation to Sponsor)
+   */
+  static async sendSponsorshipApplicationSubmittedEmail(
+    toEmail: string,
+    fullName: string,
+    companyName: string,
+    eventTitle: string,
+    packageName?: string,
+    pledgedAmount?: number
+  ): Promise<void> {
+    const subject = `Application Submitted: ${eventTitle} Sponsorship`;
+    const formattedAmount = pledgedAmount ? `${pledgedAmount.toLocaleString()} ETB` : 'Flexible / Package standard';
+    const htmlBody = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <h2 style="color: #63474D; font-size: 22px; margin-top: 0;">Sponsorship Application Submitted</h2>
+        <p>Hello ${fullName},</p>
+        <p>Your formal sponsorship proposal for <strong>${eventTitle}</strong> on behalf of <strong>${companyName}</strong> has been received and queued for review.</p>
+        
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 12px; padding: 18px; margin: 20px 0;">
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Event Pitch:</strong> ${eventTitle}</p>
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Selected Package:</strong> ${packageName || 'Custom Tier'}</p>
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Proposed Amount:</strong> ${formattedAmount}</p>
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Status:</strong> Under Sheeba Administration Review</p>
+        </div>
+
+        <p style="font-size: 13px; color: #555; line-height: 1.5;">Every sponsorship application undergoes manual administrator review to guarantee alignment and platform integrity. You will receive an immediate notification as soon as a decision is made.</p>
+        
+        <div style="margin: 24px 0;">
+          <a href="${getFrontendUrl()}/sponsor/deals" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px; display: inline-block;">
+            View Submitted Application
+          </a>
+        </div>
+        <p style="font-size: 12px; color: #756366; margin-top: 32px;">Sheeba Platform • Ethiopian Tech Community Credentials</p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Sponsorship Application Approved Email (To Sponsor)
+   */
+  static async sendSponsorshipApplicationApprovedEmail(
+    toEmail: string,
+    fullName: string,
+    companyName: string,
+    eventTitle: string,
+    packageName?: string,
+    pledgedAmount?: number,
+    organizerName?: string,
+    organizerOrg?: string
+  ): Promise<void> {
+    const subject = `🎉 Sponsorship Application Approved: ${eventTitle}`;
+    const formattedAmount = pledgedAmount ? `${pledgedAmount.toLocaleString()} ETB` : 'Agreed amount';
+    const htmlBody = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <h2 style="color: #2A7B5F; font-size: 22px; margin-top: 0;">Sponsorship Application Approved!</h2>
+        <p>Hello ${fullName},</p>
+        <p>Congratulations! Sheeba Administration has formally approved your sponsorship application for <strong>${eventTitle}</strong>.</p>
+        
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 12px; padding: 18px; margin: 20px 0;">
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Event Pitch:</strong> ${eventTitle}</p>
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Package:</strong> ${packageName || 'Approved Tier'}</p>
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Pledged Amount:</strong> ${formattedAmount}</p>
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Organizer:</strong> ${organizerOrg || organizerName || 'Event Host'}</p>
+          <p style="margin: 4px 0; font-size: 13px; color: #2A7B5F;"><strong>Status:</strong> Approved</p>
+        </div>
+
+        <p style="font-size: 13px; color: #555; line-height: 1.5;">The event organizer has been notified of your sponsorship and can now access your corporate representative details to coordinate deliverables and event logistics.</p>
+
+        <div style="margin: 24px 0;">
+          <a href="${getFrontendUrl()}/sponsor/deals" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px; display: inline-block;">
+            Access Deal Pipeline
+          </a>
+        </div>
+        <p style="font-size: 12px; color: #756366; margin-top: 32px;">Sheeba Platform • Ethiopian Tech Community Credentials</p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Organizer Notified of Approved Sponsor Email
+   */
+  static async sendOrganizerSponsorApprovedNotificationEmail(
+    toEmail: string,
+    organizerName: string,
+    eventTitle: string,
+    sponsorCompanyName: string,
+    sponsorRepName: string,
+    sponsorEmail: string,
+    sponsorPhone?: string,
+    packageName?: string,
+    pledgedAmount?: number,
+    proposalMessage?: string
+  ): Promise<void> {
+    const subject = `✨ New Approved Sponsor for ${eventTitle}: ${sponsorCompanyName}`;
+    const formattedAmount = pledgedAmount ? `${pledgedAmount.toLocaleString()} ETB` : 'Pledged package tier';
+    const htmlBody = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <h2 style="color: #63474D; font-size: 22px; margin-top: 0;">New Approved Sponsor!</h2>
+        <p>Hello ${organizerName},</p>
+        <p>Great news! Sheeba Administration has reviewed and approved a corporate sponsor for your pitch <strong>${eventTitle}</strong>.</p>
+        
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 12px; padding: 18px; margin: 20px 0;">
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Sponsor Company:</strong> ${sponsorCompanyName}</p>
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Representative:</strong> ${sponsorRepName}</p>
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Contact Email:</strong> <a href="mailto:${sponsorEmail}" style="color: #63474D;">${sponsorEmail}</a></p>
+          ${sponsorPhone ? `<p style="margin: 4px 0; font-size: 13px;"><strong>Phone:</strong> ${sponsorPhone}</p>` : ''}
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Package:</strong> ${packageName || 'Standard'}</p>
+          <p style="margin: 4px 0; font-size: 13px;"><strong>Pledged Amount:</strong> ${formattedAmount}</p>
+          ${proposalMessage ? `<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #E8DDD7;"><p style="margin: 2px 0; font-size: 12px; color: #555;"><strong>Proposal Note:</strong></p><p style="margin: 4px 0; font-size: 12px; font-style: italic; color: #333;">"${proposalMessage}"</p></div>` : ''}
+        </div>
+
+        <p style="font-size: 13px; color: #555; line-height: 1.5;">You can now reach out directly to coordinate brand placements, stage mentions, and logistics for your upcoming event.</p>
+        
+        <div style="margin: 24px 0;">
+          <a href="${getFrontendUrl()}/organizer/pitches" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px; display: inline-block;">
+            View Pitch & Sponsors
+          </a>
+        </div>
+        <p style="font-size: 12px; color: #756366; margin-top: 32px;">Sheeba Platform • Ethiopian Tech Community Credentials</p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, organizerName);
+  }
+
+  /**
+   * Sponsorship Application Rejected Email (To Sponsor with mandatory reason)
+   */
+  static async sendSponsorshipApplicationRejectedEmail(
+    toEmail: string,
+    fullName: string,
+    companyName: string,
+    eventTitle: string,
+    packageName?: string,
+    rejectionReason?: string
+  ): Promise<void> {
+    const subject = `Update Regarding Your Sponsorship Application: ${eventTitle}`;
+    const htmlBody = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <h2 style="color: #63474D; font-size: 22px; margin-top: 0;">Sponsorship Application Update</h2>
+        <p>Hello ${fullName},</p>
+        <p>Thank you for submitting a sponsorship application for <strong>${eventTitle}</strong> on behalf of <strong>${companyName}</strong>.</p>
+        <p>After careful administrator review, your application for the <strong>${packageName || 'selected package'}</strong> could not be approved at this time.</p>
+        
+        <div style="background-color: #FFFFFF; border: 1px solid #FFA686; border-radius: 12px; padding: 18px; margin: 20px 0;">
+          <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: #A83232;">Administrator Review Feedback:</p>
+          <p style="margin: 0; font-size: 13px; color: #444; line-height: 1.5; font-style: italic;">"${rejectionReason || 'Application does not meet current pitch criteria or package availability.'}"</p>
+        </div>
+
+        <p style="font-size: 13px; color: #555; line-height: 1.5;">You are welcome to revise your proposal and submit a new application for this pitch, or explore other tech events and hackathons open on the marketplace.</p>
+
+        <div style="margin: 24px 0;">
+          <a href="${getFrontendUrl()}/sponsor/explore" style="background-color: #63474D; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px; display: inline-block;">
+            Explore Other Pitches
+          </a>
+        </div>
+        <p style="font-size: 12px; color: #756366; margin-top: 32px;">Sheeba Platform • Ethiopian Tech Community Credentials</p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
   static async sendOrganizerApprovalEmail(toEmail: string, fullName: string, organization: string): Promise<void> {
     const subject = `🎉 Your Sheeba Organizer Account Has Been Approved!`;
     const htmlBody = `
@@ -835,7 +999,7 @@ export class EmailService {
    * Dispatched by AdminService.rejectOrganizer() after the DB update succeeds.
    * Informs the user their attendee access remains fully intact.
    */
-  static async sendOrganizerRejectionEmail(toEmail: string, fullName: string, organization: string): Promise<void> {
+  static async sendOrganizerRejectionEmail(toEmail: string, fullName: string, organization: string, reason?: string): Promise<void> {
     const subject = `Update on Your Sheeba Organizer Application`;
     const htmlBody = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
@@ -849,7 +1013,15 @@ export class EmailService {
           <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">Hello ${fullName},</p>
           <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
             Thank you for your interest in organizing community events through Sheeba. After reviewing your application for <strong>${organization}</strong>, the Sheeba Administration was unable to approve it at this time.
+          ${reason ? `<div style="background-color: #FFF5F5; border-left: 4px solid #E53E3E; padding: 14px 18px; margin: 18px 0; border-radius: 8px;"><p style="margin: 0; font-size: 13px; font-weight: bold; color: #C53030;">Reason for Decision:</p><p style="margin: 6px 0 0 0; font-size: 14px; color: #4A5568; line-height: 1.5;">${reason}</p></div>` : ''}
+
           </p>
+          ${reason ? `
+          <div style="background-color: #FFF5F5; border-left: 4px solid #E53E3E; padding: 14px 18px; margin: 18px 0; border-radius: 8px;">
+            <p style="margin: 0; font-size: 13px; font-weight: bold; color: #C53030;">Reason for Decision:</p>
+            <p style="margin: 6px 0 0 0; font-size: 14px; color: #4A5568; line-height: 1.5;">${reason}</p>
+          </div>
+          ` : ''}
           <p style="color: #555; line-height: 1.6; margin: 0 0 24px 0; font-size: 14px;">
             <strong>Your attendee account remains fully active.</strong> You can still register for events, collect verifiable attendance badges, and use all attendee features on the platform. You may also update your community details and re-apply from your Account Settings.
           </p>
@@ -877,6 +1049,61 @@ export class EmailService {
   }
 
   /**
+   * Organizer Application Additional Information Requested Email
+   * Dispatched by AdminService.requestOrganizerInfo()
+   */
+  static async sendOrganizerInfoRequestedEmail(toEmail: string, fullName: string, organization: string, notes: string, actionToken?: string): Promise<void> {
+    const subject = `Additional Information Requested: Your Sheeba Organizer Application`;
+    const actionUrl = actionToken
+      ? `${getFrontendUrl()}/organizer-response?token=${encodeURIComponent(actionToken)}`
+      : `${getFrontendUrl()}/app/settings`;
+
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Organization &amp; Verifiable Credentials</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+          <h2 style="color: #63474D; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Additional Information Requested</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">Hello ${fullName},</p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            The Sheeba administration is currently reviewing your organizer application for <strong>${organization}</strong>. To complete your verification, we need some additional information:
+          </p>
+
+          <div style="background-color: #FEF8E7; border-left: 4px solid #D97706; padding: 14px 18px; margin: 18px 0; border-radius: 8px;">
+            <p style="margin: 0; font-size: 13px; font-weight: bold; color: #92400E;">Admin Note:</p>
+            <p style="margin: 6px 0 0 0; font-size: 14px; color: #78350F; line-height: 1.5;">${notes}</p>
+          </div>
+
+          <p style="color: #555; line-height: 1.6; margin: 0 0 24px 0; font-size: 14px;">
+            Please click the button below to answer the administration's question and update your application details.
+          </p>
+
+          <div style="margin: 28px 0; text-align: center;">
+            <a href="${actionUrl}" style="background-color: #63474D; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block; font-size: 14px;">
+              Answer Question &amp; Update Application
+            </a>
+          </div>
+
+          <p style="color: #555; line-height: 1.6; margin: 0; font-size: 13px;">
+            If you have questions, reply directly to this message or contact us at
+            <a href="mailto:sheebanet.events@gmail.com" style="color: #63474D; font-weight: 600;">sheebanet.events@gmail.com</a>.
+          </p>
+        </div>
+
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 28px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
    * Contact Us Notification Email to Sheeba Team
    * Dispatched to the organization email (BREVO_SENDER_EMAIL) when a visitor submits the contact form.
    */
@@ -887,7 +1114,7 @@ export class EmailService {
     category?: string;
     message: string;
   }): Promise<void> {
-    const teamEmail = process.env.BREVO_SENDER_EMAIL || 'sheebanet.events@gmail.com';
+    const teamEmail = process.env.CONTACT_RECIPIENT_EMAIL || process.env.BREVO_SENDER_EMAIL || 'sheebanet.events@gmail.com';
     const emailSubject = `📬 [Contact Us] ${data.category ? `[${data.category}] ` : ''}${data.subject} - from ${data.name}`;
     const formattedDate = new Date().toLocaleString('en-US', {
       timeZone: 'Africa/Addis_Ababa',

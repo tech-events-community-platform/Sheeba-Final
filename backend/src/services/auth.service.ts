@@ -2,8 +2,9 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { query } from '../config/db';
 import { IUser, IUserSafe, UserRole, ISponsorRegistration } from '../types';
-import { signAuthToken } from '../utils/jwt.util';
+import { signAuthToken, verifyAuthToken } from '../utils/jwt.util';
 import { EmailService } from './email.service';
+import { CacheService } from './cache.service';
 import { OAuth2Client } from 'google-auth-library';
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -15,6 +16,10 @@ export class AuthService {
       ? user.organizer_approval_status
       : (user.role?.toLowerCase() === 'organizer' ? (user.approval_status || 'pending') : 'none');
 
+    const isExhibitor = Boolean(
+      user.is_exhibitor || user.role?.toLowerCase() === 'exhibitor'
+    );
+
     const hasExhibitorApplications = Boolean(
       user.has_exhibitor_applications || user.role?.toLowerCase() === 'exhibitor'
     );
@@ -24,7 +29,7 @@ export class AuthService {
       ...(isOrganizer ? ['ORGANIZER'] : []),
       ...(user.role?.toLowerCase() === 'admin' ? ['ADMIN'] : []),
       ...(isSponsor ? ['SPONSOR'] : []),
-      ...(hasExhibitorApplications ? ['EXHIBITOR'] : []),
+      ...(isExhibitor || hasExhibitorApplications ? ['EXHIBITOR'] : []),
     ];
 
     return {
@@ -46,9 +51,21 @@ export class AuthService {
       approvalStatus: user.approval_status || (user.role?.toLowerCase() === 'organizer' ? 'pending' : 'approved'),
       isOrganizer,
       organizerApprovalStatus,
+      isExhibitor,
       hasExhibitorApplications,
       mustChangePassword: Boolean(user.must_change_password),
+      applicantType: user.applicant_type || undefined,
+      organizationType: user.organization_type || undefined,
+      applicantPosition: user.applicant_position || undefined,
+      organizationDescription: user.organization_description || undefined,
+      organizationWebsite: user.organization_website || undefined,
+      organizationLogo: user.organization_logo || undefined,
+      personalIntroduction: user.bio || user.organizer_bio || undefined,
+      organizerRejectionReason: user.organizer_rejection_reason || undefined,
+      organizerInfoRequestedNotes: user.organizer_info_requested_notes || undefined,
+      organizerAppliedAt: user.organizer_applied_at || undefined,
       hasPassword: user.has_password !== undefined ? Boolean(user.has_password) : Boolean(user.password_hash),
+      sponsorPreferences: user.sponsor_preferences || undefined,
       roles,
       stats: stats || {
         meetupsCount: 0,
@@ -89,6 +106,25 @@ export class AuthService {
     phone?: string;
     bio?: string;
     organization?: string;
+    organization_name?: string;
+    organizationName?: string;
+    applicant_type?: string;
+    applicantType?: string;
+    personal_introduction?: string;
+    personalIntroduction?: string;
+    organization_type?: string;
+    organizationType?: string;
+    applicant_position?: string;
+    applicantPosition?: string;
+    position?: string;
+    organization_description?: string;
+    organizationDescription?: string;
+    organization_website?: string;
+    organizationWebsite?: string;
+    website?: string;
+    organization_logo?: string;
+    organizationLogo?: string;
+    socials?: Record<string, string>;
   }): Promise<{ user: any; token: string; isPendingApproval?: boolean; requireOtp?: boolean; email?: string; message?: string }> {
     const {
       email,
@@ -106,8 +142,6 @@ export class AuthService {
       throw err;
     }
     const isOrganizer = normalizedRole === 'organizer';
-    const initialApprovalStatus = isOrganizer ? 'pending' : 'approved';
-    const initialIsActive = !isOrganizer;
 
     // Check existing email
     const existing = await query<IUser>(
@@ -117,7 +151,12 @@ export class AuthService {
 
     if (existing.rowCount && existing.rowCount > 0) {
       const existingUser = existing.rows[0];
-      const hasOrganizerProfile = Boolean(existingUser.is_organizer || existingUser.role?.toLowerCase() === 'organizer');
+      const hasOrganizerProfile = Boolean(
+        existingUser.is_organizer ||
+        existingUser.role?.toLowerCase() === 'organizer' ||
+        (existingUser.organizer_approval_status && existingUser.organizer_approval_status !== 'none')
+      );
+      const isExhibitorRegistration = normalizedRole === 'exhibitor';
 
       if (isOrganizer) {
         if (hasOrganizerProfile) {
@@ -129,6 +168,13 @@ export class AuthService {
           err.statusCode = 409;
           throw err;
         }
+      } else if (isExhibitorRegistration) {
+        // Existing users can add the exhibitor role — signal the frontend to use add-exhibitor-role flow
+        const err: any = new Error('An account with this email already exists. Confirm your password to add the Exhibitor role to your account.');
+        err.statusCode = 409;
+        err.code = 'EXHIBITOR_EMAIL_EXISTS';
+        err.requiresExhibitorRoleAdd = true;
+        throw err;
       } else {
         const err: any = new Error('An account with this email already exists. Please sign in to your account.');
         err.statusCode = 409;
@@ -140,32 +186,83 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, salt);
     const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(full_name)}&background=63474D&color=fff`;
 
-    // If organizer: preserve existing registration and review workflow
+    // If organizer: save formalization fields, set organizer_approval_status to 'pending',
+    // is_organizer = FALSE, role = 'attendee', is_active = TRUE so the user has attendee access
+    // while pending admin review.
     if (isOrganizer) {
+      let rawType = (data.applicant_type || data.applicantType || '').trim();
+      let normType: 'Individual Organizer' | 'Organization / Institution';
+      if (rawType.toLowerCase() === 'individual' || rawType.toLowerCase() === 'individual organizer') {
+        normType = 'Individual Organizer';
+      } else if (
+        rawType.toLowerCase() === 'organization' ||
+        rawType.toLowerCase() === 'organization / institution' ||
+        rawType.toLowerCase() === 'institution'
+      ) {
+        normType = 'Organization / Institution';
+      } else if (!rawType && (organization || data.organization_name || data.organizationName)) {
+        normType = 'Organization / Institution';
+      } else {
+        normType = 'Individual Organizer';
+      }
+
+      const isIndividual = normType === 'Individual Organizer';
+      const personalIntro = (data.personal_introduction || data.personalIntroduction || bio || '').trim();
+      const orgName = (organization || data.organization_name || data.organizationName || '').trim();
+      const orgType = (data.organization_type || data.organizationType || '').trim();
+      const position = (data.applicant_position || data.applicantPosition || data.position || '').trim();
+      const orgDesc = (data.organization_description || data.organizationDescription || bio || '').trim();
+      const orgWebsite = (data.organization_website || data.organizationWebsite || data.website || '').trim();
+      const orgLogo = (data.organization_logo || data.organizationLogo || '').trim();
+
+      const finalBio = isIndividual ? personalIntro : (orgDesc || full_name);
+      const finalOrgName = isIndividual ? (full_name || 'Individual Organizer') : orgName;
+      const finalSocials = data.socials || (orgWebsite ? { website: orgWebsite } : {});
+
       const result = await query<IUser>(
         `INSERT INTO users (
           email, password_hash, full_name, role, phone, bio, organization,
           avatar_url, visibility, member_since, is_active, approval_status,
-          is_organizer, organizer_approval_status, organizer_bio
+          is_organizer, organizer_approval_status, organizer_applied_at,
+          applicant_type, organization_type, applicant_position,
+          organization_description, organization_website, organization_logo,
+          organizer_bio, organizer_socials
          )
-         VALUES (LOWER($1), $2, $3, $4, $5, $6, $7, $8, 'public', 'August 2026', $9, $10, $11, $12, $13)
-         RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, created_at, updated_at`,
+         VALUES (
+           LOWER($1), $2, $3, 'attendee', $4, $5, $6,
+           $7, 'public', 'August 2026', TRUE, 'approved',
+           FALSE, 'pending', NOW(),
+           $8, $9, $10,
+           $11, $12, $13,
+           $14, $15
+         )
+         RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_applied_at, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_bio, organizer_socials, organizer_rejection_reason, organizer_info_requested_notes, created_at, updated_at`,
         [
           email,
           passwordHash,
           full_name,
-          normalizedRole,
           phone,
-          bio,
-          organization,
+          finalBio || null,
+          finalOrgName || null,
           avatarUrl,
-          initialIsActive,
-          initialApprovalStatus,
-          isOrganizer,
-          'pending',
-          bio,
+          normType,
+          isIndividual ? null : (orgType || null),
+          isIndividual ? null : (position || null),
+          isIndividual ? null : (orgDesc || null),
+          isIndividual ? null : (orgWebsite || null),
+          isIndividual ? null : (orgLogo || null),
+          finalBio || null,
+          JSON.stringify(finalSocials),
         ]
       );
+
+      // Invalidate admin cache so pending applicant immediately appears in admin review
+      try {
+        await CacheService.delPattern('admin:users:*');
+        await CacheService.del('admin:dashboard:metrics');
+      } catch (cacheErr) {
+        // ignore
+      }
 
       const rawUser = result.rows[0];
       const user = this.formatUserResponse(rawUser);
@@ -200,6 +297,9 @@ export class AuthService {
           phone: phone ? phone.trim() : null,
           bio: bio ? bio.trim() : null,
           organization: organization ? organization.trim() : null,
+          industry_category: (data as any).industry_category ? (data as any).industry_category.trim() : null,
+          is_exhibitor_registration: normalizedRole === 'exhibitor',
+          company_name: organization ? organization.trim() : null,
         }),
       ]
     );
@@ -283,14 +383,16 @@ export class AuthService {
 
     const userRole = (meta.role || 'attendee').toLowerCase();
 
+    const isExhibitorReg = Boolean(meta.is_exhibitor_registration);
     const result = await query<IUser>(
       `INSERT INTO users (
         email, password_hash, full_name, role, phone, bio, organization,
         avatar_url, visibility, member_since, is_active, approval_status,
-        is_organizer, organizer_approval_status
+        is_organizer, organizer_approval_status,
+        is_exhibitor, company_name, industry_category
        )
-       VALUES (LOWER($1), $2, $3, $8, $4, $5, $6, $7, 'public', 'August 2026', TRUE, 'approved', FALSE, 'none')
-       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, created_at, updated_at`,
+       VALUES (LOWER($1), $2, $3, $9, $4, $5, $6, $7, 'public', 'August 2026', TRUE, 'approved', FALSE, 'none', $8, $6, $10)
+       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, is_exhibitor, company_name, industry_category, created_at, updated_at`,
       [
         cleanEmail,
         meta.password_hash,
@@ -299,7 +401,9 @@ export class AuthService {
         meta.bio || null,
         meta.organization || null,
         avatarUrl,
+        isExhibitorReg,
         userRole,
+        meta.industry_category || null,
       ]
     );
 
@@ -386,7 +490,7 @@ export class AuthService {
     const { email, password, role } = data;
 
     const result = await query<IUser>(
-      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at,
+      `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
               created_at, updated_at
        FROM users WHERE LOWER(email) = LOWER($1)`,
@@ -471,7 +575,8 @@ export class AuthService {
     const isAdmin = rawUser.role?.toLowerCase() === 'admin';
     const isOrganizerAccount = Boolean(
       rawUser.role?.toLowerCase() === 'organizer' ||
-      (rawUser.is_organizer && rawUser.organizer_approval_status && rawUser.organizer_approval_status !== 'none')
+      rawUser.is_organizer ||
+      (rawUser.organizer_approval_status && rawUser.organizer_approval_status !== 'none')
     );
     const organizerStatus = (rawUser.organizer_approval_status && rawUser.organizer_approval_status !== 'none')
       ? rawUser.organizer_approval_status
@@ -484,6 +589,19 @@ export class AuthService {
     } else if (requestedRole === 'sponsor') {
       sessionRole = 'sponsor';
     } else if (requestedRole === 'exhibitor') {
+      const hasExhibitorRole = Boolean(
+        rawUser.is_exhibitor ||
+        rawUser.role?.toLowerCase() === 'exhibitor'
+      );
+      if (!hasExhibitorRole) {
+        const err: any = new Error(
+          'Your account is not currently registered as an exhibitor. Please complete exhibitor registration to access the Exhibitor Workspace.'
+        );
+        err.statusCode = 403;
+        err.code = 'EXHIBITOR_ROLE_NOT_ACTIVATED';
+        err.requiresExhibitorRegistration = true;
+        throw err;
+      }
       sessionRole = 'exhibitor';
     } else if (requestedRole === 'organizer') {
       if (!isOrganizerAccount && !isAdmin) {
@@ -546,7 +664,7 @@ export class AuthService {
 
   static async getCurrentUser(userId: string): Promise<any> {
     const result = await query<IUser>(
-      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, (password_hash IS NOT NULL) AS has_password,
+      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at, (password_hash IS NOT NULL) AS has_password,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
               created_at, updated_at
        FROM users WHERE id = $1`,
@@ -567,23 +685,48 @@ export class AuthService {
   static async applyForOrganizer(
     userId: string,
     data: {
-      organization: string;
+      applicant_type?: string;
+      applicantType?: string;
+      organization?: string;
+      organization_name?: string;
+      organizationName?: string;
+      organization_type?: string;
+      organizationType?: string;
+      applicant_position?: string;
+      applicantPosition?: string;
+      position?: string;
+      organization_description?: string;
+      organizationDescription?: string;
+      organization_website?: string;
+      organizationWebsite?: string;
+      website?: string;
+      organization_logo?: string;
+      organizationLogo?: string;
+      personal_introduction?: string;
+      personalIntroduction?: string;
       bio?: string;
       phone?: string;
       password?: string;
+      applyPassword?: string;
       socials?: Record<string, string>;
     }
   ): Promise<{ user: any; message: string }> {
-    const { organization, bio = null, phone = null, password, socials = {} } = data;
+    const rawType = (data.applicant_type || data.applicantType || '').trim();
+    const isIndividual = rawType.toLowerCase().includes('individual');
+    const applicantType = isIndividual ? 'Individual Organizer' : 'Organization / Institution';
 
-    if (!organization || !organization.trim()) {
-      const err: any = new Error('Organization / Community name is required.');
-      err.statusCode = 400;
-      throw err;
-    }
+    const phone = (data.phone || '').trim();
+    const password = data.password || data.applyPassword;
+    const personalIntro = (data.personal_introduction || data.personalIntroduction || data.bio || '').trim();
+    const orgName = (data.organization || data.organization_name || data.organizationName || '').trim();
+    const orgType = (data.organization_type || data.organizationType || '').trim();
+    const position = (data.applicant_position || data.applicantPosition || data.position || '').trim();
+    const orgDesc = (data.organization_description || data.organizationDescription || data.bio || '').trim();
+    const orgWebsite = (data.organization_website || data.organizationWebsite || data.website || '').trim();
+    const orgLogo = (data.organization_logo || data.organizationLogo || '').trim();
 
     const userRes = await query<IUser>(
-      'SELECT id, password_hash, approval_status, organizer_approval_status FROM users WHERE id = $1',
+      'SELECT id, full_name, password_hash, approval_status, organizer_approval_status, avatar_url FROM users WHERE id = $1',
       [userId]
     );
 
@@ -610,19 +753,44 @@ export class AuthService {
       }
     }
 
+    const finalBio = isIndividual ? personalIntro : (orgDesc || user.full_name);
+    const finalOrgName = isIndividual ? (user.full_name || 'Individual Organizer') : orgName;
+    const finalSocials = data.socials || (orgWebsite ? { website: orgWebsite } : {});
+
     const updated = await query<IUser>(
       `UPDATE users
-       SET organization = $1,
-           organizer_bio = COALESCE($2, organizer_bio, bio),
-           bio = COALESCE($2, bio),
-           phone = COALESCE($3, phone),
-           organizer_socials = $4,
+       SET applicant_type = $1,
+           organization = $2,
+           organization_type = $3,
+           applicant_position = $4,
+           organization_description = $5,
+           organization_website = $6,
+           organization_logo = $7,
+           organizer_bio = $8,
+           bio = COALESCE($8, bio),
+           phone = COALESCE(NULLIF($9, ''), phone),
+           organizer_socials = $10,
            organizer_approval_status = 'pending',
-           is_organizer = TRUE,
+           is_organizer = FALSE,
+           organizer_applied_at = NOW(),
+           organizer_rejection_reason = NULL,
+           organizer_info_requested_notes = NULL,
            updated_at = NOW()
-       WHERE id = $5
-       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, created_at, updated_at`,
-      [organization.trim(), bio ? bio.trim() : null, phone ? phone.trim() : null, JSON.stringify(socials), userId]
+       WHERE id = $11
+       RETURNING id, email, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at, created_at, updated_at`,
+      [
+        applicantType,
+        finalOrgName,
+        isIndividual ? null : (orgType || null),
+        isIndividual ? null : (position || null),
+        isIndividual ? null : (orgDesc || null),
+        isIndividual ? null : (orgWebsite || null),
+        isIndividual ? null : (orgLogo || null),
+        finalBio || null,
+        phone || null,
+        JSON.stringify(finalSocials),
+        userId,
+      ]
     );
 
     const rawUpdated = updated.rows[0];
@@ -636,15 +804,15 @@ export class AuthService {
   static async switchRole(
     userId: string,
     data: {
-      targetRole: 'ATTENDEE' | 'ORGANIZER';
+      targetRole: 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR';
       password?: string;
     }
   ): Promise<{ user: any; token: string }> {
     const { targetRole, password } = data;
-    const normalizedTarget = (targetRole || 'ATTENDEE').toUpperCase() as 'ATTENDEE' | 'ORGANIZER';
+    const normalizedTarget = (targetRole || 'ATTENDEE').toUpperCase() as 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR';
 
     const userRes = await query<IUser>(
-      `SELECT id, email, password_hash, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, created_at, updated_at
+      `SELECT id, email, password_hash, full_name, role, phone, bio, organization, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at, created_at, updated_at
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -702,6 +870,28 @@ export class AuthService {
       const userFormatted = this.formatUserResponse(rawUser, stats);
       userFormatted.role = rawUser.role?.toLowerCase() === 'admin' ? 'ADMIN' : 'ORGANIZER';
       return { user: userFormatted, token };
+    } else if (normalizedTarget === 'EXHIBITOR') {
+      const hasExhibitorRole = Boolean(rawUser.is_exhibitor || rawUser.role?.toLowerCase() === 'exhibitor');
+      if (!hasExhibitorRole) {
+        const err: any = new Error(
+          'This account does not have an exhibitor profile. Please complete exhibitor registration to access the Exhibitor Workspace.'
+        );
+        err.statusCode = 403;
+        err.code = 'EXHIBITOR_ROLE_NOT_ACTIVATED';
+        throw err;
+      }
+
+      const token = signAuthToken({
+        userId: rawUser.id,
+        email: rawUser.email,
+        role: 'exhibitor',
+        fullName: rawUser.full_name,
+      });
+
+      const stats = await this.computeUserStats(rawUser.id);
+      const userFormatted = this.formatUserResponse(rawUser, stats);
+      userFormatted.role = 'EXHIBITOR';
+      return { user: userFormatted, token };
     } else {
       // Switching to ATTENDEE
       const token = signAuthToken({
@@ -716,6 +906,93 @@ export class AuthService {
       userFormatted.role = rawUser.role?.toLowerCase() === 'admin' ? 'ADMIN' : 'ATTENDEE';
       return { user: userFormatted, token };
     }
+  }
+
+  /**
+   * Add Exhibitor role to an existing authenticated user account.
+   * Password verification required. Does NOT change the user's primary role.
+   */
+  static async addExhibitorRole(
+    userId: string,
+    data: {
+      companyName: string;
+      industryCategory: string;
+      companyPhone?: string;
+      companyWebsite?: string;
+      exhibitorDescription?: string;
+      password: string;
+    }
+  ): Promise<{ user: any; message: string }> {
+    const { companyName, industryCategory, companyPhone, companyWebsite, exhibitorDescription, password } = data;
+
+    if (!companyName || !companyName.trim()) {
+      const err: any = new Error('Company / Organization name is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!industryCategory || !industryCategory.trim()) {
+      const err: any = new Error('Industry category is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const userRes = await query<IUser>(
+      'SELECT id, email, full_name, password_hash, is_exhibitor, role FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (!userRes.rowCount || userRes.rowCount === 0) {
+      const err: any = new Error('User account not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const rawUser = userRes.rows[0];
+
+    // Password verification gate
+    if (rawUser.password_hash) {
+      if (!password) {
+        const err: any = new Error('Please confirm with your account password to add the Exhibitor role.');
+        err.statusCode = 401;
+        throw err;
+      }
+      const isMatch = await bcrypt.compare(password, rawUser.password_hash);
+      if (!isMatch) {
+        const err: any = new Error('Incorrect password. Please verify your credentials.');
+        err.statusCode = 401;
+        throw err;
+      }
+    }
+
+    const updated = await query<IUser>(
+      `UPDATE users
+       SET is_exhibitor = TRUE,
+           company_name = $1,
+           industry_category = $2,
+           company_phone = COALESCE($3, company_phone),
+           company_website = COALESCE($4, company_website),
+           bio = COALESCE($5, bio),
+           organization = COALESCE(organization, $1),
+           updated_at = NOW()
+       WHERE id = $6
+       RETURNING id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, is_exhibitor, created_at, updated_at`,
+      [
+        companyName.trim(),
+        industryCategory.trim(),
+        companyPhone ? companyPhone.trim() : null,
+        companyWebsite ? companyWebsite.trim() : null,
+        exhibitorDescription ? exhibitorDescription.trim() : null,
+        userId,
+      ]
+    );
+
+    const updatedUser = updated.rows[0];
+    const stats = await this.computeUserStats(updatedUser.id);
+
+    return {
+      user: this.formatUserResponse(updatedUser, stats),
+      message: 'Exhibitor role has been successfully added to your account. You can now access the Exhibitor Workspace.',
+    };
   }
 
   static async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
@@ -1037,16 +1314,13 @@ export class AuthService {
 
     // If registering and user does not exist, create the account
     if (!user) {
-      const requested = (role || 'attendee').toLowerCase();
-      // Ensure newly created Google users can only be attendee or organizer, never admin
-      const assignedRole = requested === 'organizer' ? 'organizer' : 'attendee';
-      const isOrganizer = assignedRole === 'organizer';
-      const approvalStatus = isOrganizer ? 'pending' : 'approved';
+      // Ensure newly created Google users have an active Attendee account.
+      // Google registration must never grant unverified organizer permissions.
       const insertRes = await query(
         `INSERT INTO users (email, full_name, role, avatar_url, google_id, approval_status, member_since, is_organizer, organizer_approval_status, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         VALUES ($1, $2, 'attendee', $3, $4, 'approved', 'September 2026', FALSE, 'none', TRUE)
          RETURNING *`,
-        [email, fullName, assignedRole, avatarUrl, googleId, approvalStatus, 'September 2026', isOrganizer, isOrganizer ? 'pending' : 'none', isOrganizer ? false : true]
+        [email, fullName, avatarUrl, googleId]
       );
       user = insertRes.rows[0];
 
@@ -1059,7 +1333,8 @@ export class AuthService {
     // Determine session role
     const isOrganizerAccount = Boolean(
       user.role?.toLowerCase() === 'organizer' ||
-      (user.is_organizer && user.organizer_approval_status && user.organizer_approval_status !== 'none')
+      user.is_organizer ||
+      (user.organizer_approval_status && user.organizer_approval_status !== 'none')
     );
     const effOrganizerStatus = user.organizer_approval_status && user.organizer_approval_status !== 'none'
       ? user.organizer_approval_status
@@ -1116,10 +1391,50 @@ export class AuthService {
       industry_category,
       company_phone,
       company_website = null,
+      company_description,
+      company_logo = null,
+      sponsorship_objectives = [],
+      target_audience = [],
+      preferred_event_categories = [],
+      skills_and_interests = [],
+      preferred_locations = [],
+      budget_range = null,
+      preferred_benefits = [],
+      additional_preferences = {},
     } = data;
 
     if (!full_name || !email || !password || !company_name || !industry_category || !company_phone) {
       const err: any = new Error('All required sponsor fields must be provided.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!company_description || !company_description.trim()) {
+      const err: any = new Error('Company description is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!sponsorship_objectives || !Array.isArray(sponsorship_objectives) || sponsorship_objectives.length === 0) {
+      const err: any = new Error('Please select at least one sponsorship objective.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!target_audience || !Array.isArray(target_audience) || target_audience.length === 0) {
+      const err: any = new Error('Please select at least one target audience.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!preferred_event_categories || !Array.isArray(preferred_event_categories) || preferred_event_categories.length === 0) {
+      const err: any = new Error('Please select at least one preferred event category.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!skills_and_interests || !Array.isArray(skills_and_interests) || skills_and_interests.length === 0) {
+      const err: any = new Error('Please select or enter at least one skill or interest.');
       err.statusCode = 400;
       throw err;
     }
@@ -1140,15 +1455,48 @@ export class AuthService {
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
-    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(company_name)}&background=63474D&color=FFA686`;
+    const avatarUrl = company_logo && company_logo.trim()
+      ? company_logo.trim()
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(company_name)}&background=63474D&color=FFA686`;
+
+    // Build preferences object structured for seamless AI matching consumption
+    const targetInterests = Array.from(
+      new Set([
+        ...skills_and_interests,
+        ...preferred_event_categories,
+        industry_category,
+      ].filter(Boolean))
+    );
+
+    const preferredEventTypes = preferred_event_categories.map((c) => {
+      const lower = c.toLowerCase();
+      if (lower.includes('hackathon')) return 'hackathon';
+      if (lower.includes('workshop')) return 'workshop';
+      if (lower.includes('conference')) return 'conference';
+      if (lower.includes('meetup')) return 'meetup';
+      return lower;
+    });
+
+    const sponsorPreferences = {
+      targetInterests,
+      targetSkills: skills_and_interests,
+      sponsorshipObjectives: sponsorship_objectives,
+      preferredEventTypes,
+      targetAudience: target_audience,
+      preferredLocations: preferred_locations || [],
+      maxBudget: budget_range ? Number(budget_range) : null,
+      preferredBenefits: preferred_benefits || [],
+      additionalPreferences: additional_preferences || {},
+    };
 
     const result = await query<IUser>(
       `INSERT INTO users (
         email, password_hash, full_name, role, phone, organization,
         company_name, industry_category, company_phone, company_website,
-        avatar_url, visibility, member_since, is_active, approval_status
+        avatar_url, visibility, member_since, is_active, approval_status,
+        bio, sponsor_preferences
        )
-       VALUES (LOWER($1), $2, $3, 'sponsor', $4, $5, $5, $6, $4, $7, $8, 'public', 'September 2026', FALSE, 'pending')
+       VALUES (LOWER($1), $2, $3, 'sponsor', $4, $5, $5, $6, $4, $7, $8, 'public', 'September 2026', FALSE, 'pending', $9, $10)
        RETURNING *`,
       [
         cleanEmail,
@@ -1159,6 +1507,8 @@ export class AuthService {
         industry_category.trim(),
         company_website ? company_website.trim() : null,
         avatarUrl,
+        company_description.trim(),
+        JSON.stringify(sponsorPreferences),
       ]
     );
 
@@ -1547,6 +1897,206 @@ export class AuthService {
       message: 'Password changed successfully. A confirmation email has been sent.',
       token,
       user: userFormatted,
+    };
+  }
+
+  static async getOrganizerResponseDetails(token?: string, authenticatedUserId?: string) {
+    let targetUserId = authenticatedUserId;
+
+    if (token) {
+      try {
+        const payload = verifyAuthToken(token);
+        targetUserId = payload.userId;
+      } catch (tokenErr) {
+        const err: any = new Error('Your response link has expired or is invalid. Please contact Sheeba administration.');
+        err.statusCode = 401;
+        throw err;
+      }
+    }
+
+    if (!targetUserId) {
+      const err: any = new Error('Authentication or valid token is required.');
+      err.statusCode = 401;
+      throw err;
+    }
+
+    const userRes = await query<IUser>(
+      `SELECT id, email, full_name, phone, bio, organization, avatar_url,
+              applicant_type, organization_type, applicant_position,
+              organization_description, organization_website, organization_logo,
+              organizer_bio, organizer_socials, organizer_info_requested_notes,
+              organizer_approval_status
+       FROM users WHERE id = $1`,
+      [targetUserId]
+    );
+
+    if (!userRes.rowCount || userRes.rowCount === 0) {
+      const err: any = new Error('Applicant record not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const rawUser = userRes.rows[0];
+    return {
+      applicant: {
+        id: rawUser.id,
+        fullName: rawUser.full_name,
+        email: rawUser.email,
+        phone: rawUser.phone || '',
+        applicantType: rawUser.applicant_type || 'Organization / Institution',
+        organization: rawUser.organization || '',
+        organizationType: rawUser.organization_type || '',
+        applicantPosition: rawUser.applicant_position || '',
+        organizationDescription: rawUser.organization_description || rawUser.bio || '',
+        organizationWebsite: rawUser.organization_website || '',
+        organizationLogo: rawUser.organization_logo || '',
+        personalIntroduction: rawUser.organizer_bio || rawUser.bio || '',
+        infoRequestedNotes: rawUser.organizer_info_requested_notes || '',
+        approvalStatus: rawUser.organizer_approval_status || 'more_info_needed',
+        socials: rawUser.organizer_socials || {},
+      },
+    };
+  }
+
+  static async submitOrganizerResponse(data: {
+    token?: string;
+    authenticatedUserId?: string;
+    answer?: string;
+    applicant_type?: string;
+    applicantType?: string;
+    organization?: string;
+    organization_name?: string;
+    organization_type?: string;
+    organizationType?: string;
+    applicant_position?: string;
+    applicantPosition?: string;
+    position?: string;
+    organization_description?: string;
+    organizationDescription?: string;
+    organization_website?: string;
+    organizationWebsite?: string;
+    website?: string;
+    organization_logo?: string;
+    organizationLogo?: string;
+    personal_introduction?: string;
+    personalIntroduction?: string;
+    phone?: string;
+  }) {
+    let targetUserId = data.authenticatedUserId;
+
+    if (data.token) {
+      try {
+        const payload = verifyAuthToken(data.token);
+        targetUserId = payload.userId;
+      } catch (tokenErr) {
+        const err: any = new Error('Your response link has expired or is invalid.');
+        err.statusCode = 401;
+        throw err;
+      }
+    }
+
+    if (!targetUserId) {
+      const err: any = new Error('Authentication or valid token is required.');
+      err.statusCode = 401;
+      throw err;
+    }
+
+    const userRes = await query<IUser>(
+      `SELECT id, email, full_name, phone, organization, organizer_info_requested_notes, organizer_socials, organizer_approval_status
+       FROM users WHERE id = $1`,
+      [targetUserId]
+    );
+
+    if (!userRes.rowCount || userRes.rowCount === 0) {
+      const err: any = new Error('Application record not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const existingUser = userRes.rows[0];
+
+    const rawType = (data.applicant_type || data.applicantType || '').trim();
+    const isIndividual = rawType.toLowerCase().includes('individual');
+    const normApplicantType = isIndividual ? 'Individual Organizer' : 'Organization / Institution';
+
+    const finalPhone = (data.phone || existingUser.phone || '').trim();
+    const finalOrgName = isIndividual
+      ? (existingUser.full_name || 'Individual Organizer')
+      : (data.organization || data.organization_name || existingUser.organization || '').trim();
+    const finalOrgType = (data.organization_type || data.organizationType || '').trim();
+    const finalPosition = (data.applicant_position || data.applicantPosition || data.position || '').trim();
+    const finalOrgDesc = (data.organization_description || data.organizationDescription || '').trim();
+    const finalOrgWebsite = (data.organization_website || data.organizationWebsite || data.website || '').trim();
+    const finalOrgLogo = (data.organization_logo || data.organizationLogo || '').trim();
+    const personalIntro = (data.personal_introduction || data.personalIntroduction || '').trim();
+    const finalBio = isIndividual ? personalIntro : finalOrgDesc;
+
+    // Combine admin question with applicant answer for transparent history in the review modal
+    const applicantAnswer = (data.answer || '').trim();
+    const existingQuestion = existingUser.organizer_info_requested_notes || '';
+    let updatedNotesHistory = existingQuestion;
+    if (applicantAnswer) {
+      updatedNotesHistory = existingQuestion
+        ? `${existingQuestion}\n\n[Applicant Answer]: ${applicantAnswer}`
+        : `[Applicant Answer]: ${applicantAnswer}`;
+    }
+
+    const currentSocials = typeof existingUser.organizer_socials === 'object' && existingUser.organizer_socials !== null
+      ? existingUser.organizer_socials
+      : {};
+
+    const updatedSocials = {
+      ...currentSocials,
+      ...(finalOrgWebsite ? { website: finalOrgWebsite } : {}),
+      applicant_response: applicantAnswer,
+      applicant_responded_at: new Date().toISOString(),
+    };
+
+    await query(
+      `UPDATE users
+       SET applicant_type = $1,
+           organization = $2,
+           organization_type = $3,
+           applicant_position = $4,
+           organization_description = $5,
+           organization_website = $6,
+           organization_logo = $7,
+           organizer_bio = $8,
+           bio = COALESCE($8, bio),
+           phone = COALESCE(NULLIF($9, ''), phone),
+           organizer_socials = $10,
+           organizer_info_requested_notes = $11,
+           organizer_approval_status = 'pending',
+           is_organizer = FALSE,
+           updated_at = NOW()
+       WHERE id = $12`,
+      [
+        normApplicantType,
+        finalOrgName,
+        isIndividual ? null : (finalOrgType || null),
+        isIndividual ? null : (finalPosition || null),
+        isIndividual ? null : (finalOrgDesc || null),
+        isIndividual ? null : (finalOrgWebsite || null),
+        isIndividual ? null : (finalOrgLogo || null),
+        finalBio || null,
+        finalPhone || null,
+        JSON.stringify(updatedSocials),
+        updatedNotesHistory,
+        targetUserId,
+      ]
+    );
+
+    // Invalidate admin cache so updated application appears in review queue immediately
+    try {
+      await CacheService.delPattern('admin:users:*');
+      await CacheService.del('admin:dashboard:metrics');
+    } catch (cacheErr) {
+      // ignore
+    }
+
+    return {
+      success: true,
+      message: 'Your response and updated application have been submitted successfully. Sheeba Administration is reviewing your details.',
     };
   }
 }

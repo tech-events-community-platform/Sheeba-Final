@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 /**
- * Deal status enum for sponsorship deals pipeline
+ * Deal status enum for sponsorship deals pipeline and formal applications
  */
 export const dealStatusEnum = z.enum(
-  ['INTERESTED', 'DECLINED', 'DEAL_ACCEPTED', 'REJECTED', 'WITHDRAWN'],
+  ['INTERESTED', 'DECLINED', 'DEAL_ACCEPTED', 'REJECTED', 'WITHDRAWN', 'PENDING', 'APPROVED'],
   {
-    message: "Status must be 'INTERESTED', 'DECLINED', 'DEAL_ACCEPTED', 'REJECTED', or 'WITHDRAWN'.",
+    message: "Status must be 'INTERESTED', 'DECLINED', 'DEAL_ACCEPTED', 'REJECTED', 'WITHDRAWN', 'PENDING', or 'APPROVED'.",
   }
 );
 
@@ -115,21 +115,75 @@ export const exploreApplicationsQuerySchema = z.object({
 export type ExploreApplicationsQueryInput = z.infer<typeof exploreApplicationsQuerySchema>;
 
 /**
- * Schema for POST /api/sponsorships/deals (B-48)
+ * Schema for POST /api/sponsorships/deals (Formal application or legacy interest)
  */
 export const createDealSchema = z.object({
   applicationId: z.string().trim().min(1, { message: 'Application ID is required.' }),
-  status: dealStatusEnum,
+  status: dealStatusEnum.optional().default('PENDING'),
   package_name: z.string().trim().optional().nullable(),
   pledged_amount: z.coerce
     .number({ message: 'Pledged amount must be a number.' })
     .min(0, { message: 'Pledged amount must be greater than or equal to 0.' })
     .optional()
     .nullable(),
+  proposal_message: z.string().trim().optional().nullable(),
   sponsor_notes: z.string({ message: 'Sponsor notes must be a string.' }).optional().nullable(),
 });
 
 export type CreateDealInput = z.infer<typeof createDealSchema>;
+
+/**
+ * Strict schema for formal sponsor application submission
+ */
+export const submitSponsorshipApplicationSchema = z.object({
+  applicationId: z.string().trim().min(1, { message: 'Sponsorship pitch ID is required.' }),
+  package_name: z.string().trim().min(1, { message: 'Sponsorship package name is required.' }),
+  pledged_amount: z.coerce
+    .number({ message: 'Proposed amount must be a number.' })
+    .positive({ message: 'Proposed amount must be greater than 0.' }),
+  proposal_message: z
+    .string()
+    .trim()
+    .min(10, { message: 'Proposal message must be at least 10 characters long explaining your interest.' })
+    .max(2000, { message: 'Proposal message cannot exceed 2000 characters.' }),
+  sponsor_notes: z.string().trim().optional().nullable(),
+});
+
+export type SubmitSponsorshipApplicationInput = z.infer<typeof submitSponsorshipApplicationSchema>;
+
+/**
+ * Schema for admin rejecting a sponsorship application
+ */
+export const adminRejectApplicationSchema = z.object({
+  rejection_reason: z
+    .string()
+    .trim()
+    .min(5, { message: 'A rejection reason of at least 5 characters is required.' })
+    .max(1000, { message: 'Rejection reason cannot exceed 1000 characters.' }),
+});
+
+export type AdminRejectApplicationInput = z.infer<typeof adminRejectApplicationSchema>;
+
+/**
+ * Schema for admin approving a sponsorship application
+ */
+export const adminApproveApplicationSchema = z.object({
+  notes: z.string().trim().optional().nullable(),
+});
+
+export type AdminApproveApplicationInput = z.infer<typeof adminApproveApplicationSchema>;
+
+/**
+ * Schema for admin querying sponsorship applications
+ */
+export const adminApplicationsQuerySchema = z.object({
+  status: dealStatusEnum.optional(),
+  search: z.string().trim().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+});
+
+export type AdminApplicationsQueryInput = z.infer<typeof adminApplicationsQuerySchema>;
 
 /**
  * Schema for GET /api/sponsorships/sponsor/my-deals query parameters (B-49)
@@ -141,15 +195,27 @@ export const sponsorDealsQuerySchema = z.object({
 export type SponsorDealsQueryInput = z.infer<typeof sponsorDealsQuerySchema>;
 
 /**
+ * Sponsor-updatable deal status enum: Only INTERESTED or DECLINED
+ * Sponsors must NEVER be able to set PENDING, APPROVED, or REJECTED.
+ */
+export const sponsorUpdatableDealStatusEnum = z.enum(['INTERESTED', 'DECLINED'], {
+  message: "Sponsors may only set status to 'INTERESTED' or 'DECLINED'. 'PENDING', 'APPROVED', and 'REJECTED' are forbidden.",
+});
+
+export type SponsorUpdatableDealStatusInput = z.infer<typeof sponsorUpdatableDealStatusEnum>;
+
+/**
  * Schema for PATCH /api/sponsorships/deals/:id (B-50)
  */
 export const updateDealSchema = z.object({
-  status: dealStatusEnum,
+  status: sponsorUpdatableDealStatusEnum.optional(),
   sponsor_notes: z.string({ message: 'Sponsor notes must be a string.' }).optional().nullable(),
+  proposal_message: z.string().trim().optional().nullable(),
 });
 
 export type UpdateDealInput = z.infer<typeof updateDealSchema>;
 
+/**
 /**
  * Phase 3: Sponsor Questionnaire Schemas
  */
@@ -185,3 +251,41 @@ export const recordAttendeeResponseSchema = z.object({
 });
 
 export type RecordAttendeeResponseInput = z.infer<typeof recordAttendeeResponseSchema>;
+
+/**
+ * Deliverables Schemas (Stage 4)
+ */
+export const deliverableStatusEnum = z.enum(['DRAFT', 'SUBMITTED', 'IN_PROGRESS', 'FULFILLED']);
+
+export const saveDeliverableSchema = z.object({
+  deal_id: z.string().uuid().optional().nullable(),
+  dealId: z.string().uuid().optional().nullable(),
+  company_name: z.string().trim().min(1, { message: 'Company name is required.' }).optional(),
+  companyName: z.string().trim().min(1, { message: 'Company name is required.' }).optional(),
+  website: z.string().trim().url({ message: 'Website must be a valid URL.' }).optional().or(z.literal('')).nullable(),
+  tagline: z.string().trim().max(255).optional().nullable(),
+  primary_color: z.string().trim().max(50).optional().nullable(),
+  primaryColor: z.string().trim().max(50).optional().nullable(),
+  secondary_color: z.string().trim().max(50).optional().nullable(),
+  secondaryColor: z.string().trim().max(50).optional().nullable(),
+  media_kit_url: z.string().trim().url({ message: 'Media kit URL must be a valid URL.' }).optional().or(z.literal('')).nullable(),
+  mediaKitUrl: z.string().trim().url({ message: 'Media kit URL must be a valid URL.' }).optional().or(z.literal('')).nullable(),
+  bio: z.string().trim().optional().nullable(),
+  booth_preference: z.string().trim().optional().nullable(),
+  boothPreference: z.string().trim().optional().nullable(),
+  av_requirements: z.string().trim().optional().nullable(),
+  avRequirements: z.string().trim().optional().nullable(),
+  ticket_vouchers_needed: z.string().trim().optional().nullable(),
+  ticketVouchersNeeded: z.string().trim().optional().nullable(),
+  rep_name: z.string().trim().min(1, { message: 'Representative name is required.' }).optional(),
+  repName: z.string().trim().min(1, { message: 'Representative name is required.' }).optional(),
+  rep_title: z.string().trim().min(1, { message: 'Representative title is required.' }).optional(),
+  repTitle: z.string().trim().min(1, { message: 'Representative title is required.' }).optional(),
+  rep_phone: z.string().trim().min(1, { message: 'Representative phone is required.' }).optional(),
+  repPhone: z.string().trim().min(1, { message: 'Representative phone is required.' }).optional(),
+  rep_email: z.string().trim().email({ message: 'Representative email must be valid.' }).optional(),
+  repEmail: z.string().trim().email({ message: 'Representative email must be valid.' }).optional(),
+  status: deliverableStatusEnum.optional().default('SUBMITTED'),
+});
+
+export type SaveDeliverableInput = z.infer<typeof saveDeliverableSchema>;

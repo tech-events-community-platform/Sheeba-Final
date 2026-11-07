@@ -21,6 +21,9 @@ import {
   Briefcase,
   Building2,
   Clock,
+  Upload,
+  Phone,
+  Mail,
   X,
   KeyRound,
   Store,
@@ -33,9 +36,20 @@ import {
   switchRoleSchema,
   validateForm,
 } from '../../schemas';
+import { uploadToCloudinary } from '../../utils/cloudinary';
+import { ORGANIZATION_TYPES, ORGANIZER_APPLICANT_TYPES } from '../../schemas/auth.schema';
 
 export const AttendeeSettingsPage: React.FC = () => {
-  const { user, logout, refreshUser, applyForOrganizer, switchRole } = useAuth();
+  const { user, logout, refreshUser, applyForOrganizer, switchRole, addExhibitorRole } = useAuth();
+  const [targetSwitchRole, setTargetSwitchRole] = useState<'ORGANIZER' | 'EXHIBITOR'>('ORGANIZER');
+  const [showAddExhibitorModal, setShowAddExhibitorModal] = useState(false);
+  const [exhibitorCompanyName, setExhibitorCompanyName] = useState('');
+  const [exhibitorCategory, setExhibitorCategory] = useState('Tech & Software');
+  const [exhibitorPhone, setExhibitorPhone] = useState('');
+  const [exhibitorPassword, setExhibitorPassword] = useState('');
+  const [isAddingExhibitor, setIsAddingExhibitor] = useState(false);
+  const [addExhibitorError, setAddExhibitorError] = useState<string | null>(null);
+  const [addExhibitorSuccess, setAddExhibitorSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -46,11 +60,19 @@ export const AttendeeSettingsPage: React.FC = () => {
   const [visibility, setVisibility] = useState<ProfileVisibility>(user?.visibility || 'public');
 
   // Organizer Application & Credentials State
+  const [applicantType, setApplicantType] = useState<'Individual Organizer' | 'Organization / Institution'>(
+    user?.applicantType || (user?.organization ? 'Organization / Institution' : 'Individual Organizer')
+  );
+  const [personalIntro, setPersonalIntro] = useState(user?.personalIntroduction || user?.bio || '');
   const [orgName, setOrgName] = useState(user?.organization || '');
-  const [orgBio, setOrgBio] = useState(user?.bio || '');
+  const [orgType, setOrgType] = useState(user?.organizationType || 'Community / Student Club');
+  const [applicantPosition, setApplicantPosition] = useState(user?.applicantPosition || '');
+  const [orgDescription, setOrgDescription] = useState(user?.organizationDescription || user?.bio || '');
+  const [orgWebsite, setOrgWebsite] = useState(user?.organizationWebsite || user?.socials?.x || '');
+  const [orgLogo, setOrgLogo] = useState(user?.organizationLogo || '');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
   const [orgPhone, setOrgPhone] = useState(user?.phone || '');
-  const [telegram, setTelegram] = useState(user?.socials?.telegram || '');
-  const [xHandle, setXHandle] = useState(user?.socials?.x || '');
   const [applyPassword, setApplyPassword] = useState('');
   const [isApplying, setIsApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
@@ -81,11 +103,17 @@ export const AttendeeSettingsPage: React.FC = () => {
     if (user) {
       setName(user.name || '');
       setPhone(user.phone || '');
+      if (user.phone) setOrgPhone(user.phone);
       setBio(user.bio || '');
       setVisibility(user.visibility || 'public');
       if (user.organization) setOrgName(user.organization);
-      if (user.socials?.telegram) setTelegram(user.socials.telegram);
-      if (user.socials?.x) setXHandle(user.socials.x);
+      if (user.applicantType) setApplicantType(user.applicantType);
+      if (user.personalIntroduction) setPersonalIntro(user.personalIntroduction);
+      if (user.organizationType) setOrgType(user.organizationType);
+      if (user.applicantPosition) setApplicantPosition(user.applicantPosition);
+      if (user.organizationDescription) setOrgDescription(user.organizationDescription);
+      if (user.organizationWebsite) setOrgWebsite(user.organizationWebsite);
+      if (user.organizationLogo) setOrgLogo(user.organizationLogo);
     }
 
     if ((location.state as any)?.successMessage) {
@@ -93,6 +121,66 @@ export const AttendeeSettingsPage: React.FC = () => {
       window.history.replaceState({}, document.title);
     }
   }, [user, location.state]);
+
+  
+  const handleAddExhibitorRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!exhibitorCompanyName.trim()) {
+      setAddExhibitorError('Company / Organization name is required.');
+      return;
+    }
+    if (user?.hasPassword !== false && (!exhibitorPassword || exhibitorPassword.length < 6)) {
+      setAddExhibitorError('Please enter your account password (at least 6 characters).');
+      return;
+    }
+    setIsAddingExhibitor(true);
+    setAddExhibitorError(null);
+    try {
+      await addExhibitorRole({
+        companyName: exhibitorCompanyName.trim(),
+        industryCategory: exhibitorCategory,
+        companyPhone: exhibitorPhone.trim() || undefined,
+        password: exhibitorPassword,
+      });
+      setAddExhibitorSuccess('Exhibitor role activated successfully! You can now access the Exhibitor Workspace.');
+      setTimeout(() => {
+        setShowAddExhibitorModal(false);
+        setAddExhibitorSuccess(null);
+        if (refreshUser) refreshUser();
+      }, 1500);
+    } catch (err: any) {
+      setAddExhibitorError(err.message || 'Failed to activate Exhibitor role. Please verify your password.');
+    } finally {
+      setIsAddingExhibitor(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setLogoUploadError('Please select an image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setLogoUploadError(null);
+    try {
+      const uploadedUrl = await uploadToCloudinary(file, { folder: 'sheeba_organization_logos' });
+      setOrgLogo(uploadedUrl);
+    } catch (err: any) {
+      setLogoUploadError(err.message || 'Failed to upload organization logo.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
 
   const handleApplyOrganizer = async (e: React.FormEvent) => {
     if (e?.preventDefault) e.preventDefault();
@@ -102,13 +190,18 @@ export const AttendeeSettingsPage: React.FC = () => {
     }
 
     const validation = validateForm(applyOrganizerSchema, {
-      organization: orgName,
-      applyPassword: applyPassword || undefined,
-      bio: orgBio,
+      applicantType,
       phone: orgPhone,
-      telegram,
-      xHandle,
+      applyPassword: applyPassword || undefined,
+      personalIntroduction: personalIntro,
+      organization: orgName,
+      organizationType: orgType,
+      applicantPosition,
+      organizationDescription: orgDescription,
+      organizationWebsite: orgWebsite,
+      organizationLogo: orgLogo,
     });
+
     if (!validation.success) {
       const firstError = Object.values(validation.errors || {})[0] || 'Please complete all required application fields.';
       setApplyError(firstError);
@@ -121,14 +214,17 @@ export const AttendeeSettingsPage: React.FC = () => {
 
     try {
       const res = await applyForOrganizer({
-        organization: orgName.trim(),
-        bio: orgBio.trim(),
+        applicantType,
         phone: orgPhone.trim(),
+        personalIntroduction: personalIntro.trim(),
+        organization: orgName.trim(),
+        organizationType: orgType.trim(),
+        applicantPosition: applicantPosition.trim(),
+        organizationDescription: orgDescription.trim(),
+        organizationWebsite: orgWebsite.trim() || undefined,
+        organizationLogo: orgLogo.trim() || undefined,
         password: applyPassword || undefined,
-        socials: {
-          telegram: telegram.trim(),
-          x: xHandle.trim(),
-        },
+        socials: orgWebsite ? { website: orgWebsite.trim() } : {},
       });
 
       setApplySuccess(res.message || 'Organizer application submitted for administrative review.');
@@ -149,21 +245,16 @@ export const AttendeeSettingsPage: React.FC = () => {
       return;
     }
 
-    const validation = validateForm(switchRoleSchema, { switchPassword: switchPassword || undefined });
-    if (!validation.success) {
-      setSwitchError(validation.errors.switchPassword || 'Please enter your account password.');
-      return;
-    }
-
     setIsSwitching(true);
     setSwitchError(null);
 
     try {
-      await switchRole('ORGANIZER', switchPassword || undefined);
+      await switchRole(targetSwitchRole, switchPassword || undefined);
       setShowSwitchModal(false);
-      navigate('/organizer');
+      setSwitchPassword('');
+      navigate(targetSwitchRole === 'EXHIBITOR' ? '/exhibitor' : '/organizer');
     } catch (err: any) {
-      setSwitchError(err.message || 'Authentication failed. Please verify your password.');
+      setSwitchError(err.message || 'Failed to authenticate and switch workspace.');
     } finally {
       setIsSwitching(false);
     }
@@ -384,26 +475,33 @@ export const AttendeeSettingsPage: React.FC = () => {
 
       {/* 2. Organizer Credentials & Community Application */}
       <div className="pt-6 border-t border-[#E8DDD7] space-y-4 max-w-2xl">
-        <div>
-          <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
-            <Briefcase className="w-4 h-4 text-[#63474D]" />
-            Organizer Credentials & Privileges
-          </h2>
-          <p className="text-xs text-[#756366] mt-0.5">
-            Organize tech meetups, workshops, and hackathons using this same account. Your attendee profile and earned badges remain completely intact.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E8DDD7] pb-4">
+          <div>
+            <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#63474D]" />
+              Event Organizer Workspace &amp; Verification
+            </h2>
+            <p className="text-xs text-[#756366] mt-0.5">
+              Apply using your existing Sheeba account. Manage door check-ins, issue verifiable credentials, and host events.
+            </p>
+          </div>
+          {user.isOrganizer && (
+            <span className="self-start sm:self-auto text-[10px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-200">
+              Approved Organizer
+            </span>
+          )}
         </div>
 
-        {/* Status: Approved / Verified Organizer */}
-        {(user.isOrganizer || user.organizerApprovalStatus === 'approved') && (
-          <div className="p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl space-y-3 shadow-xs">
+        {/* Status: Approved */}
+        {user.isOrganizer && (
+          <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
                 <div>
-                  <h3 className="text-xs font-bold text-emerald-950">Verified Community Organizer</h3>
+                  <h3 className="text-xs font-bold text-emerald-950">Organizer Access Activated</h3>
                   <p className="text-[11px] text-emerald-800">
-                    {user.organization ? `Authorized for: ${user.organization}` : 'Authorized to host community events'}
+                    {user.organization ? `Official profile: ${user.organization}` : 'You have full organizer access.'}
                   </p>
                 </div>
               </div>
@@ -433,8 +531,49 @@ export const AttendeeSettingsPage: React.FC = () => {
           </div>
         )}
 
+        {/* Status: Additional Information Requested */}
+        {user.organizerApprovalStatus === 'more_info_needed' && !user.isOrganizer && !showApplyForm && (
+          <div className="p-5 bg-amber-50 border border-amber-300 rounded-2xl space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-700 shrink-0 animate-pulse" />
+                <div>
+                  <h3 className="text-xs font-bold text-amber-950">Additional Information Requested</h3>
+                  <p className="text-[11px] text-amber-800">
+                    The Sheeba administration requested more information to finalize your organizer application.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200">
+                Action Required
+              </span>
+            </div>
+
+            {user.organizerInfoRequestedNotes && (
+              <div className="p-3 bg-white/80 border border-amber-200 rounded-xl text-xs text-amber-950 space-y-1">
+                <span className="font-bold text-[11px] uppercase tracking-wider text-amber-900">Admin Note:</span>
+                <p className="text-xs leading-relaxed">{user.organizerInfoRequestedNotes}</p>
+              </div>
+            )}
+
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowApplyForm(true);
+                  setApplyError(null);
+                  setApplySuccess(null);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <span>Update Application Details</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Status: Pending Approval */}
-        {user.organizerApprovalStatus === 'pending' && !user.isOrganizer && (
+        {user.organizerApprovalStatus === 'pending' && !user.isOrganizer && !showApplyForm && (
           <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -442,7 +581,7 @@ export const AttendeeSettingsPage: React.FC = () => {
                 <div>
                   <h3 className="text-xs font-bold text-amber-950">Organizer Application Under Review</h3>
                   <p className="text-[11px] text-amber-800">
-                    {user.organization ? `Application submitted for: ${user.organization}` : 'Awaiting administrative verification'}
+                    {user.applicantType ? `Applicant Type: ${user.applicantType}` : 'Awaiting administrative verification'}
                   </p>
                 </div>
               </div>
@@ -452,8 +591,14 @@ export const AttendeeSettingsPage: React.FC = () => {
             </div>
 
             <p className="text-xs text-amber-900 leading-relaxed">
-              Your application has been received and is currently in the Sheba Admin queue for verification. Once approved, you will be able to launch the Organizer Workspace from this page.
+              Your application was submitted and is currently in the Sheeba Admin queue for manual review. Your attendee and exhibitor permissions remain active. Once approved, you will be able to access the Organizer Workspace.
             </p>
+
+            {user.organizerAppliedAt && (
+              <p className="text-[11px] text-amber-700 font-medium">
+                Submitted on: {new Date(user.organizerAppliedAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+              </p>
+            )}
           </div>
         )}
 
@@ -475,8 +620,15 @@ export const AttendeeSettingsPage: React.FC = () => {
               </span>
             </div>
 
+            {user.organizerRejectionReason && (
+              <div className="p-3 bg-white/80 border border-rose-200 rounded-xl text-xs text-rose-950 space-y-1">
+                <span className="font-bold text-[11px] uppercase tracking-wider text-rose-900">Reason for decision:</span>
+                <p className="text-xs leading-relaxed">{user.organizerRejectionReason}</p>
+              </div>
+            )}
+
             <p className="text-xs text-rose-900 leading-relaxed">
-              You can review your community details and submit an updated application for consideration.
+              <strong>Your attendee account remains fully active.</strong> Rejection does not deactivate your account. You can review and update your application details to submit an updated application.
             </p>
 
             <div>
@@ -489,7 +641,7 @@ export const AttendeeSettingsPage: React.FC = () => {
                 }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
-                <span>Update & Re-apply</span>
+                <span>Update &amp; Re-apply</span>
               </button>
             </div>
           </div>
@@ -503,10 +655,10 @@ export const AttendeeSettingsPage: React.FC = () => {
                 <div className="space-y-1">
                   <h3 className="text-xs font-bold text-[#2D1F23] flex items-center gap-1.5">
                     <Building2 className="w-4 h-4 text-[#63474D]" />
-                    Apply to Become a Community Organizer
+                    Apply to Become an Event Organizer
                   </h3>
                   <p className="text-[11px] text-[#756366] leading-relaxed max-w-lg">
-                    Hosting community tech meetups, hackathons, or workshops? Submit an application to have your organizer status reviewed by the Sheba team.
+                    Host tech meetups, hackathons, or workshops. Apply using your existing account as an Individual Organizer or an Organization / Institution.
                   </p>
                 </div>
                 <button
@@ -523,20 +675,35 @@ export const AttendeeSettingsPage: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleApplyOrganizer} className="space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-[#E8DDD7]">
-                  <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-[#63474D]" />
-                    Community Organizer Application
-                  </h3>
+              <form onSubmit={handleApplyOrganizer} className="space-y-5">
+                <div className="flex items-center justify-between pb-3 border-b border-[#E8DDD7]">
+                  <div>
+                    <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-[#63474D]" />
+                      Organizer Application Form
+                    </h3>
+                    <p className="text-[11px] text-[#756366]">
+                      Applying with your existing Sheeba account ({user.email}). No duplicate account created.
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowApplyForm(false)}
-                    className="text-xs text-[#756366] hover:text-[#2D1F23]"
+                    className="text-xs text-[#756366] hover:text-[#2D1F23] cursor-pointer"
                   >
                     Cancel
                   </button>
                 </div>
+
+                {user.organizerInfoRequestedNotes && (
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-950 space-y-1">
+                    <span className="font-bold text-[11px] uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
+                      Information Requested by Admin:
+                    </span>
+                    <p className="text-xs font-medium leading-relaxed">{user.organizerInfoRequestedNotes}</p>
+                  </div>
+                )}
 
                 {applyError && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2">
@@ -552,99 +719,286 @@ export const AttendeeSettingsPage: React.FC = () => {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Organization / Initiative Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Addis Tech Hub, GDG Addis, Sheba Labs"
-                      value={orgName}
-                      onChange={(e) => setOrgName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    />
-                  </div>
+                {/* Common Information */}
+                <div className="space-y-3">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#63474D] block">
+                    1. Common Information
+                  </span>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Organizer Bio & Mission
-                    </label>
-                    <textarea
-                      rows={2}
-                      placeholder="Briefly describe your community's purpose and upcoming events..."
-                      value={orgBio}
-                      onChange={(e) => setOrgBio(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Contact Phone
-                    </label>
-                    <input
-                      type="tel"
-                      placeholder="+251 9... (optional)"
-                      value={orgPhone}
-                      onChange={(e) => setOrgPhone(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Telegram Community / Channel
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="@addistech (optional)"
-                      value={telegram}
-                      onChange={(e) => setTelegram(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      X / Twitter Handle
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="@addistech (optional)"
-                      value={xHandle}
-                      onChange={(e) => setXHandle(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    />
-                  </div>
-
-                  {user?.hasPassword !== false && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
-                      <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1">
-                        <Lock className="w-3 h-3 text-[#63474D]" />
-                        Account Password Verification *
+                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                        Full Name (From Account)
                       </label>
                       <input
-                        type="password"
+                        type="text"
+                        disabled
+                        value={user.name}
+                        className="w-full px-3.5 py-2 bg-gray-100 border border-[#E8DDD7] rounded-xl text-xs text-gray-600 cursor-not-allowed"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                        Email Address (From Account)
+                      </label>
+                      <input
+                        type="email"
+                        disabled
+                        value={user.email}
+                        className="w-full px-3.5 py-2 bg-gray-100 border border-[#E8DDD7] rounded-xl text-xs text-gray-600 cursor-not-allowed"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                        Phone Number *
+                      </label>
+                      <input
+                        type="tel"
                         required
-                        placeholder="••••••••"
-                        value={applyPassword}
-                        onChange={(e) => setApplyPassword(e.target.value)}
+                        placeholder="+251 9... or 09..."
+                        value={orgPhone}
+                        onChange={(e) => setOrgPhone(e.target.value)}
                         className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                       />
                     </div>
-                  )}
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                        Applicant Type *
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        {ORGANIZER_APPLICANT_TYPES.map((type) => (
+                          <label
+                            key={type}
+                            className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                              applicantType === type
+                                ? 'bg-[#63474D]/5 border-[#63474D] ring-1 ring-[#63474D]'
+                                : 'bg-white border-[#E8DDD7] hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="applicantType"
+                              value={type}
+                              checked={applicantType === type}
+                              onChange={() => setApplicantType(type)}
+                              className="w-4 h-4 text-[#63474D] focus:ring-[#63474D]"
+                            />
+                            <div>
+                              <div className="font-bold text-xs text-[#2D1F23]">{type}</div>
+                              <div className="text-[10px] text-[#756366]">
+                                {type === 'Individual Organizer'
+                                  ? 'Solo community leader or independent host'
+                                  : 'University, business, student club, or NGO'}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Conditional Fields: Individual Organizer */}
+                {applicantType === 'Individual Organizer' && (
+                  <div className="space-y-3 pt-2 border-t border-[#E8DDD7]">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#63474D] block">
+                      2. Individual Organizer Details
+                    </span>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                        Short Personal Introduction *
+                      </label>
+                      <textarea
+                        rows={3}
+                        required
+                        placeholder="Introduce yourself, your background in the community, and what kind of gatherings you plan to organize..."
+                        value={personalIntro}
+                        onChange={(e) => setPersonalIntro(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                      />
+                      <p className="text-[11px] text-[#756366] mt-1">
+                        As an individual applicant, you are not required to provide organization information.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Conditional Fields: Organization / Institution */}
+                {applicantType === 'Organization / Institution' && (
+                  <div className="space-y-3 pt-2 border-t border-[#E8DDD7]">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#63474D] block">
+                      2. Organization / Institution Details
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                          Organization Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Addis Tech Hub, GDG Addis, Sheba Labs"
+                          value={orgName}
+                          onChange={(e) => setOrgName(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                          Organization Type *
+                        </label>
+                        <select
+                          required
+                          value={orgType}
+                          onChange={(e) => setOrgType(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                        >
+                          {ORGANIZATION_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                          Applicant's Position or Role *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. President, Community Lead, Program Coordinator, Director"
+                          value={applicantPosition}
+                          onChange={(e) => setApplicantPosition(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                          Short Organization Description *
+                        </label>
+                        <textarea
+                          rows={3}
+                          required
+                          placeholder="Briefly describe your organization's mission, focus area, and community activities..."
+                          value={orgDescription}
+                          onChange={(e) => setOrgDescription(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                          Organization Website or Social Media Link (Optional)
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://yourorganization.org or https://t.me/yourcommunity"
+                          value={orgWebsite}
+                          onChange={(e) => setOrgWebsite(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                        />
+                      </div>
+
+                      {/* Organization Logo Upload */}
+                      <div className="sm:col-span-2 pt-1">
+                        <label className="block text-xs font-bold text-[#2D1F23] mb-2">
+                          Organization Logo (Optional)
+                        </label>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-white border border-[#E8DDD7] rounded-2xl">
+                          {/* Circular Logo Preview / Default Placeholder */}
+                          <div className="w-16 h-16 rounded-full border-2 border-[#E8DDD7] overflow-hidden bg-[#FAF7F5] flex items-center justify-center shrink-0 shadow-xs relative">
+                            {orgLogo ? (
+                              <img
+                                src={orgLogo}
+                                alt="Organization Logo"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Building2 className="w-8 h-8 text-[#63474D]/40" />
+                            )}
+                          </div>
+
+                          <div className="space-y-1.5 flex-1">
+                            <div className="flex items-center gap-3">
+                              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#63474D]/10 hover:bg-[#63474D]/20 text-[#63474D] text-xs font-bold cursor-pointer transition-all">
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>{isUploadingLogo ? 'Uploading...' : orgLogo ? 'Change Logo' : 'Upload Logo'}</span>
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  onChange={handleLogoUpload}
+                                  disabled={isUploadingLogo}
+                                  className="hidden"
+                                />
+                              </label>
+
+                              {orgLogo && (
+                                <button
+                                  type="button"
+                                  onClick={() => setOrgLogo('')}
+                                  className="text-xs text-rose-600 hover:text-rose-700 font-semibold"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+
+                            {logoUploadError && (
+                              <p className="text-[11px] text-red-600 font-medium">{logoUploadError}</p>
+                            )}
+
+                            <p className="text-[11px] text-[#756366] leading-relaxed">
+                              PNG, JPG, or WebP up to 5MB. Displayed as the organization's circular profile image. Never replaces your personal account profile picture.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Account Password Verification */}
+                {user?.hasPassword !== false && (
+                  <div className="pt-2 border-t border-[#E8DDD7]">
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-[#63474D]" />
+                      Account Password Verification *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="••••••••"
+                      value={applyPassword}
+                      onChange={(e) => setApplyPassword(e.target.value)}
+                      className="w-full sm:w-1/2 px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                    <p className="text-[11px] text-[#756366] mt-1">
+                      Confirming your password verifies your identity before submitting your organizer application.
+                    </p>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2 pt-2">
                   <Button
                     type="submit"
                     variant="primary"
                     size="sm"
-                    disabled={isApplying}
+                    disabled={isApplying || isUploadingLogo}
                   >
-                    {isApplying ? 'Submitting Application...' : 'Submit Application for Admin Review'}
+                    {isApplying
+                      ? 'Submitting Application...'
+                      : user.organizerApprovalStatus === 'more_info_needed'
+                      ? 'Update & Resubmit Application'
+                      : 'Submit Application for Admin Review'}
                   </Button>
                   <Button
                     type="button"
@@ -661,49 +1015,86 @@ export const AttendeeSettingsPage: React.FC = () => {
         )}
       </div>
 
-      {/* 2b. Exhibitor Applications & Discovery */}
+      {/* 2b. Exhibitor Portals & Multi-Role Privileges */}
       <div className="pt-6 border-t border-[#E8DDD7] space-y-4 max-w-2xl">
         <div>
           <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
             <Store className="w-4 h-4 text-[#AA767C]" />
-            Exhibitor Portals & Booth Applications
+            Exhibitor Workspace & Booth Management
           </h2>
           <p className="text-xs text-[#756366] mt-0.5">
-            Showcase your company, products, or community initiatives at upcoming conferences and tech exhibitions.
+            Participate in major events as a company or brand with physical booth space. Add the Exhibitor role to this account without losing your attendee data.
           </p>
         </div>
 
-        {user?.hasExhibitorApplications ? (
-          <div className="p-4 bg-[#FAF7F5] border border-[#E8DDD7] rounded-2xl flex items-center justify-between gap-4">
-            <div className="space-y-0.5">
-              <span className="text-xs font-bold text-[#2D1F23] block">Active Exhibitor Applications</span>
-              <p className="text-[11px] text-gray-500">
-                You have active booth applications or bookings. Track status, upload payments, and manage leads in your Exhibitor Workspace.
-              </p>
+        {(user?.isExhibitor || user?.roles?.includes('EXHIBITOR')) ? (
+          <div className="p-5 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-2xl space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Store className="w-5 h-5 text-purple-700 shrink-0" />
+                <div>
+                  <h3 className="text-xs font-bold text-purple-950">Activated Exhibitor Account</h3>
+                  <p className="text-[11px] text-purple-800">
+                    {user?.companyName ? `Company: ${user.companyName}` : 'Authorized to book booths and capture visitor leads'}
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full border border-purple-200">
+                Activated
+              </span>
             </div>
-            <Link
-              to="/exhibitor/booths"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#63474D] text-white text-xs font-semibold hover:bg-[#523A3F] transition-colors shrink-0"
-            >
-              <span>Exhibitor Workspace</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
+
+            <p className="text-xs text-purple-900 leading-relaxed">
+              Your Exhibitor Workspace is active. Switch contexts to apply for event booth floor space, track confirmations, and capture badge leads.
+            </p>
+
+            <div className="pt-1 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetSwitchRole('EXHIBITOR');
+                  setShowSwitchModal(true);
+                  setSwitchPassword('');
+                  setSwitchError(null);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#63474D] hover:bg-[#4E373C] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <Store className="w-4 h-4 text-[#FFA686]" />
+                <span>Launch Exhibitor Workspace</span>
+              </button>
+              <Link
+                to="/exhibitor/explore"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[#63474D] text-[#63474D] text-xs font-semibold hover:bg-[#63474D]/10 transition-colors"
+              >
+                <span>Browse Booth Calls</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         ) : (
-          <div className="p-4 bg-white border border-[#E8DDD7] rounded-2xl flex items-center justify-between gap-4">
-            <div className="space-y-0.5">
-              <span className="text-xs font-bold text-[#2D1F23] block">Discover Open Exhibitor Calls</span>
-              <p className="text-[11px] text-gray-500">
-                Explore events currently accepting booth applications and reserve your space.
-              </p>
+          <div className="p-5 bg-white border border-[#E8DDD7] rounded-2xl space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-[#2D1F23]">Register as an Exhibitor</h3>
+                <p className="text-[11px] text-gray-500">
+                  Add the Exhibitor capability to your current Sheeba profile. No second account or alternate email required.
+                </p>
+              </div>
             </div>
-            <Link
-              to="/exhibitor/explore"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#63474D] text-[#63474D] text-xs font-semibold hover:bg-[#63474D]/10 transition-colors shrink-0"
-            >
-              <span>Explore Calls</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddExhibitorModal(true);
+                  setAddExhibitorError(null);
+                  setAddExhibitorSuccess(null);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#63474D] text-white rounded-xl text-xs font-bold hover:bg-[#523A3F] transition-all cursor-pointer"
+              >
+                <Store className="w-3.5 h-3.5 text-[#FFA686]" />
+                <span>Register as Exhibitor</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -989,6 +1380,136 @@ export const AttendeeSettingsPage: React.FC = () => {
         </button>
       </div>
 
+
+      {/* Add Exhibitor Role Modal */}
+      {showAddExhibitorModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+          <div
+            onClick={() => setShowAddExhibitorModal(false)}
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+          />
+          <div className="relative bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#E8DDD7] z-10 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E8DDD7]">
+              <div className="flex items-center gap-2">
+                <Store className="w-5 h-5 text-[#63474D]" />
+                <h3 className="font-serif font-bold text-base text-[#2D1F23]">Activate Exhibitor Role</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddExhibitorModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#756366] leading-relaxed">
+              Add the Exhibitor capability to your account. Your attendee profile and ticket passes will remain completely intact.
+            </p>
+
+            {addExhibitorError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                {addExhibitorError}
+              </div>
+            )}
+            {addExhibitorSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
+                {addExhibitorSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleAddExhibitorRole} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Company / Organization Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Acme Tech Solutions"
+                  value={exhibitorCompanyName}
+                  onChange={(e) => setExhibitorCompanyName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Industry Category *
+                </label>
+                <select
+                  value={exhibitorCategory}
+                  onChange={(e) => setExhibitorCategory(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                >
+                  <option value="Tech & Software">Tech & Software</option>
+                  <option value="AI & Robotics">AI & Robotics</option>
+                  <option value="Fintech & Banking">Fintech & Banking</option>
+                  <option value="Education & Training">Education & Training</option>
+                  <option value="Retail & Hardware">Retail & Hardware</option>
+                  <option value="Creative Agency & Media">Creative Agency & Media</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Company Contact Phone
+                </label>
+                <input
+                  type="tel"
+                  placeholder="+251 9... (optional)"
+                  value={exhibitorPhone}
+                  onChange={(e) => setExhibitorPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
+              </div>
+
+              {user?.hasPassword !== false ? (
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                    Account Password *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Enter your existing account password"
+                    value={exhibitorPassword}
+                    onChange={(e) => setExhibitorPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Confirm with your password to activate the Exhibitor role.</p>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                  You are signed in via Google OAuth. Confirm below to activate your Exhibitor role without a password.
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="primary"
+                  size="sm"
+                  disabled={isAddingExhibitor}
+                >
+                  {isAddingExhibitor ? 'Activating...' : 'Activate Exhibitor Role'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddExhibitorModal(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Switch to Organizer Credential Verification Modal */}
       {showSwitchModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
@@ -1000,7 +1521,7 @@ export const AttendeeSettingsPage: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-[#E8DDD7]">
               <div className="flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-[#63474D]" />
-                <h3 className="font-serif font-bold text-base text-[#2D1F23]">Organizer Workspace</h3>
+                <h3 className="font-serif font-bold text-base text-[#2D1F23]">{targetSwitchRole === "EXHIBITOR" ? "Exhibitor Workspace" : "Organizer Workspace"}</h3>
               </div>
               <button
                 type="button"

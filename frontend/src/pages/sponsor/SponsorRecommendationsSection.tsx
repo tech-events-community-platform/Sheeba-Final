@@ -129,7 +129,7 @@ export const SponsorRecommendationsSection: React.FC = () => {
     try {
       setSavingPrefs(true);
       const updated = await api.sponsorship.updatePreferences(tuningPrefs);
-      setPreferences(updated);
+      setPreferences(updated.preferences || (updated as any));
       setIsModalOpen(false);
       await fetchRecommendations(selectedObjectiveFilter);
     } catch (err: any) {

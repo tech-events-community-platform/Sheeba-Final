@@ -15,6 +15,14 @@ import {
   Globe,
   ExternalLink,
   XCircle,
+  User,
+  Phone,
+  Mail,
+  Calendar,
+  FileText,
+  Eye,
+  Send,
+  HelpCircle,
 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -36,12 +44,23 @@ export interface OrganizerRecord {
   name: string;
   email: string;
   phone?: string;
+  applicantType?: string;
   organization: string;
+  organizationType?: string;
+  applicantPosition?: string;
+  organizationDescription?: string;
+  organizationWebsite?: string;
+  organizationLogo?: string;
+  personalIntroduction?: string;
+  bio?: string;
   eventsCount: number;
   totalCheckIns: number;
   status: string;
   approvalStatus: string;
   isActive: boolean;
+  rejectionReason?: string;
+  infoRequestedNotes?: string;
+  appliedAt?: string;
   registeredAt: string;
 }
 
@@ -68,6 +87,15 @@ export const AdminUsersPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [statusModalUser, setStatusModalUser] = useState<AttendeeRecord | OrganizerRecord | SponsorRecord | null>(null);
+
+  // Organizer Review Modal state
+  const [reviewOrganizer, setReviewOrganizer] = useState<OrganizerRecord | null>(null);
+  const [reviewOrganizerLoading, setReviewOrganizerLoading] = useState<boolean>(false);
+  const [orgLogoError, setOrgLogoError] = useState<boolean>(false);
+  const [reviewActionTab, setReviewActionTab] = useState<'idle' | 'reject' | 'request_info'>('idle');
+  const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('');
+  const [requestInfoNotesInput, setRequestInfoNotesInput] = useState<string>('');
+
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [actionErrorMsg, setActionErrorMsg] = useState<string | null>(null);
@@ -92,6 +120,25 @@ export const AdminUsersPage: React.FC = () => {
     fetchUsers();
   }, []);
 
+  const handleOpenOrganizerReview = async (organizer: OrganizerRecord) => {
+    setReviewOrganizer(organizer);
+    setOrgLogoError(false);
+    setReviewActionTab('idle');
+    setRejectionReasonInput('');
+    setRequestInfoNotesInput('');
+    setReviewOrganizerLoading(true);
+    try {
+      const details = await api.admin.getOrganizerDetails(organizer.id);
+      if (details) {
+        setReviewOrganizer((prev) => (prev ? { ...prev, ...details } : details));
+      }
+    } catch (err) {
+      console.warn('Could not fetch detailed organizer record, using row data:', err);
+    } finally {
+      setReviewOrganizerLoading(false);
+    }
+  };
+
   const handleApproveOrganizer = async (organizerId: string) => {
     setActionLoadingId(organizerId);
     setActionSuccessMsg(null);
@@ -99,10 +146,59 @@ export const AdminUsersPage: React.FC = () => {
 
     try {
       await api.admin.approveOrganizer(organizerId);
-      setActionSuccessMsg('Organizer approved and activated successfully! They can now log in.');
+      setActionSuccessMsg('Organizer approved and activated successfully! An approval notification email has been dispatched.');
+      if (reviewOrganizer?.id === organizerId) {
+        setReviewOrganizer(null);
+      }
       await fetchUsers();
     } catch (err: any) {
       setActionErrorMsg(err.message || 'Failed to approve organizer.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRejectOrganizer = async (organizerId: string) => {
+    if (!rejectionReasonInput.trim()) {
+      setActionErrorMsg('Please provide a reason for rejection.');
+      return;
+    }
+    setActionLoadingId(organizerId);
+    setActionSuccessMsg(null);
+    setActionErrorMsg(null);
+
+    try {
+      await api.admin.rejectOrganizer(organizerId, rejectionReasonInput.trim());
+      setActionSuccessMsg('Organizer application rejected. A notification email with the specified reason has been dispatched.');
+      setReviewOrganizer(null);
+      setReviewActionTab('idle');
+      setRejectionReasonInput('');
+      await fetchUsers();
+    } catch (err: any) {
+      setActionErrorMsg(err.message || 'Failed to reject organizer.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRequestOrganizerInfo = async (organizerId: string) => {
+    if (!requestInfoNotesInput.trim()) {
+      setActionErrorMsg('Please specify what additional information is requested.');
+      return;
+    }
+    setActionLoadingId(organizerId);
+    setActionSuccessMsg(null);
+    setActionErrorMsg(null);
+
+    try {
+      await api.admin.requestOrganizerInfo(organizerId, requestInfoNotesInput.trim());
+      setActionSuccessMsg('Information request dispatched successfully. The applicant will be prompted to update their submission.');
+      setReviewOrganizer(null);
+      setReviewActionTab('idle');
+      setRequestInfoNotesInput('');
+      await fetchUsers();
+    } catch (err: any) {
+      setActionErrorMsg(err.message || 'Failed to request additional information.');
     } finally {
       setActionLoadingId(null);
     }
@@ -156,7 +252,9 @@ export const AdminUsersPage: React.FC = () => {
     }
   };
 
-  const pendingOrganizersCount = organizers.filter((o) => o.approvalStatus === 'pending').length;
+  const pendingOrganizersCount = organizers.filter(
+    (o) => o.approvalStatus === 'pending' || o.approvalStatus === 'more_info_needed'
+  ).length;
   const pendingSponsorsCount = sponsors.filter((s) => s.approvalStatus === 'pending').length;
 
   const filteredAttendees = attendees.filter(
@@ -404,11 +502,11 @@ export const AdminUsersPage: React.FC = () => {
               <thead>
                 <tr className="bg-[#FAF7F5] border-b border-[#E8DDD7] text-[10px] font-bold uppercase tracking-wider text-[#756366]">
                   <th className="py-3 px-4">Organizer / Organization</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Events Hosted</th>
-                  <th className="py-3 px-4">Check-ins Validated</th>
+                  <th className="py-3 px-4">Contact</th>
+                  <th className="py-3 px-4">Events</th>
+                  <th className="py-3 px-4">Check-ins</th>
                   <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4 text-right">Review & Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DDD7] text-[#2D1F23]">
@@ -419,50 +517,105 @@ export const AdminUsersPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredOrganizers.map((o) => (
-                    <tr key={o.id} className="hover:bg-[#FAF7F5]/50 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="font-bold">{o.organization}</div>
-                        <div className="text-[11px] text-[#756366]">{o.name}</div>
-                      </td>
-                      <td className="py-3.5 px-4 text-[#756366]">{o.email}</td>
-                      <td className="py-3.5 px-4">{o.eventsCount}</td>
-                      <td className="py-3.5 px-4 font-bold text-[#63474D]">{o.totalCheckIns}</td>
-                      <td className="py-3.5 px-4">
-                        <Badge
-                          variant={
-                            o.approvalStatus === 'approved'
-                              ? 'success'
-                              : o.approvalStatus === 'pending'
-                              ? 'warning'
-                              : 'error'
-                          }
-                        >
-                          {o.status}
-                        </Badge>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        {o.approvalStatus === 'pending' ? (
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            isLoading={actionLoadingId === o.id}
-                            onClick={() => handleApproveOrganizer(o.id)}
-                            className="text-xs px-3 py-1"
+                  filteredOrganizers.map((o) => {
+                    const isOrg = o.applicantType === 'Organization / Institution' || (!o.applicantType && o.organization);
+                    return (
+                      <tr key={o.id} className="hover:bg-[#FAF7F5]/50 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="shrink-0">
+                              {isOrg && o.organizationLogo ? (
+                                <img
+                                  src={o.organizationLogo}
+                                  alt={`${o.organization} Logo`}
+                                  className="w-9 h-9 rounded-full object-cover border border-[#E8DDD7] bg-white shadow-xs"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-full bg-[#FAF7F5] border border-[#E8DDD7] flex items-center justify-center text-[#63474D]">
+                                  {isOrg ? <Building2 className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-bold text-[#2D1F23] truncate">
+                                {o.organization || o.name}
+                              </div>
+                              <div className="text-[11px] text-[#756366] flex items-center gap-1.5 flex-wrap">
+                                <span>Lead: {o.name}</span>
+                                <span className="text-gray-300">•</span>
+                                <span className="text-[10px] font-semibold text-[#63474D] bg-[#FAF7F5] px-1.5 py-0.5 rounded border border-[#E8DDD7]">
+                                  {o.applicantType || (o.organization ? 'Organization' : 'Individual')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <div className="text-gray-700">{o.email}</div>
+                          {o.phone && <div className="text-[11px] text-[#756366]">{o.phone}</div>}
+                        </td>
+
+                        <td className="py-3.5 px-4">{o.eventsCount}</td>
+                        <td className="py-3.5 px-4 font-bold text-[#63474D]">{o.totalCheckIns}</td>
+
+                        <td className="py-3.5 px-4">
+                          <Badge
+                            variant={
+                              o.approvalStatus === 'approved'
+                                ? 'success'
+                                : o.approvalStatus === 'pending'
+                                ? 'warning'
+                                : o.approvalStatus === 'more_info_needed'
+                                ? 'warning'
+                                : 'error'
+                            }
                           >
-                            Approve
-                          </Button>
-                        ) : (
-                          <button
-                            onClick={() => setStatusModalUser(o)}
-                            className="text-xs font-semibold text-[#63474D] hover:underline"
-                          >
-                            {o.isActive ? 'Deactivate' : 'Activate'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                            {o.approvalStatus === 'pending'
+                              ? 'Pending Review'
+                              : o.approvalStatus === 'more_info_needed'
+                              ? 'More Info Needed'
+                              : o.approvalStatus === 'approved'
+                              ? 'Active'
+                              : 'Rejected'}
+                          </Badge>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenOrganizerReview(o)}
+                              className="text-xs px-2.5 py-1 flex items-center gap-1 border-[#E8DDD7] text-[#63474D] hover:bg-[#FAF7F5]"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              Review
+                            </Button>
+
+                            {o.approvalStatus === 'pending' || o.approvalStatus === 'more_info_needed' ? (
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                isLoading={actionLoadingId === o.id}
+                                onClick={() => handleApproveOrganizer(o.id)}
+                                className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                              >
+                                Approve
+                              </Button>
+                            ) : (
+                              <button
+                                onClick={() => setStatusModalUser(o)}
+                                className="text-xs font-semibold text-[#63474D] hover:underline px-1 py-1"
+                              >
+                                {o.isActive ? 'Deactivate' : 'Activate'}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -516,6 +669,327 @@ export const AdminUsersPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Organizer Application Review Modal */}
+      <Modal
+        isOpen={!!reviewOrganizer}
+        onClose={() => {
+          setReviewOrganizer(null);
+          setReviewActionTab('idle');
+        }}
+        title="Organizer Application Review"
+        maxWidth="2xl"
+      >
+        {reviewOrganizer && (
+          <div className="space-y-5 text-xs text-[#2D1F23]">
+            {/* Header Info */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E8DDD7] gap-2">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={
+                    reviewOrganizer.approvalStatus === 'approved'
+                      ? 'success'
+                      : reviewOrganizer.approvalStatus === 'pending'
+                      ? 'warning'
+                      : reviewOrganizer.approvalStatus === 'more_info_needed'
+                      ? 'warning'
+                      : 'error'
+                  }
+                >
+                  {reviewOrganizer.approvalStatus === 'pending'
+                    ? 'Pending Review'
+                    : reviewOrganizer.approvalStatus === 'more_info_needed'
+                    ? 'More Info Needed'
+                    : reviewOrganizer.approvalStatus === 'approved'
+                    ? 'Approved / Active'
+                    : 'Rejected'}
+                </Badge>
+                <span className="text-[11px] font-semibold text-[#756366]">
+                  {reviewOrganizer.applicantType ||
+                    (reviewOrganizer.organization ? 'Organization / Institution' : 'Individual Organizer')}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-[#756366]">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>
+                  Applied:{' '}
+                  {reviewOrganizer.appliedAt
+                    ? new Date(reviewOrganizer.appliedAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })
+                    : 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {reviewOrganizerLoading ? (
+              <div className="py-8 text-center text-[#756366] flex flex-col items-center gap-2">
+                <RefreshCw className="w-5 h-5 animate-spin text-[#63474D]" />
+                <span>Loading application details...</span>
+              </div>
+            ) : (
+              <>
+                {/* Applicant & Organization Card */}
+                <div className="flex items-start gap-4 p-4 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7]">
+                  {/* Logo or Avatar */}
+                  <div className="shrink-0">
+                    {reviewOrganizer.applicantType === 'Organization / Institution' ||
+                    (!reviewOrganizer.applicantType && reviewOrganizer.organization) ? (
+                      reviewOrganizer.organizationLogo && !orgLogoError ? (
+                        <img
+                          src={reviewOrganizer.organizationLogo}
+                          alt={`${reviewOrganizer.organization} Logo`}
+                          onError={() => setOrgLogoError(true)}
+                          className="w-16 h-16 rounded-full object-cover border-2 border-[#E8DDD7] shadow-sm bg-white"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-white border-2 border-[#E8DDD7] flex items-center justify-center text-[#63474D] shadow-sm">
+                          <Building2 className="w-8 h-8" />
+                        </div>
+                      )
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-white border-2 border-[#E8DDD7] flex items-center justify-center text-[#63474D] shadow-sm">
+                        <User className="w-8 h-8" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <h4 className="font-bold text-sm text-[#2D1F23] truncate">
+                        {reviewOrganizer.organization || reviewOrganizer.name}
+                      </h4>
+                    </div>
+                    <div className="text-[11px] text-[#756366]">
+                      Applicant:{' '}
+                      <strong className="text-[#2D1F23]">{reviewOrganizer.name}</strong>
+                      {reviewOrganizer.applicantPosition && (
+                        <span> ({reviewOrganizer.applicantPosition})</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-[11px] text-[#756366]">
+                      <span className="flex items-center gap-1">
+                        <Mail className="w-3 h-3 text-[#63474D]" />
+                        {reviewOrganizer.email}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-[#63474D]" />
+                        {reviewOrganizer.phone || 'No phone provided'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Conditional Details: Individual vs Organization */}
+                {reviewOrganizer.applicantType === 'Individual Organizer' ? (
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-[#63474D]" />
+                      Personal Introduction
+                    </label>
+                    <div className="p-3.5 rounded-2xl bg-white border border-[#E8DDD7] text-xs leading-relaxed text-[#2D1F23] whitespace-pre-wrap">
+                      {reviewOrganizer.personalIntroduction ||
+                        reviewOrganizer.bio ||
+                        'No personal introduction provided.'}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-white border border-[#E8DDD7]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] block">
+                          Organization Type
+                        </span>
+                        <span className="font-semibold text-xs text-[#2D1F23]">
+                          {reviewOrganizer.organizationType || 'Not specified'}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-white border border-[#E8DDD7]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] block">
+                          Website or Social Link
+                        </span>
+                        {reviewOrganizer.organizationWebsite ? (
+                          <a
+                            href={
+                              reviewOrganizer.organizationWebsite.startsWith('http')
+                                ? reviewOrganizer.organizationWebsite
+                                : `https://${reviewOrganizer.organizationWebsite}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-[#63474D] font-bold hover:underline truncate max-w-full"
+                          >
+                            <Globe className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{reviewOrganizer.organizationWebsite}</span>
+                            <ExternalLink className="w-3 h-3 shrink-0" />
+                          </a>
+                        ) : (
+                          <span className="text-gray-400 text-xs">Not provided</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-[#756366] block">
+                        Organization Description
+                      </label>
+                      <div className="p-3.5 rounded-2xl bg-white border border-[#E8DDD7] text-xs leading-relaxed text-[#2D1F23] whitespace-pre-wrap">
+                        {reviewOrganizer.organizationDescription ||
+                          reviewOrganizer.bio ||
+                          'No description provided.'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Previous Rejection or Info Request Notes */}
+                {reviewOrganizer.rejectionReason && (
+                  <div className="p-3 rounded-2xl bg-red-50 border border-red-200 text-red-800">
+                    <span className="font-bold flex items-center gap-1 text-xs mb-1">
+                      <XCircle className="w-4 h-4 text-red-600 shrink-0" />
+                      Previous Rejection Reason:
+                    </span>
+                    <p className="text-xs">{reviewOrganizer.rejectionReason}</p>
+                  </div>
+                )}
+
+                {reviewOrganizer.infoRequestedNotes && (
+                  <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800">
+                    <span className="font-bold flex items-center gap-1 text-xs mb-1">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      Information Requested from Applicant:
+                    </span>
+                    <p className="text-xs whitespace-pre-wrap">{reviewOrganizer.infoRequestedNotes}</p>
+                  </div>
+                )}
+
+                {/* Action Panels */}
+                {reviewActionTab === 'idle' ? (
+                  <div className="pt-3 border-t border-[#E8DDD7] flex flex-wrap items-center justify-between gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReviewOrganizer(null)}
+                    >
+                      Close
+                    </Button>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setReviewActionTab('request_info')}
+                        className="border-amber-300 text-amber-800 hover:bg-amber-50 text-xs"
+                      >
+                        Request Info
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setReviewActionTab('reject')}
+                        className="border-red-300 text-red-700 hover:bg-red-50 text-xs"
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        isLoading={actionLoadingId === reviewOrganizer.id}
+                        onClick={() => handleApproveOrganizer(reviewOrganizer.id)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                      >
+                        Approve Application
+                      </Button>
+                    </div>
+                  </div>
+                ) : reviewActionTab === 'reject' ? (
+                  <div className="pt-3 border-t border-[#E8DDD7] space-y-3 bg-red-50/50 p-4 rounded-2xl border border-red-200">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-bold text-xs text-red-800 flex items-center gap-1.5">
+                        <XCircle className="w-4 h-4 text-red-600" />
+                        Specify Reason for Rejection
+                      </h5>
+                      <button
+                        type="button"
+                        onClick={() => setReviewActionTab('idle')}
+                        className="text-xs text-[#756366] hover:text-[#2D1F23]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <textarea
+                      value={rejectionReasonInput}
+                      onChange={(e) => setRejectionReasonInput(e.target.value)}
+                      placeholder="Explain clearly to the applicant why their organizer application cannot be approved at this time..."
+                      rows={3}
+                      className="w-full p-2.5 text-xs bg-white border border-red-300 rounded-xl focus:outline-none focus:border-red-500 text-[#2D1F23]"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReviewActionTab('idle')}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        isLoading={actionLoadingId === reviewOrganizer.id}
+                        onClick={() => handleRejectOrganizer(reviewOrganizer.id)}
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                      >
+                        Confirm Rejection & Notify
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-3 border-t border-[#E8DDD7] space-y-3 bg-amber-50/50 p-4 rounded-2xl border border-amber-200">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-bold text-xs text-amber-900 flex items-center gap-1.5">
+                        <HelpCircle className="w-4 h-4 text-amber-700" />
+                        Request Additional Information
+                      </h5>
+                      <button
+                        type="button"
+                        onClick={() => setReviewActionTab('idle')}
+                        className="text-xs text-[#756366] hover:text-[#2D1F23]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <textarea
+                      value={requestInfoNotesInput}
+                      onChange={(e) => setRequestInfoNotesInput(e.target.value)}
+                      placeholder="Specify what additional details or corrections are needed before this application can be approved..."
+                      rows={3}
+                      className="w-full p-2.5 text-xs bg-white border border-amber-300 rounded-xl focus:outline-none focus:border-amber-500 text-[#2D1F23]"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReviewActionTab('idle')}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        isLoading={actionLoadingId === reviewOrganizer.id}
+                        onClick={() => handleRequestOrganizerInfo(reviewOrganizer.id)}
+                        className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs"
+                      >
+                        Send Request to Applicant
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Confirmation Modal */}
       <Modal

@@ -3,7 +3,7 @@ import type { Ticket } from '../types/ticket';
 import type { BadgeAward, BadgeCode, SponsorReportData, AttendeeRosterItem } from '../types/attendance';
 import type { User, UserRole, ProfileVisibility } from '../types/user';
 import type { EventReviewItem, EventReviewsSummary } from '../types/review';
-import type { SponsorRecommendationsResponse, SponsorPreferences } from '../types/matching';
+import type { SponsorRecommendationsResponse, SponsorPreferences, SponsorProfileAndPreferences } from '../types/matching';
 import type {
   IExhibitorCall,
   IEventVendor,
@@ -250,6 +250,11 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
     }
 
     if (!response.ok) {
+      if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
+        removeAuthToken();
+        localStorage.removeItem('sheba_auth_user');
+      }
+
       const errorMsg =
         (data && typeof data === 'object' && (data.message || data.error)) ||
         `HTTP ${response.status}: ${response.statusText}`;
@@ -257,6 +262,9 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
       const errorObj: any = new Error(errorMsg);
       errorObj.status = response.status;
       errorObj.data = data;
+      errorObj.code = data?.code || data?.error;
+      errorObj.requiresExhibitorRoleAdd = data?.requiresExhibitorRoleAdd;
+      errorObj.requiresExhibitorRegistration = data?.requiresExhibitorRegistration;
       errorObj.isPendingApproval = data?.isPendingApproval || response.status === 403;
       throw errorObj;
     }
@@ -316,6 +324,11 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
     }
 
     if (!response.ok) {
+      if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
+        removeAuthToken();
+        localStorage.removeItem('sheba_auth_user');
+      }
+
       const errorMsg =
         (data && typeof data === 'object' && (data.message || data.error)) ||
         `HTTP ${response.status}: ${response.statusText}`;
@@ -368,10 +381,25 @@ export const api = {
     },
 
     applyOrganizer: async (data: {
-      organization: string;
+      applicantType?: string;
+      applicant_type?: string;
+      organization?: string;
+      organizationType?: string;
+      organization_type?: string;
+      applicantPosition?: string;
+      applicant_position?: string;
+      organizationDescription?: string;
+      organization_description?: string;
+      organizationWebsite?: string;
+      organization_website?: string;
+      organizationLogo?: string;
+      organization_logo?: string;
+      personalIntroduction?: string;
+      personal_introduction?: string;
       bio?: string;
       phone?: string;
       password?: string;
+      applyPassword?: string;
       socials?: Record<string, string>;
     }): Promise<{ user: User; message: string }> => {
       const res = await requestApi('/auth/apply-organizer', {
@@ -382,7 +410,7 @@ export const api = {
     },
 
     switchRole: async (data: {
-      targetRole: 'ATTENDEE' | 'ORGANIZER';
+      targetRole: 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR';
       password?: string;
     }): Promise<{ user: User; token: string }> => {
       const res = await requestApi('/auth/switch-role', {
@@ -397,6 +425,21 @@ export const api = {
         user: res.data.user,
         token: res.data.token,
       };
+    },
+
+    addExhibitorRole: async (data: {
+      companyName: string;
+      industryCategory: string;
+      companyPhone?: string;
+      companyWebsite?: string;
+      exhibitorDescription?: string;
+      password: string;
+    }): Promise<{ user: User; message: string }> => {
+      const res = await requestApi<{ success: boolean; data: { user: User; message: string } }>('/auth/add-exhibitor-role', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+      return res.data;
     },
 
     googleLogin: async (data: { credential: string; role?: string; mode?: 'login' | 'register' }): Promise<{ user: User; token: string }> => {
@@ -423,6 +466,25 @@ export const api = {
       organization?: string;
       phone?: string;
       bio?: string;
+      confirm_password?: string;
+      confirmPassword?: string;
+      applicant_type?: string;
+      applicantType?: string;
+      personal_introduction?: string;
+      personalIntroduction?: string;
+      organization_type?: string;
+      organizationType?: string;
+      applicant_position?: string;
+      applicantPosition?: string;
+      position?: string;
+      organization_description?: string;
+      organizationDescription?: string;
+      organization_website?: string;
+      organizationWebsite?: string;
+      website?: string;
+      organization_logo?: string;
+      organizationLogo?: string;
+      socials?: Record<string, string>;
     }): Promise<{ user?: User; token?: string; isPendingApproval?: boolean; requireOtp?: boolean; email?: string; message?: string }> => {
       const res = await requestApi('/auth/register', {
         method: 'POST',
@@ -537,6 +599,19 @@ export const api = {
       return res.data || { success: true, message: res.message || 'Password changed successfully.' };
     },
 
+    getOrganizerResponseDetails: async (token: string): Promise<any> => {
+      const res = await requestApi(`/auth/organizer-response-details?token=${encodeURIComponent(token)}`);
+      return res.data;
+    },
+
+    submitOrganizerResponse: async (payload: any): Promise<any> => {
+      const res = await requestApi('/auth/submit-organizer-response', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return res.data || res;
+    },
+
     sponsor: {
       register: async (data: {
         full_name: string;
@@ -546,6 +621,16 @@ export const api = {
         industry_category: string;
         company_phone: string;
         company_website?: string;
+        company_description: string;
+        company_logo?: string;
+        sponsorship_objectives: string[];
+        target_audience: string[];
+        preferred_event_categories: string[];
+        skills_and_interests: string[];
+        preferred_locations?: string[];
+        budget_range?: number;
+        preferred_benefits?: string[];
+        additional_preferences?: Record<string, any>;
       }): Promise<{ user: User; message: string }> => {
         const res = await requestApi('/auth/sponsor/register', {
           method: 'POST',
@@ -719,13 +804,23 @@ export const api = {
       return res.data;
     },
 
-    getMyDeals: async (status?: 'INTERESTED' | 'DECLINED') => {
+    submitApplication: async (data: { applicationId: string; package_name: string; pledged_amount: number; proposal_message: string; sponsor_notes?: string; }) => {
+      const res = await requestApi('/sponsorships/applications/submit', { method: 'POST', body: JSON.stringify(data) });
+      return res.data;
+    },
+
+    getApprovedSponsorsForPitch: async (pitchId: string) => {
+      const res = await requestApi(`/sponsorships/organizer/pitches/${pitchId}/approved-sponsors`);
+      return res.data?.approvedSponsors || [];
+    },
+
+    getMyDeals: async (status?: string) => {
       const queryStr = status ? `?status=${encodeURIComponent(status)}` : '';
       const res = await requestApi(`/sponsorships/sponsor/my-deals${queryStr}`);
       return res.data || [];
     },
 
-    updateDeal: async (dealId: string, data: { status: SponsorshipDealStatus; sponsor_notes?: string }) => {
+    updateDeal: async (dealId: string, data: { status?: SponsorshipDealStatus; sponsor_notes?: string }) => {
       const res = await requestApi(`/sponsorships/deals/${dealId}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -876,20 +971,41 @@ export const api = {
       return res.data;
     },
 
-    getPreferences: async (): Promise<{
-      preferences: SponsorPreferences;
-      companyName: string;
-      industryCategory: string;
-      isCustomized: boolean;
-    }> => {
+    getPreferences: async (): Promise<SponsorProfileAndPreferences> => {
       const res = await requestApi('/sponsorships/preferences');
       return res.data;
     },
 
-    updatePreferences: async (preferences: Partial<SponsorPreferences>): Promise<SponsorPreferences> => {
+    updatePreferences: async (payload: any): Promise<SponsorProfileAndPreferences> => {
       const res = await requestApi('/sponsorships/preferences', {
         method: 'PUT',
-        body: JSON.stringify(preferences),
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+
+    // Deliverables API (Stage 4)
+    getMyDeliverables: async () => {
+      const res = await requestApi('/sponsorships/sponsor/deliverables');
+      return res.data || [];
+    },
+
+    saveDeliverable: async (payload: any) => {
+      const res = await requestApi('/sponsorships/sponsor/deliverables', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return res.data;
+    },
+
+    getDealDeliverable: async (dealId: string) => {
+      const res = await requestApi(`/sponsorships/deals/${dealId}/deliverables`);
+      return res.data;
+    },
+
+    deleteDeliverable: async (id: string) => {
+      const res = await requestApi(`/sponsorships/sponsor/deliverables/${id}`, {
+        method: 'DELETE',
       });
       return res.data;
     },
@@ -2105,9 +2221,25 @@ export const api = {
       return res.data;
     },
 
-    rejectOrganizer: async (userId: string) => {
+    rejectOrganizer: async (userId: string, reason?: string) => {
       const res = await requestApi(`/admin/users/${userId}/reject`, {
         method: 'PATCH',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    requestOrganizerInfo: async (userId: string, notes: string) => {
+      const res = await requestApi(`/admin/users/${userId}/request-info`, {
+        method: 'PATCH',
+        body: JSON.stringify({ notes }),
+      });
+      return res.data;
+    },
+
+    getOrganizerDetails: async (userId: string) => {
+      const res = await requestApi(`/admin/users/${userId}/organizer-details`, {
+        method: 'GET',
       });
       return res.data;
     },
@@ -2126,10 +2258,41 @@ export const api = {
       return res.data;
     },
 
+    getSponsorDetails: async (userId: string) => {
+      const res = await requestApi(`/admin/users/${userId}/sponsor-details`);
+      return res.data;
+    },
+
     toggleUserStatus: async (userId: string) => {
       const res = await requestApi(`/admin/users/${userId}/status`, {
         method: 'PATCH',
       });
+      return res.data;
+    },
+
+    getSponsorshipApplications: async (params?: { status?: string; search?: string; page?: number; limit?: number }) => {
+      const queryParts: string[] = [];
+      if (params?.status && params.status !== 'ALL') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/admin/sponsorship-applications${queryStr}`);
+      return res.data || { applications: [], total: 0, page: 1, totalPages: 1 };
+    },
+
+    getSponsorshipApplicationDetail: async (id: string) => {
+      const res = await requestApi(`/admin/sponsorship-applications/${id}`);
+      return res.data;
+    },
+
+    approveSponsorshipApplication: async (id: string, notes?: string) => {
+      const res = await requestApi(`/admin/sponsorship-applications/${id}/approve`, { method: 'PATCH', body: JSON.stringify({ notes }) });
+      return res.data;
+    },
+
+    rejectSponsorshipApplication: async (id: string, rejection_reason: string) => {
+      const res = await requestApi(`/admin/sponsorship-applications/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ rejection_reason }) });
       return res.data;
     },
 

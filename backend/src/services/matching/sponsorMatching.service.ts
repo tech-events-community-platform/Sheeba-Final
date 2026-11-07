@@ -83,10 +83,14 @@ export class SponsorMatchingService {
     preferences: SponsorPreferences;
     companyName: string;
     industryCategory: string;
+    bio: string;
+    avatarUrl: string;
+    companyPhone: string;
+    companyWebsite: string;
     isCustomized: boolean;
   }> {
     const result = await query(
-      `SELECT id, role, company_name, organization, industry_category, bio, sponsor_preferences 
+      `SELECT id, role, company_name, organization, industry_category, bio, avatar_url, company_phone, company_website, sponsor_preferences 
        FROM users WHERE id = $1 AND deleted_at IS NULL`,
       [userId]
     );
@@ -105,17 +109,41 @@ export class SponsorMatchingService {
     const hasCustomPrefs =
       storedPrefs &&
       typeof storedPrefs === 'object' &&
-      Array.isArray(storedPrefs.targetInterests) &&
-      storedPrefs.targetInterests.length > 0;
+      ((Array.isArray(storedPrefs.targetInterests) && storedPrefs.targetInterests.length > 0) ||
+       (Array.isArray(storedPrefs.sponsorshipObjectives) && storedPrefs.sponsorshipObjectives.length > 0) ||
+       (Array.isArray(storedPrefs.targetSkills) && storedPrefs.targetSkills.length > 0));
 
     const preferences: SponsorPreferences = hasCustomPrefs
-      ? storedPrefs
-      : this.getDefaultPreferencesForIndustry(industryCategory, companyName, user.bio);
+      ? {
+          targetInterests: storedPrefs.targetInterests || [],
+          targetSkills: storedPrefs.targetSkills || [],
+          sponsorshipObjectives: storedPrefs.sponsorshipObjectives || ['brand_awareness'],
+          preferredEventTypes: storedPrefs.preferredEventTypes || [],
+          preferredEventCategories: storedPrefs.preferredEventCategories || [],
+          targetAudience: storedPrefs.targetAudience || [],
+          preferredLocations: storedPrefs.preferredLocations || [],
+          maxBudget: storedPrefs.maxBudget !== undefined ? storedPrefs.maxBudget : null,
+          preferredBenefits: storedPrefs.preferredBenefits || [],
+          additionalPreferences: storedPrefs.additionalPreferences || {},
+        }
+      : {
+          targetAudience: [],
+          preferredEventCategories: [],
+          preferredLocations: [],
+          maxBudget: null,
+          preferredBenefits: [],
+          additionalPreferences: {},
+          ...this.getDefaultPreferencesForIndustry(industryCategory, companyName, user.bio),
+        };
 
     return {
       preferences,
       companyName,
       industryCategory,
+      bio: user.bio || '',
+      avatarUrl: user.avatar_url || '',
+      companyPhone: user.company_phone || '',
+      companyWebsite: user.company_website || '',
       isCustomized: Boolean(hasCustomPrefs),
     };
   }
@@ -125,27 +153,98 @@ export class SponsorMatchingService {
    */
   static async updateSponsorPreferences(
     userId: string,
-    newPreferences: Partial<SponsorPreferences>
-  ): Promise<SponsorPreferences> {
+    payload: any
+  ): Promise<any> {
     const current = await this.getSponsorPreferences(userId);
-    const updated: SponsorPreferences = {
+
+    // 1. Separate user profile columns from sponsor_preferences JSONB
+    const newBio = payload.companyDescription !== undefined ? payload.companyDescription : payload.bio;
+    const newAvatar = payload.companyLogo !== undefined ? payload.companyLogo : payload.avatarUrl;
+    const newWebsite = payload.companyWebsite;
+    const newPhone = payload.companyPhone;
+    const newCompanyName = payload.companyName;
+
+    // 2. Build updated preferences object
+    const skillsList = payload.targetSkills !== undefined
+      ? payload.targetSkills
+      : (payload.skillsAndInterests !== undefined ? payload.skillsAndInterests : current.preferences.targetSkills);
+    const interestsList = payload.targetInterests !== undefined
+      ? payload.targetInterests
+      : (payload.skillsAndInterests !== undefined ? payload.skillsAndInterests : current.preferences.targetInterests);
+
+    const updatedPreferences: SponsorPreferences = {
       ...current.preferences,
-      ...newPreferences,
+      targetInterests: interestsList,
+      targetSkills: skillsList,
+      ...(payload.sponsorshipObjectives !== undefined && { sponsorshipObjectives: payload.sponsorshipObjectives }),
+      ...(payload.preferredEventTypes !== undefined && { preferredEventTypes: payload.preferredEventTypes }),
+      ...(payload.preferredEventCategories !== undefined && { preferredEventCategories: payload.preferredEventCategories }),
+      ...(payload.targetAudience !== undefined && { targetAudience: payload.targetAudience }),
+      ...(payload.preferredLocations !== undefined && { preferredLocations: payload.preferredLocations }),
+      ...(payload.maxBudget !== undefined && { maxBudget: payload.maxBudget }),
+      ...(payload.preferredBenefits !== undefined && { preferredBenefits: payload.preferredBenefits }),
+      ...(payload.additionalPreferences !== undefined && { additionalPreferences: payload.additionalPreferences }),
     };
 
-    await query(
+    // If preferredEventCategories is provided, harmonize preferredEventTypes
+    if (payload.preferredEventCategories && Array.isArray(payload.preferredEventCategories)) {
+      const derivedTypes = payload.preferredEventCategories.map((c: string) => {
+        const lower = c.toLowerCase();
+        if (lower.includes('hackathon')) return 'hackathon';
+        if (lower.includes('workshop')) return 'workshop';
+        if (lower.includes('conference')) return 'conference';
+        if (lower.includes('meetup')) return 'meetup';
+        return lower;
+      });
+      updatedPreferences.preferredEventTypes = Array.from(new Set([...(updatedPreferences.preferredEventTypes || []), ...derivedTypes]));
+    }
+
+    // 3. Persist to PostgreSQL
+    const res = await query(
       `UPDATE users 
-       SET sponsor_preferences = $1, updated_at = NOW() 
-       WHERE id = $2`,
-      [JSON.stringify(updated), userId]
+       SET bio = COALESCE($1, bio),
+           avatar_url = COALESCE($2, avatar_url),
+           company_website = COALESCE($3, company_website),
+           company_phone = COALESCE($4, company_phone),
+           company_name = COALESCE($5, company_name),
+           organization = COALESCE($5, organization),
+           sponsor_preferences = $6,
+           updated_at = NOW() 
+       WHERE id = $7 AND deleted_at IS NULL
+       RETURNING id, role, company_name, organization, industry_category, bio, avatar_url, company_phone, company_website, sponsor_preferences`,
+      [
+        newBio !== undefined ? (newBio ? newBio.trim() : null) : null,
+        newAvatar !== undefined ? (newAvatar ? newAvatar.trim() : null) : null,
+        newWebsite !== undefined ? (newWebsite ? newWebsite.trim() : null) : null,
+        newPhone !== undefined ? (newPhone ? newPhone.trim() : null) : null,
+        newCompanyName !== undefined ? (newCompanyName ? newCompanyName.trim() : null) : null,
+        JSON.stringify(updatedPreferences),
+        userId,
+      ]
     );
 
-    // Invalidate cached recommendations and private sponsorship views for this sponsor
-    await CacheService.delPattern(`matching:recommendations:${userId}*`);
-    await CacheService.delPattern(`*http:*user:${userId}*sponsorship*`);
-    await CacheService.delPattern(`*http:*user:${userId}*matching*`);
+    if (!res.rowCount || res.rowCount === 0) {
+      const err: any = new Error('Sponsor not found or unauthorized.');
+      err.statusCode = 404;
+      throw err;
+    }
 
-    return updated;
+    // 4. Invalidate all recommendation and sponsorship caches for this sponsor
+    await CacheService.delPattern(`matching:recommendations:${userId}*`);
+    await CacheService.delPattern(`*http:*user:${userId}*matching*`);
+    await CacheService.delPattern(`*http:*user:${userId}*sponsorship*`);
+    await CacheService.delPattern('sponsorship:explore*');
+
+    return {
+      preferences: updatedPreferences,
+      companyName: res.rows[0].company_name || current.companyName,
+      industryCategory: res.rows[0].industry_category || current.industryCategory,
+      bio: res.rows[0].bio || '',
+      avatarUrl: res.rows[0].avatar_url || '',
+      companyPhone: res.rows[0].company_phone || '',
+      companyWebsite: res.rows[0].company_website || '',
+      isCustomized: true,
+    };
   }
 
   /**
@@ -339,7 +438,12 @@ export class SponsorMatchingService {
     });
 
     // 5. Compute Semantic Similarities via EmbeddingService
-    const sponsorProfileText = `Sponsor: ${sponsorData.companyName}. Industry: ${sponsorData.industryCategory}. Focus: ${activePreferences.targetInterests.join(', ')}. Skills: ${activePreferences.targetSkills.join(', ')}. Objectives: ${activePreferences.sponsorshipObjectives.join(', ')}.`;
+    const audienceStr = activePreferences.targetAudience?.length ? ` Audience: ${activePreferences.targetAudience.join(', ')}.` : '';
+    const categoriesStr = activePreferences.preferredEventCategories?.length ? ` Categories: ${activePreferences.preferredEventCategories.join(', ')}.` : '';
+    const locationsStr = activePreferences.preferredLocations?.length ? ` Locations: ${activePreferences.preferredLocations.join(', ')}.` : '';
+    const bioStr = sponsorData.bio ? ` Description: ${sponsorData.bio}.` : '';
+
+    const sponsorProfileText = `Sponsor: ${sponsorData.companyName}. Industry: ${sponsorData.industryCategory}.${bioStr} Focus: ${(activePreferences.targetInterests || []).join(', ')}. Skills: ${(activePreferences.targetSkills || []).join(', ')}. Objectives: ${(activePreferences.sponsorshipObjectives || []).join(', ')}.${audienceStr}${categoriesStr}${locationsStr}`;
 
     const semanticScores = new Map<string, number>();
 

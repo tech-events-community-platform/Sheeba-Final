@@ -3,8 +3,12 @@ export interface SponsorPreferences {
   targetSkills: string[];
   sponsorshipObjectives: ('talent_recruitment' | 'brand_awareness' | 'startup_discovery' | 'product_showcase' | 'community_impact' | string)[];
   preferredEventTypes?: string[];
+  preferredEventCategories?: string[];
+  targetAudience?: string[];
   preferredLocations?: string[];
-  maxBudget?: number;
+  maxBudget?: number | null;
+  preferredBenefits?: string[];
+  additionalPreferences?: Record<string, any>;
 }
 
 export interface EventCandidate {

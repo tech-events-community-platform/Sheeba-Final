@@ -18,13 +18,28 @@ interface AuthContextType {
   login: (email: string, password: string, role?: string) => Promise<User>;
   loginWithGoogle: (credential: string, role?: UserRole, mode?: 'login' | 'register') => Promise<User>;
   applyForOrganizer: (data: {
-    organization: string;
+    applicantType?: string;
+    organization?: string;
+    organizationType?: string;
+    applicantPosition?: string;
+    organizationDescription?: string;
+    organizationWebsite?: string;
+    organizationLogo?: string;
+    personalIntroduction?: string;
     bio?: string;
     phone?: string;
     password?: string;
     socials?: Record<string, string>;
   }) => Promise<{ user: User; message: string }>;
-  switchRole: (targetRole: 'ATTENDEE' | 'ORGANIZER', password?: string) => Promise<User>;
+  switchRole: (targetRole: 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR', password?: string) => Promise<User>;
+  addExhibitorRole: (data: {
+    companyName: string;
+    industryCategory: string;
+    companyPhone?: string;
+    companyWebsite?: string;
+    exhibitorDescription?: string;
+    password: string;
+  }) => Promise<{ user: User; message: string }>;
   register: (userData: {
     email: string;
     password: string;
@@ -33,6 +48,25 @@ interface AuthContextType {
     organization?: string;
     phone?: string;
     bio?: string;
+    confirm_password?: string;
+    confirmPassword?: string;
+    applicant_type?: string;
+    applicantType?: string;
+    personal_introduction?: string;
+    personalIntroduction?: string;
+    organization_type?: string;
+    organizationType?: string;
+    applicant_position?: string;
+    applicantPosition?: string;
+    position?: string;
+    organization_description?: string;
+    organizationDescription?: string;
+    organization_website?: string;
+    organizationWebsite?: string;
+    website?: string;
+    organization_logo?: string;
+    organizationLogo?: string;
+    socials?: Record<string, string>;
   }) => Promise<RegisterResult>;
   verifyRegistrationOtp: (email: string, otp: string) => Promise<User>;
   loginSponsor: (email: string, password: string) => Promise<User>;
@@ -44,6 +78,16 @@ interface AuthContextType {
     industry_category: string;
     company_phone: string;
     company_website?: string;
+    company_description: string;
+    company_logo?: string;
+    sponsorship_objectives: string[];
+    target_audience: string[];
+    preferred_event_categories: string[];
+    skills_and_interests: string[];
+    preferred_locations?: string[];
+    budget_range?: number;
+    preferred_benefits?: string[];
+    additional_preferences?: Record<string, any>;
   }) => Promise<{ user: User; message: string }>;
   loginSponsorWithGoogle: (credential: string, mode?: 'login' | 'register', sponsorData?: any) => Promise<User>;
   logout: () => Promise<void>;
@@ -99,7 +143,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const applyForOrganizer = async (data: {
-    organization: string;
+    applicantType?: string;
+    organization?: string;
+    organizationType?: string;
+    applicantPosition?: string;
+    organizationDescription?: string;
+    organizationWebsite?: string;
+    organizationLogo?: string;
+    personalIntroduction?: string;
     bio?: string;
     phone?: string;
     password?: string;
@@ -116,13 +167,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const switchRole = async (targetRole: 'ATTENDEE' | 'ORGANIZER', password?: string): Promise<User> => {
+  const switchRole = async (targetRole: 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR', password?: string): Promise<User> => {
     setIsLoading(true);
     try {
       const res = await api.auth.switchRole({ targetRole, password });
       setUser(res.user);
       localStorage.setItem('sheba_auth_user', JSON.stringify(res.user));
       return res.user;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addExhibitorRole = async (data: {
+    companyName: string;
+    industryCategory: string;
+    companyPhone?: string;
+    companyWebsite?: string;
+    exhibitorDescription?: string;
+    password: string;
+  }): Promise<{ user: User; message: string }> => {
+    setIsLoading(true);
+    try {
+      const res = await api.auth.addExhibitorRole(data);
+      setUser(res.user);
+      localStorage.setItem('sheba_auth_user', JSON.stringify(res.user));
+      return res;
     } finally {
       setIsLoading(false);
     }
@@ -152,6 +222,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     organization?: string;
     phone?: string;
     bio?: string;
+    confirm_password?: string;
+    confirmPassword?: string;
+    applicant_type?: string;
+    applicantType?: string;
+    personal_introduction?: string;
+    personalIntroduction?: string;
+    organization_type?: string;
+    organizationType?: string;
+    applicant_position?: string;
+    applicantPosition?: string;
+    position?: string;
+    organization_description?: string;
+    organizationDescription?: string;
+    organization_website?: string;
+    organizationWebsite?: string;
+    website?: string;
+    organization_logo?: string;
+    organizationLogo?: string;
+    socials?: Record<string, string>;
   }): Promise<RegisterResult> => {
     setIsLoading(true);
     try {
@@ -204,6 +293,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     industry_category: string;
     company_phone: string;
     company_website?: string;
+    company_description: string;
+    company_logo?: string;
+    sponsorship_objectives: string[];
+    target_audience: string[];
+    preferred_event_categories: string[];
+    skills_and_interests: string[];
+    preferred_locations?: string[];
+    budget_range?: number;
+    preferred_benefits?: string[];
+    additional_preferences?: Record<string, any>;
   }): Promise<{ user: User; message: string }> => {
     setIsLoading(true);
     try {
@@ -260,6 +359,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginSponsorWithGoogle,
         applyForOrganizer,
         switchRole,
+        addExhibitorRole,
         register,
         verifyRegistrationOtp,
         logout,

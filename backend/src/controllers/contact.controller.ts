@@ -48,7 +48,7 @@ export class ContactController {
         {
           id: messageRecordId,
           status: 'sent',
-          deliveredTo: process.env.BREVO_SENDER_EMAIL || 'sheebanet.events@gmail.com',
+          deliveredTo: process.env.CONTACT_RECIPIENT_EMAIL || process.env.BREVO_SENDER_EMAIL || 'sheebanet.events@gmail.com',
         },
         'Thank you! Your message has been sent successfully. We will get back to you shortly.',
         201

@@ -10,6 +10,7 @@ import {
   CreditCard,
   User,
   Trash2,
+  HandCoins,
 } from 'lucide-react';
 
 export const AdminLayout: React.FC = () => {
@@ -38,6 +39,7 @@ export const AdminLayout: React.FC = () => {
             { label: 'Overview', path: '/admin', icon: LayoutDashboard },
             { label: 'Events', path: '/admin/events', icon: Calendar },
             { label: 'Users', path: '/admin/users', icon: Users },
+            { label: 'Sponsorships', path: '/admin/sponsorship-applications', icon: HandCoins },
             { label: 'Recycle Bin', path: '/admin/recycle-bin', icon: Trash2 },
             { label: 'Badge Queue', path: '/admin#badges', icon: Award },
             { label: 'Payments', path: '/admin#payments', icon: CreditCard },

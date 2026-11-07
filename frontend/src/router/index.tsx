@@ -21,6 +21,7 @@ import { VerifyOtpPage } from '../pages/public/VerifyOtpPage';
 import { ForgotPasswordPage } from '../pages/public/ForgotPasswordPage';
 import { ChangePasswordPage } from '../pages/shared/ChangePasswordPage';
 import { ContactPage } from '../pages/public/ContactPage';
+import { OrganizerResponsePage } from '../pages/public/OrganizerResponsePage';
 
 // Sponsor Pages & Layout
 import { SponsorLayout } from '../layouts/SponsorLayout';
@@ -33,6 +34,7 @@ import { SponsorDeliverablesPage } from '../pages/sponsor/SponsorDeliverablesPag
 import { SponsorApplicationDetailPage } from '../pages/sponsor/SponsorApplicationDetailPage';
 import { SponsorEventsPage } from '../pages/sponsor/SponsorEventsPage';
 import { SponsorReportsPage } from '../pages/sponsor/SponsorReportsPage';
+import { SponsorSettingsPage } from '../pages/sponsor/SponsorSettingsPage';
 
 // Exhibitor Pages & Layout
 import { ExhibitorLayout } from '../layouts/ExhibitorLayout';
@@ -85,12 +87,13 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <LandingPage /> },
       { path: 'login', element: <LoginPage /> },
-      { path: 'register', element: <LoginPage /> },
+      { path: 'register', element: <RegisterPage /> },
       { path: 'verify-otp', element: <VerifyOtpPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
       { path: 'reset-password', element: <ForgotPasswordPage /> },
       { path: 'pending-approval', element: <PendingApprovalPage /> },
       { path: 'contact', element: <ContactPage /> },
+      { path: 'organizer-response', element: <OrganizerResponsePage /> },
       { path: 'search', element: <Navigate to="/" replace /> },
       { path: 'e/:token', element: <PublicRegisterPage /> },
       { path: 'e/:token/register', element: <EventRegistrationCheckoutPage /> },
@@ -203,7 +206,7 @@ export const router = createBrowserRouter([
           { path: 'reports', element: <SponsorReportsPage /> },
           { path: 'deliverables', element: <SponsorDeliverablesPage /> },
           { path: 'recycle-bin', element: <SponsorRecycleBinPage /> },
-          { path: 'settings', element: <AccountSettingsPage /> },
+          { path: 'settings', element: <SponsorSettingsPage /> },
           { path: 'change-password', element: <ChangePasswordPage /> },
           { path: 'dashboard', element: <Navigate to="/sponsor" replace /> },
         ],

@@ -80,6 +80,8 @@ export function calculateCategoryFit(
   const combinedPrefs = [
     ...(preferences.targetInterests || []),
     ...(preferences.preferredEventTypes || []),
+    ...(preferences.preferredEventCategories || []),
+    ...(preferences.targetAudience || []),
     sponsorIndustry || '',
   ]
     .join(' ')
@@ -92,15 +94,25 @@ export function calculateCategoryFit(
     return 1.0;
   }
 
-  // Check event type match
+  // Check event type or category match
   if (
     preferences.preferredEventTypes &&
     preferences.preferredEventTypes.length > 0 &&
     preferences.preferredEventTypes.some(
-      (type) => type.toLowerCase() === event.eventType.toLowerCase()
+      (type) => type.toLowerCase() === event.eventType.toLowerCase() || event.category.toLowerCase().includes(type.toLowerCase())
     )
   ) {
-    return 0.9;
+    return 0.95;
+  }
+
+  if (
+    preferences.preferredEventCategories &&
+    preferences.preferredEventCategories.length > 0 &&
+    preferences.preferredEventCategories.some(
+      (cat) => cat.toLowerCase() === event.category.toLowerCase() || event.title.toLowerCase().includes(cat.toLowerCase())
+    )
+  ) {
+    return 0.95;
   }
 
   // Affinity check
@@ -133,7 +145,10 @@ export function calculateAudienceSkillFit(
   preferences: SponsorPreferences
 ): { score: number; matchedSkills: string[]; matchedRoles: string[]; isTelemetryAvailable: boolean } {
   const targetSkills = (preferences.targetSkills || []).map((s) => s.toLowerCase());
-  const targetRoles = (preferences.targetInterests || []).map((r) => r.toLowerCase());
+  const targetRoles = [
+    ...(preferences.targetInterests || []),
+    ...(preferences.targetAudience || []),
+  ].map((r) => r.toLowerCase());
 
   const totalRegistered = event.registeredCount || 0;
   const roleEntries = Object.entries(event.attendeeRoles || {});

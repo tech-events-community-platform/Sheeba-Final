@@ -3,7 +3,7 @@ import { Request } from 'express';
 export type UserRole = 'attendee' | 'organizer' | 'admin' | 'sponsor' | 'exhibitor';
 export type ProfileVisibility = 'public' | 'private';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-export type OrganizerApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected';
+export type OrganizerApprovalStatus = 'none' | 'pending' | 'approved' | 'rejected' | 'more_info_needed';
 
 export interface ISponsorRegistration {
   full_name: string;
@@ -13,6 +13,16 @@ export interface ISponsorRegistration {
   industry_category: string;
   company_phone: string;
   company_website?: string;
+  company_description: string;
+  company_logo?: string;
+  sponsorship_objectives: string[];
+  target_audience: string[];
+  preferred_event_categories: string[];
+  skills_and_interests: string[];
+  preferred_locations?: string[];
+  budget_range?: number;
+  preferred_benefits?: string[];
+  additional_preferences?: Record<string, any>;
 }
 
 export interface IUser {
@@ -39,6 +49,17 @@ export interface IUser {
   organizer_approval_status?: OrganizerApprovalStatus;
   organizer_bio?: string | null;
   organizer_socials?: Record<string, string> | null;
+  applicant_type?: string | null;
+  organization_type?: string | null;
+  applicant_position?: string | null;
+  organization_description?: string | null;
+  organization_website?: string | null;
+  organization_logo?: string | null;
+  organizer_rejection_reason?: string | null;
+  organizer_info_requested_notes?: string | null;
+  organizer_applied_at?: Date | string | null;
+  is_exhibitor?: boolean;
+  exhibitor_approval_status?: string;
   must_change_password?: boolean;
   created_at: Date;
   updated_at: Date;
@@ -387,7 +408,14 @@ export interface ISponsorshipApplication {
   interested_sponsors_count?: number;
 }
 
-export type SponsorshipDealStatus = 'INTERESTED' | 'DECLINED' | 'DEAL_ACCEPTED' | 'REJECTED' | 'WITHDRAWN';
+export type SponsorshipDealStatus =
+  | 'INTERESTED'
+  | 'DECLINED'
+  | 'DEAL_ACCEPTED'
+  | 'REJECTED'
+  | 'WITHDRAWN'
+  | 'PENDING'
+  | 'APPROVED';
 
 export interface ISponsorshipDeal {
   id: string;
@@ -403,11 +431,22 @@ export interface ISponsorshipDeal {
   rejected_at?: Date | null;
   rejected_by?: string | null;
   withdrawn_at?: Date | null;
+  proposal_message?: string;
+  rejection_reason?: string;
+  reviewed_by?: string;
+  reviewed_at?: Date;
+  deleted_at?: Date;
+  deleted_by?: string;
   created_at: Date;
   updated_at: Date;
   // Joined fields
   application?: ISponsorshipApplication;
   sponsor?: IUserSafe;
+  reviewer?: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
 }
 
 export interface ISponsorPublicProfile {
