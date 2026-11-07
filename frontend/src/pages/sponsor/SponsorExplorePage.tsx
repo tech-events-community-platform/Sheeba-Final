@@ -6,8 +6,13 @@ import {
   Building2,
   ChevronRight,
   Compass,
+  RefreshCw,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import type { ISponsorshipApplication } from '../../types/sponsorship';
 import { sponsorExploreFilterSchema, validateForm } from '../../schemas';
 
@@ -24,19 +29,36 @@ const CATEGORIES = [
 
 export const SponsorExplorePage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = (user?.role as string)?.toUpperCase() === 'ADMIN';
 
   const [allApplications, setAllApplications] = useState<ISponsorshipApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [searchQuery, setSearchQuery] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
-  const loadApplications = async (query = searchQuery) => {
+  // Admin take-down state
+  const [pitchToTakeDown, setPitchToTakeDown] = useState<ISponsorshipApplication | null>(null);
+  const [takingDown, setTakingDown] = useState(false);
+
+  const loadApplications = async (query = searchQuery, isManualRefresh = false) => {
     try {
-      setLoading(true);
+      if (isManualRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       const params: any = {};
       if (query.trim()) params.search = query.trim();
+      if (isManualRefresh) {
+        params.refresh = true;
+        params.skipCache = true;
+      }
 
-      const validation = validateForm(sponsorExploreFilterSchema, params);
+      const validation = validateForm(sponsorExploreFilterSchema, { search: params.search });
       if (!validation.success) {
         console.warn('Invalid explore filter params:', validation.errors);
         return;
@@ -44,11 +66,16 @@ export const SponsorExplorePage: React.FC = () => {
 
       const data = await api.sponsorship.exploreApplications(params);
       setAllApplications(data || []);
+      if (isManualRefresh) {
+        setFeedbackMessage('Marketplace refreshed with latest proposals.');
+        setTimeout(() => setFeedbackMessage(null), 3500);
+      }
     } catch (err: any) {
       console.error('Failed to load marketplace applications', err);
       setAllApplications([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -59,6 +86,22 @@ export const SponsorExplorePage: React.FC = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     loadApplications(searchQuery);
+  };
+
+  const handleConfirmTakeDown = async () => {
+    if (!pitchToTakeDown) return;
+    try {
+      setTakingDown(true);
+      await api.admin.takeDownSponsorshipPitch(pitchToTakeDown.id);
+      setAllApplications((prev) => prev.filter((p) => p.id !== pitchToTakeDown.id));
+      setFeedbackMessage(`Sponsorship pitch "${pitchToTakeDown.event_title}" was successfully taken down.`);
+      setPitchToTakeDown(null);
+      setTimeout(() => setFeedbackMessage(null), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to take down sponsorship pitch.');
+    } finally {
+      setTakingDown(false);
+    }
   };
 
   // Compute how many applications match each category
@@ -86,9 +129,41 @@ export const SponsorExplorePage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
-      {/* Hero Banner (Tag removed per user request) */}
+      {/* Feedback banner */}
+      {feedbackMessage && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between animate-fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{feedbackMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFeedbackMessage(null)}
+            className="text-emerald-700 hover:text-emerald-900 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Hero Banner */}
       <div className="bg-gradient-to-r from-[#2D1F23] via-[#4A3238] to-[#63474D] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute -right-10 -bottom-10 w-60 h-60 bg-[#FFA686]/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Top-right Refresh button */}
+        <div className="absolute top-6 right-6 z-10">
+          <button
+            type="button"
+            disabled={refreshing || loading}
+            onClick={() => loadApplications(searchQuery, true)}
+            className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-xs transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
+            title="Refresh marketplace pitches"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        </div>
+
         <div className="relative z-10 max-w-3xl">
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-white tracking-tight">
             Discover Upcoming Events Seeking Backing
@@ -167,7 +242,7 @@ export const SponsorExplorePage: React.FC = () => {
         })}
       </div>
 
-      {/* Applications List: Structured as Rows (Like Organizer Dashboard, Fatter & Longer Vertically) */}
+      {/* Applications List: Structured as Rows */}
       {loading ? (
         <div className="p-12 text-center text-gray-500 bg-white rounded-3xl border border-gray-100">
           <div className="animate-spin w-8 h-8 border-3 border-[#63474D] border-t-transparent rounded-full mx-auto mb-3" />
@@ -200,10 +275,10 @@ export const SponsorExplorePage: React.FC = () => {
             <div
               key={app.id}
               onClick={() => navigate(`/sponsor/applications/${app.id}`)}
-              className="bg-white rounded-2xl border border-gray-200 shadow-2xs hover:border-[#63474D] hover:shadow-xs transition-all overflow-hidden flex flex-row items-stretch cursor-pointer group h-32 sm:h-32"
+              className="bg-white rounded-2xl border border-gray-200 shadow-2xs hover:border-[#63474D] hover:shadow-xs transition-all overflow-hidden flex flex-row items-stretch cursor-pointer group min-h-[128px]"
             >
-              {/* Left Cover Image Container with coming-soon.webp (Flush Slot) */}
-              <div className="w-28 sm:w-36 h-full shrink-0 overflow-hidden bg-stone-100 border-r border-gray-200/80 relative">
+              {/* Left Cover Image Container */}
+              <div className="w-28 sm:w-36 shrink-0 overflow-hidden bg-stone-100 border-r border-gray-200/80 relative">
                 <img
                   src="/coming-soon.webp"
                   loading="lazy"
@@ -212,8 +287,8 @@ export const SponsorExplorePage: React.FC = () => {
                 />
               </div>
 
-              {/* Rest of the Row (Sleek, a few px taller than organizer's h-28) */}
-              <div className="flex-1 px-3.5 sm:px-4 py-2 sm:py-2.5 flex flex-col justify-between min-w-0">
+              {/* Rest of the Row */}
+              <div className="flex-1 px-3.5 sm:px-4 py-2.5 flex flex-col justify-between min-w-0">
                 {/* Top Line: Title + Funding Goal & Arrow */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -230,13 +305,29 @@ export const SponsorExplorePage: React.FC = () => {
                     </p>
                   </div>
 
-                  <div className="text-right shrink-0 flex items-center gap-2">
+                  <div className="text-right shrink-0 flex items-center gap-3">
                     <div>
                       <span className="text-[9px] uppercase font-bold text-gray-400 block leading-none">Goal</span>
                       <span className="font-serif font-bold text-sm sm:text-base text-[#63474D]">
                         {app.funding_goal.toLocaleString()} {app.currency}
                       </span>
                     </div>
+
+                    {/* Admin Take-down button */}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPitchToTakeDown(app);
+                        }}
+                        className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors cursor-pointer"
+                        title="Admin: Take down pitch"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+
                     <div className="hidden sm:flex items-center text-[#AA767C] group-hover:text-[#63474D] group-hover:translate-x-0.5 transition-all">
                       <ChevronRight className="w-4 h-4" />
                     </div>
@@ -244,7 +335,7 @@ export const SponsorExplorePage: React.FC = () => {
                 </div>
 
                 {/* Middle: Category Pill + Social Proof Badges + Description */}
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 py-1">
                   <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-[#FFA686]/20 text-[#63474D] border border-[#FFA686]/30 shrink-0">
                     {app.category}
                   </span>
@@ -290,6 +381,55 @@ export const SponsorExplorePage: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Admin Take-down Modal */}
+      {pitchToTakeDown && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-gray-100 space-y-5 animate-scale-in">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-serif font-bold text-xl text-gray-900">Take Down Sponsorship Pitch</h3>
+              <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                As an admin, are you sure you want to take down <strong className="text-gray-900">"{pitchToTakeDown.event_title}"</strong>?
+              </p>
+              <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
+                This pitch will be immediately closed and removed from the marketplace for all users.
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                disabled={takingDown}
+                onClick={() => setPitchToTakeDown(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={takingDown}
+                onClick={handleConfirmTakeDown}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {takingDown ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Taking down...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Take Down Pitch</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

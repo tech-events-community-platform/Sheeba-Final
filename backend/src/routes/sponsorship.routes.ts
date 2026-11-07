@@ -12,6 +12,8 @@ import {
   submitSponsorshipApplicationSchema,
   sponsorDealsQuerySchema,
   updateDealSchema,
+  saveSponsorQuestionnaireSchema,
+  recordAttendeeResponseSchema,
   saveDeliverableSchema,
 } from '../schemas/sponsorship.schema';
 import {
@@ -33,6 +35,21 @@ router.get(
   '/organizer/my-applications',
   authenticate,
   SponsorshipController.getMyApplications
+);
+
+// Phase 1: Organizer My Sponsors Management
+router.get(
+  '/organizer/my-sponsors',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  SponsorshipController.getOrganizerMySponsors
+);
+
+// Phase 1: Sponsor Profile Lookup
+router.get(
+  '/sponsor-profile/:sponsorId',
+  authenticate,
+  SponsorshipController.getSponsorProfile
 );
 
 // Stage 2: Organizer retrieves approved sponsors for their pitch
@@ -96,6 +113,102 @@ router.patch(
   validateParams(idParamSchema),
   validateBody(updateDealSchema),
   SponsorshipController.updateDeal
+);
+
+// Phase 1: Organizer Deal Actions (Accept and Reject)
+router.patch(
+  '/deals/:id/accept',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.acceptDeal
+);
+
+router.patch(
+  '/deals/:id/reject',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.rejectDeal
+);
+
+// Phase 1: Sponsor Withdraw Action
+router.patch(
+  '/deals/:id/withdraw',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.withdrawDeal
+);
+
+// Phase 2: Organizer Controls Attendee-Information Sharing (Enable or Revoke)
+router.patch(
+  '/deals/:id/sharing',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.toggleAttendeeSharing
+);
+
+// Phase 2: Sponsor My Events Pipeline
+router.get(
+  '/sponsor/my-events',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  SponsorshipController.getSponsorMyEvents
+);
+
+// Phase 2: Sponsor Checked-In Attendees (Strictly Gated by Accepted Deal + Active Sharing)
+router.get(
+  '/sponsor/events/:id/attendees',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.getSponsorCheckedInAttendees
+);
+
+// Phase 3: Sponsor Questionnaire Management
+router.get(
+  '/deals/:id/questionnaire',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.getSponsorQuestionnaire
+);
+
+router.put(
+  '/deals/:id/questionnaire',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  validateBody(saveSponsorQuestionnaireSchema),
+  SponsorshipController.saveSponsorQuestionnaire
+);
+
+// Phase 3: In-Person Attendee Response Recording
+router.get(
+  '/deals/:id/attendees/:attendeeId/response',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.getAttendeeResponse
+);
+
+router.post(
+  '/deals/:id/attendees/:attendeeId/record',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateParams(idParamSchema),
+  validateBody(recordAttendeeResponseSchema),
+  SponsorshipController.recordAttendeeResponse
+);
+
+// Phase 4: Sponsor Reports Summary Shell
+router.get(
+  '/sponsor/reports/summary',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  SponsorshipController.getSponsorReportsSummary
 );
 
 // AI-Powered Sponsor-Event Matching & Recommendations
