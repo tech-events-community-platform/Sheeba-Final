@@ -107,6 +107,8 @@ export const errorHandler = (
     error: isProd && statusCode === 500 ? 'INTERNAL_SERVER_ERROR' : (err.code || err.message),
     data: err.data || undefined,
     isPendingApproval: err.isPendingApproval,
+    requiresExhibitorRoleAdd: err.requiresExhibitorRoleAdd,
+    requiresExhibitorRegistration: err.requiresExhibitorRegistration,
     ...(!isProd && { stack: err.stack }),
   });
 };

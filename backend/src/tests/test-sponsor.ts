@@ -24,7 +24,20 @@ async function runSponsorTests() {
     industry_category: 'Fintech',
     company_phone: '+251911223344',
     company_website: 'https://acmetech.et',
+    company_description: 'Leading fintech and payment infrastructure company in East Africa.',
+    company_logo: 'https://acmetech.et/logo.png',
+    sponsorship_objectives: ['Brand awareness', 'Talent recruitment'],
+    target_audience: ['Software developers', 'University students'],
+    preferred_event_categories: ['Hackathons', 'Tech conferences'],
+    skills_and_interests: ['AI', 'Software engineering', 'Python'],
+    preferred_locations: ['Addis Ababa'],
+    budget_range: 250000,
   });
+
+  if (!regResult.user.bio || !regResult.user.sponsorPreferences) {
+    throw new Error('FAIL: Company bio or sponsorPreferences not persisted on user object');
+  }
+  console.log('  ✅ PASS: Company description and sponsor preferences successfully persisted');
 
   if (regResult.user.role === 'SPONSOR' && regResult.user.approvalStatus === 'pending') {
     console.log('  ✅ PASS: Sponsor registered in pending approval status');

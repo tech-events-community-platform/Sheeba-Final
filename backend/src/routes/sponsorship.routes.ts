@@ -9,8 +9,10 @@ import {
   createApplicationSchema,
   exploreApplicationsQuerySchema,
   createDealSchema,
+  submitSponsorshipApplicationSchema,
   sponsorDealsQuerySchema,
   updateDealSchema,
+  saveDeliverableSchema,
 } from '../schemas/sponsorship.schema';
 import {
   updateSponsorPreferencesSchema,
@@ -33,6 +35,15 @@ router.get(
   SponsorshipController.getMyApplications
 );
 
+// Stage 2: Organizer retrieves approved sponsors for their pitch
+router.get(
+  ['/organizer/pitches/:id/approved-sponsors', '/organizer/pitches/approved-sponsors'],
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  SponsorshipController.getApprovedSponsorsForPitch
+);
+
 router.delete(
   ['/applications/:id', '/applications'],
   authenticate,
@@ -53,6 +64,15 @@ router.get(
   optionalAuthenticate,
   validateParams(idParamSchema),
   SponsorshipController.getApplication
+);
+
+// Stage 2: Sponsor submits formal application
+router.post(
+  '/applications/submit',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateBody(submitSponsorshipApplicationSchema),
+  SponsorshipController.submitFormalApplication
 );
 
 // Sponsor Deals Pipeline
@@ -100,6 +120,37 @@ router.put(
   authorizeRoles('sponsor', 'admin'),
   validateBody(updateSponsorPreferencesSchema),
   MatchingController.updatePreferences
+);
+
+
+// Deliverables Routes (Stage 4)
+router.get(
+  '/sponsor/deliverables',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  SponsorshipController.getMyDeliverables
+);
+
+router.post(
+  '/sponsor/deliverables',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  validateBody(saveDeliverableSchema),
+  SponsorshipController.saveDeliverable
+);
+
+router.get(
+  ['/deals/:dealId/deliverables', '/deals/:id/deliverables'],
+  authenticate,
+  authorizeRoles('sponsor', 'organizer', 'admin'),
+  SponsorshipController.getDealDeliverable
+);
+
+router.delete(
+  ['/sponsor/deliverables/:id', '/sponsor/deliverables'],
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  SponsorshipController.deleteDeliverable
 );
 
 export default router;

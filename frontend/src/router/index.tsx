@@ -31,6 +31,7 @@ import { SponsorExplorePage } from '../pages/sponsor/SponsorExplorePage';
 import { SponsorDealsPage } from '../pages/sponsor/SponsorDealsPage';
 import { SponsorDeliverablesPage } from '../pages/sponsor/SponsorDeliverablesPage';
 import { SponsorApplicationDetailPage } from '../pages/sponsor/SponsorApplicationDetailPage';
+import { SponsorSettingsPage } from '../pages/sponsor/SponsorSettingsPage';
 
 // Exhibitor Pages & Layout
 import { ExhibitorLayout } from '../layouts/ExhibitorLayout';
@@ -198,7 +199,7 @@ export const router = createBrowserRouter([
           { path: 'deals', element: <SponsorDealsPage /> },
           { path: 'deliverables', element: <SponsorDeliverablesPage /> },
           { path: 'recycle-bin', element: <SponsorRecycleBinPage /> },
-          { path: 'settings', element: <AccountSettingsPage /> },
+          { path: 'settings', element: <SponsorSettingsPage /> },
           { path: 'change-password', element: <ChangePasswordPage /> },
           { path: 'dashboard', element: <Navigate to="/sponsor" replace /> },
         ],

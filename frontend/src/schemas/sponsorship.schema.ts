@@ -1,11 +1,14 @@
 import { z } from 'zod';
 
 /**
- * Deal status enum for sponsorship pipeline
+ * Deal status enum for sponsorship pipeline and formal applications
  */
-export const dealStatusEnum = z.enum(['INTERESTED', 'DECLINED'], {
-  message: "Status must be either 'INTERESTED' or 'DECLINED'.",
-});
+export const dealStatusEnum = z.enum(
+  ['PENDING', 'APPROVED', 'REJECTED', 'INTERESTED', 'DECLINED'],
+  {
+    message: "Status must be 'PENDING', 'APPROVED', 'REJECTED', 'INTERESTED', or 'DECLINED'.",
+  }
+);
 
 /**
  * Sponsorship package tier form schema
@@ -88,17 +91,37 @@ export const sponsorExploreFilterSchema = z.object({
 export type SponsorExploreFilterData = z.infer<typeof sponsorExploreFilterSchema>;
 
 /**
- * Express interest schema for SponsorApplicationDetailPage
+ * Formal sponsorship application schema for SponsorApplicationDetailPage
+ */
+export const submitFormalSponsorshipApplicationSchema = z.object({
+  applicationId: z.string().trim().min(1, { message: 'Sponsorship pitch ID is required.' }),
+  package_name: z.string().trim().min(1, { message: 'Please select a sponsorship package.' }),
+  pledged_amount: z.coerce
+    .number({ message: 'Proposed amount must be a number.' })
+    .positive({ message: 'Proposed amount must be greater than 0 ETB.' }),
+  proposal_message: z
+    .string()
+    .trim()
+    .min(10, { message: 'Proposal message must be at least 10 characters long explaining your interest.' })
+    .max(2000, { message: 'Proposal message cannot exceed 2000 characters.' }),
+  sponsor_notes: z.string().trim().optional().nullable(),
+});
+
+export type SubmitFormalSponsorshipApplicationData = z.infer<typeof submitFormalSponsorshipApplicationSchema>;
+
+/**
+ * Express interest schema for legacy fallback
  */
 export const sponsorExpressInterestSchema = z.object({
   applicationId: z.string().trim().min(1, { message: 'Application ID is required.' }),
-  status: dealStatusEnum,
+  status: dealStatusEnum.optional().default('PENDING'),
   package_name: z.string().trim().optional().nullable(),
   pledged_amount: z.coerce
     .number({ message: 'Pledged amount must be a number.' })
     .min(0, { message: 'Pledged amount must be greater than or equal to 0.' })
     .optional()
     .nullable(),
+  proposal_message: z.string().trim().optional().nullable(),
 });
 
 export type SponsorExpressInterestData = z.infer<typeof sponsorExpressInterestSchema>;
@@ -112,3 +135,25 @@ export const sponsorDealNotesSchema = z.object({
 });
 
 export type SponsorDealNotesData = z.infer<typeof sponsorDealNotesSchema>;
+
+/**
+ * Admin reject application schema
+ */
+export const adminRejectApplicationSchema = z.object({
+  rejection_reason: z
+    .string()
+    .trim()
+    .min(5, { message: 'A rejection reason of at least 5 characters is required.' })
+    .max(1000, { message: 'Rejection reason cannot exceed 1000 characters.' }),
+});
+
+export type AdminRejectApplicationData = z.infer<typeof adminRejectApplicationSchema>;
+
+/**
+ * Admin approve application schema
+ */
+export const adminApproveApplicationSchema = z.object({
+  notes: z.string().trim().optional().nullable(),
+});
+
+export type AdminApproveApplicationData = z.infer<typeof adminApproveApplicationSchema>;

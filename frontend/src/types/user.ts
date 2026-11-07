@@ -36,6 +36,7 @@ export interface User {
   socials?: OrganizerSocials;
   approvalStatus?: ApprovalStatus;
   isOrganizer?: boolean;
+  isExhibitor?: boolean;
   organizerApprovalStatus?: OrganizerApprovalStatus;
   hasExhibitorApplications?: boolean;
   roles?: UserRole[];

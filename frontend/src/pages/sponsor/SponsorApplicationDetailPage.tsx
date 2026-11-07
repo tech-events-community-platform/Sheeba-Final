@@ -15,6 +15,10 @@ import {
   Trophy,
   ShieldCheck,
   Sparkles,
+  RotateCcw,
+  Building2,
+  DollarSign,
+  FileText,
 } from 'lucide-react';
 import {
   LinkedInIcon,
@@ -28,36 +32,54 @@ import {
 } from '../../components/ui/SocialIcons';
 import { api } from '../../services/api';
 import type { ISponsorshipApplication } from '../../types/sponsorship';
-import { sponsorExpressInterestSchema, validateForm } from '../../schemas';
+import { submitFormalSponsorshipApplicationSchema, validateForm } from '../../schemas';
 
 export const SponsorApplicationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const [application, setApplication] = useState<ISponsorshipApplication | null>(null);
+  const [existingDeal, setExistingDeal] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Interaction State
   const [selectedPackage, setSelectedPackage] = useState<string>('');
   const [pledgedAmount, setPledgedAmount] = useState<number | undefined>(undefined);
+  const [proposalMessage, setProposalMessage] = useState<string>('');
+  const [sponsorNotes, setSponsorNotes] = useState<string>('');
+  const [isResubmitting, setIsResubmitting] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
-    const fetchApplication = async () => {
+    const fetchApplicationAndDeal = async () => {
       if (!id) return;
       try {
         setLoading(true);
         setErrorMsg(null);
-        const data = await api.sponsorship.getApplication(id);
-        if (data) {
-          setApplication(data);
-          if (data.packages && data.packages.length > 0) {
-            setSelectedPackage(data.packages[0].name);
-            setPledgedAmount(data.packages[0].amount);
+        
+        const [appData, myDeals] = await Promise.all([
+          api.sponsorship.getApplication(id),
+          api.sponsorship.getMyDeals().catch(() => []),
+        ]);
+
+        if (appData) {
+          setApplication(appData);
+          if (appData.packages && appData.packages.length > 0) {
+            setSelectedPackage(appData.packages[0].name);
+            setPledgedAmount(appData.packages[0].amount);
           } else {
-            setPledgedAmount(data.funding_goal);
+            setPledgedAmount(appData.funding_goal);
+          }
+
+          // Check if active deal exists
+          const active = myDeals.find((d: any) => d.application_id === id);
+          if (active) {
+            setExistingDeal(active);
+            if (active.package_name) setSelectedPackage(active.package_name);
+            if (active.pledged_amount) setPledgedAmount(active.pledged_amount);
+            if (active.proposal_message) setProposalMessage(active.proposal_message);
           }
         } else {
           setErrorMsg('Sponsorship application pitch not found.');
@@ -70,26 +92,43 @@ export const SponsorApplicationDetailPage: React.FC = () => {
       }
     };
 
-    fetchApplication();
+    fetchApplicationAndDeal();
   }, [id]);
 
-  const handleExpressInterestOrDecline = async (status: 'INTERESTED' | 'DECLINED') => {
+  const handleFormalApplicationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!application) return;
+
+    if (!selectedPackage) {
+      setFeedbackMessage({ type: 'error', text: 'Please select a sponsorship package tier.' });
+      return;
+    }
+
+    if (!pledgedAmount || pledgedAmount <= 0) {
+      setFeedbackMessage({ type: 'error', text: 'Please enter a valid pledged sponsorship amount.' });
+      return;
+    }
+
+    if (!proposalMessage.trim() || proposalMessage.trim().length < 10) {
+      setFeedbackMessage({
+        type: 'error',
+        text: 'Please provide a proposal message of at least 10 characters explaining your interest and goals.',
+      });
+      return;
+    }
 
     const payload = {
       applicationId: application.id,
-      status,
-      package_name: selectedPackage || undefined,
-      pledged_amount: pledgedAmount !== undefined ? pledgedAmount : undefined,
+      package_name: selectedPackage,
+      pledged_amount: Number(pledgedAmount),
+      proposal_message: proposalMessage.trim(),
+      sponsor_notes: sponsorNotes.trim() || undefined,
     };
 
-    const validation = validateForm(sponsorExpressInterestSchema, payload);
+    const validation = validateForm(submitFormalSponsorshipApplicationSchema, payload);
     if (!validation.success) {
-      const firstError = Object.values(validation.errors)[0] || 'Invalid deal parameters.';
-      setFeedbackMessage({
-        type: 'error',
-        text: firstError,
-      });
+      const firstError = Object.values(validation.errors)[0] || 'Invalid application parameters.';
+      setFeedbackMessage({ type: 'error', text: firstError });
       return;
     }
 
@@ -97,31 +136,48 @@ export const SponsorApplicationDetailPage: React.FC = () => {
       setActionLoading(true);
       setFeedbackMessage(null);
 
-      await api.sponsorship.expressInterestOrDecline({
-        applicationId: application.id,
-        status,
-        package_name: selectedPackage,
-        pledged_amount: pledgedAmount,
+      await api.sponsorship.submitApplication(payload);
+
+      setFeedbackMessage({
+        type: 'success',
+        text: 'Your formal sponsorship application has been submitted and is now pending review by Sheeba Administration!',
       });
 
-      // Navigate to deals and pledges tab
-      navigate('/sponsor/deals');
+      setTimeout(() => {
+        navigate('/sponsor/deals');
+      }, 1500);
     } catch (err: any) {
       setFeedbackMessage({
         type: 'error',
-        text: err.message || 'Failed to update deal status.',
+        text: err.message || 'Failed to submit application. Please verify parameters.',
       });
     } finally {
       setActionLoading(false);
     }
   };
 
-  const formatExternalLink = (url?: string) => {
-    if (!url) return '';
-    const trimmed = url.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-    if (trimmed.startsWith('@')) return `https://t.me/${trimmed.substring(1)}`;
-    return `https://${trimmed}`;
+  const handleDeclinePitch = async () => {
+    if (!application) return;
+    try {
+      setActionLoading(true);
+      setFeedbackMessage(null);
+
+      await api.sponsorship.expressInterestOrDecline({
+        applicationId: application.id,
+        status: 'DECLINED',
+        package_name: selectedPackage || undefined,
+        pledged_amount: pledgedAmount,
+      });
+
+      navigate('/sponsor/deals');
+    } catch (err: any) {
+      setFeedbackMessage({
+        type: 'error',
+        text: err.message || 'Failed to mark pitch as declined.',
+      });
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const getSocialLogo = (platform: string) => {
@@ -136,509 +192,233 @@ export const SponsorApplicationDetailPage: React.FC = () => {
     return <GlobeIcon className="w-4 h-4" />;
   };
 
-  // Resolve organizer socials from application or stored organizer profile
   const resolvedSocials = React.useMemo(() => {
     if (!application) return {};
-    if (application.socials && Object.keys(application.socials).length > 0) {
-      return application.socials;
-    }
-    // Fallback check in localStorage
-    try {
-      const stored =
-        (application.organizer_id && localStorage.getItem(`sheeba_organizer_socials_${application.organizer_id}`)) ||
-        localStorage.getItem('sheeba_organizer_socials');
-      if (stored) return JSON.parse(stored);
-    } catch {}
-    return {};
+    const directSocials = application.socials || {};
+    return Object.keys(directSocials).length > 0 ? directSocials : {};
   }, [application]);
+
+  const socialEntries = Object.entries(resolvedSocials).filter(
+    ([_, url]) => url && typeof url === 'string' && url.trim().length > 0
+  );
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto py-20 px-4 text-center space-y-4">
-        <div className="animate-spin w-10 h-10 border-3 border-[#63474D] border-t-transparent rounded-full mx-auto" />
-        <p className="text-sm font-medium text-gray-600">Loading proposal details...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+        <Clock className="w-10 h-10 text-[#63474D] animate-spin" />
+        <p className="text-sm font-semibold text-gray-600">Retrieving sponsorship opportunity...</p>
       </div>
     );
   }
 
   if (errorMsg || !application) {
     return (
-      <div className="max-w-md mx-auto py-16 px-4 text-center space-y-4 bg-white rounded-3xl border border-[#E8DDD7] shadow-xs my-8">
-        <AlertCircle className="w-12 h-12 text-[#AA767C] mx-auto" />
-        <h2 className="font-serif text-2xl font-bold text-[#2D1F23]">Application Not Found</h2>
-        <p className="text-xs text-[#756366]">{errorMsg || 'This proposal does not exist or has been withdrawn.'}</p>
+      <div className="max-w-2xl mx-auto my-12 p-8 bg-white border border-red-200 rounded-3xl text-center space-y-4 shadow-sm">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+        <h2 className="text-xl font-serif font-bold text-gray-900">Opportunity Not Available</h2>
+        <p className="text-xs text-gray-600 leading-relaxed">
+          {errorMsg || 'This pitch application does not exist or may have been removed by the organizer.'}
+        </p>
         <Link
-          to="/sponsor"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#63474D] text-white text-xs font-bold shadow-xs hover:bg-[#523a3f]"
+          to="/sponsor/explore"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#63474D] text-white text-xs font-bold hover:bg-[#4A3238] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Explore Pitches</span>
+          <span>Return to Marketplace</span>
         </Link>
       </div>
     );
   }
 
-  const socialEntries = Object.entries(resolvedSocials);
+  const isPending = existingDeal?.status === 'PENDING';
+  const isApproved = existingDeal?.status === 'APPROVED';
+  const isRejected = existingDeal?.status === 'REJECTED';
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-20 px-2 sm:px-4">
-      {/* Top Back Nav */}
-      <div>
+    <div className="space-y-8 max-w-4xl mx-auto pb-16 px-4">
+      {/* Top Navigation */}
+      <div className="flex items-center justify-between">
         <Link
-          to="/sponsor"
-          className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-[#63474D] hover:text-[#2D1F23] transition-colors"
+          to="/sponsor/explore"
+          className="inline-flex items-center gap-2 text-xs font-bold text-[#63474D] hover:text-[#2D1F23] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Explore Pitches</span>
+          <span>Back to Marketplace</span>
         </Link>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-[#FAF7F5] border border-[#E8DDD7] text-[#63474D]">
+            {application.category} • {application.event_type}
+          </span>
+        </div>
       </div>
 
-      {/* TOP SECTION: Matches Screenshot - Picture by itself on left, typography & stats right (NO OUTER CARD BOX) */}
-      <div className="flex flex-col md:flex-row items-start gap-6 sm:gap-8">
-        {/* Left: Picture by itself */}
-        <div className="w-full sm:w-64 h-44 sm:h-48 rounded-2xl overflow-hidden bg-stone-100 shadow-sm shrink-0">
-          <img
-            src="/coming-soon.webp"
-            loading="lazy"
-            alt={application.event_title}
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        {/* Right: Meta pills, Large Title, Date/Location line, Stats row */}
-        <div className="flex-1 space-y-3 min-w-0">
-          {/* Top Meta Line */}
-          <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
-            <span>{application.event_type}</span>
-            <span>•</span>
-            <span className="text-emerald-700">UPCOMING</span>
-            <span>•</span>
-            <span className="text-[#63474D]">{application.category}</span>
+      {/* Hero Pitch Overview */}
+      <div className="bg-gradient-to-r from-[#2D1F23] via-[#4A3238] to-[#63474D] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="relative z-10 space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-[#FFA686] text-xs font-semibold uppercase tracking-wider">
+            <Sparkles className="w-3.5 h-3.5" />
+            Verified Event Pitch
           </div>
-
-          {/* Event Title */}
-          <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#2D1F23] tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-4xl font-serif font-bold text-white tracking-tight">
             {application.event_title}
           </h1>
-
-          {/* Date, Time, Location with clean icons */}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[#594246] pt-1">
-            <span className="flex items-center gap-1.5 font-medium">
-              <img src="/calendar.webp" alt="Calendar" className="w-4 h-4 object-contain shrink-0" />
-              <span>{application.expected_date}</span>
-            </span>
-            <span className="flex items-center gap-1.5 font-medium">
-              <Clock className="w-4 h-4 text-[#AA767C] shrink-0" />
-              <span>Full Day Session</span>
-            </span>
-            <span className="flex items-center gap-1.5 font-medium text-[#C44536]">
-              <img src="/location.webp" alt="Location" className="w-4 h-4 object-contain shrink-0" />
-              <span>{application.location}</span>
-            </span>
-          </div>
-
-          {/* Numeric Stats Row (Like Screenshot: REGISTERED, CHECKED IN, CAPACITY) */}
-          <div className="flex items-center gap-8 sm:gap-14 pt-3">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">
-                EXPECTED TURNOUT
-              </span>
-              <span className="font-serif font-extrabold text-2xl sm:text-3xl text-[#2D1F23]">
-                {application.expected_attendees.toLocaleString()}
-              </span>
-            </div>
-
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">
-                FUNDING GOAL
-              </span>
-              <span className="font-serif font-extrabold text-2xl sm:text-3xl text-emerald-700">
-                {application.funding_goal.toLocaleString()}{' '}
-                <span className="text-xs font-sans font-bold text-gray-500">{application.currency}</span>
-              </span>
-            </div>
-
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">
-                PACKAGES
-              </span>
-              <span className="font-serif font-extrabold text-2xl sm:text-3xl text-[#63474D]">
-                {application.packages?.length || 0}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Thick Grey Divider Line */}
-      <div className="w-full h-1 bg-gray-300/80 rounded-full my-6" />
-
-      {/* ROW 1: Event Concept & Value Proposition (Label left, answer right in same row - NO CARD BOX) */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-start py-4 border-b border-gray-200">
-        <div className="md:col-span-4">
-          <h2 className="font-serif text-lg sm:text-xl font-bold text-[#2D1F23]">
-            Event Concept & Value Proposition
-          </h2>
-          <p className="text-xs text-gray-400 mt-0.5">Pitch details provided by the organizer</p>
-        </div>
-        <div className="md:col-span-8">
-          <p className="text-sm sm:text-base text-[#3d2b2f] leading-relaxed whitespace-pre-line font-normal">
+          <p className="text-xs sm:text-sm text-gray-200 line-clamp-3 leading-relaxed max-w-2xl">
             {application.description}
           </p>
-        </div>
-      </div>
-
-      {/* ROW 2: Target Demographics & Audience Profile (Label left, answer right in same row - NO CARD BOX) */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-start py-4 border-b border-gray-200">
-        <div className="md:col-span-4">
-          <h2 className="font-serif text-lg sm:text-xl font-bold text-[#2D1F23]">
-            Target Demographics & Audience Profile
-          </h2>
-          <p className="text-xs text-gray-400 mt-0.5">Audience reach and target participants</p>
-        </div>
-        <div className="md:col-span-8">
-          <p className="text-sm sm:text-base text-[#3d2b2f] leading-relaxed font-normal">
-            {application.target_audience || 'General public, community enthusiasts, and verified tech passholders.'}
-          </p>
-        </div>
-      </div>
-
-      {/* Sheeba Event Report / Pitch Deck Links if Provided */}
-      {application.pitch_deck_url && (
-        <div className="py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">Past Sheeba Event Reports / Proposal</h3>
-            <p className="text-xs text-gray-500">Verified performance reports or proposal document</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-white/15 text-xs">
+            <div>
+              <p className="text-gray-300 text-[10px] uppercase font-bold">Expected Date</p>
+              <p className="font-bold text-white mt-0.5">{application.expected_date}</p>
+            </div>
+            <div>
+              <p className="text-gray-300 text-[10px] uppercase font-bold">Location</p>
+              <p className="font-bold text-white mt-0.5 truncate">{application.location}</p>
+            </div>
+            <div>
+              <p className="text-gray-300 text-[10px] uppercase font-bold">Attendees</p>
+              <p className="font-bold text-white mt-0.5">{application.expected_attendees.toLocaleString()}+</p>
+            </div>
+            <div>
+              <p className="text-gray-300 text-[10px] uppercase font-bold">Funding Goal</p>
+              <p className="font-bold text-[#FFA686] mt-0.5">
+                {application.funding_goal.toLocaleString()} {application.currency}
+              </p>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {application.pitch_deck_url.split(',').map((u, i) => {
-              const cleanUrl = u.trim();
-              if (!cleanUrl) return null;
-              const hasMultiple = application.pitch_deck_url!.includes(',');
+        </div>
+      </div>
+
+      {/* EXISTING STATUS BANNER (If sponsor already applied) */}
+      {existingDeal && (
+        <>
+          {isPending && (
+            <div className="p-6 bg-amber-50 border border-amber-300/80 rounded-3xl space-y-3 animate-fade-in shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-amber-900 font-bold text-base">
+                  <Clock className="w-5 h-5 text-amber-600 animate-pulse" />
+                  <span>Application Under Administrator Review</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-200/70 text-amber-900 px-3 py-1 rounded-full">
+                  Pending Decision
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                You submitted a formal sponsorship application for the <strong>{existingDeal.package_name}</strong> package ({existingDeal.pledged_amount?.toLocaleString()} {application.currency}) on {new Date(existingDeal.created_at).toLocaleDateString()}.
+              </p>
+              {existingDeal.proposal_message && (
+                <div className="bg-white/80 p-3.5 rounded-2xl border border-amber-200 text-xs italic text-gray-700">
+                  "{existingDeal.proposal_message}"
+                </div>
+              )}
+              <div className="pt-1 flex items-center gap-3">
+                <Link
+                  to="/sponsor/deals"
+                  className="text-xs font-bold text-[#63474D] underline hover:text-[#2D1F23]"
+                >
+                  View Application in Deals Pipeline →
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {isApproved && (
+            <div className="p-6 bg-emerald-50 border border-emerald-300/80 rounded-3xl space-y-3 animate-fade-in shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-emerald-900 font-bold text-base">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span>Approved Sponsorship Partner!</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-200/70 text-emerald-900 px-3 py-1 rounded-full">
+                  Approved
+                </span>
+              </div>
+              <p className="text-xs text-emerald-800 leading-relaxed">
+                Sheeba Administration has formally approved your sponsorship application for the <strong>{existingDeal.package_name}</strong> package. The event organizer has received your corporate representative details.
+              </p>
+              <div className="pt-2">
+                <Link
+                  to="/sponsor/deals"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all shadow-xs"
+                >
+                  <span>Access Deals & Deliverables</span>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {isRejected && !isResubmitting && (
+            <div className="p-6 bg-rose-50 border border-rose-300/80 rounded-3xl space-y-3 animate-fade-in shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 text-rose-900 font-bold text-base">
+                  <XCircle className="w-5 h-5 text-rose-600" />
+                  <span>Previous Application Declined</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsResubmitting(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-rose-100/60 border border-rose-300 text-rose-800 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Submit Revised Proposal</span>
+                </button>
+              </div>
+              <p className="text-xs text-rose-800 leading-relaxed">
+                Administrator Feedback: <strong className="font-semibold italic">"{existingDeal.rejection_reason || 'Package was unavailable or budget alignment required.'}"</strong>
+              </p>
+              <p className="text-xs text-gray-600">
+                You may adjust your chosen package tier or proposed contribution and submit a revised application below.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Organizer Verified Card */}
+      <div className="bg-white rounded-3xl border border-[#E8DDD7] p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center font-bold text-lg border border-[#63474D]/20 shrink-0">
+            {application.organizer_organization?.[0] || 'O'}
+          </div>
+          <div>
+            <h3 className="font-serif font-bold text-base text-[#2D1F23]">
+              {application.organizer_organization || application.organizer_name}
+            </h3>
+            <p className="text-xs text-gray-500">
+              Verified Event Organizer • Contact: {application.contact_name}
+            </p>
+          </div>
+        </div>
+
+        {/* Social logos */}
+        {socialEntries.length > 0 && (
+          <div className="flex items-center gap-2">
+            {socialEntries.map(([platform, link]) => {
+              const strLink = String(link || '');
+              const cleanLink = strLink.startsWith('http') ? strLink : `https://${strLink}`;
               return (
                 <a
-                  key={i}
-                  href={cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`}
+                  key={platform}
+                  href={cleanLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#63474D] text-white text-xs font-bold shadow-xs hover:bg-[#523a3f] transition-all"
+                  className="w-8 h-8 rounded-xl bg-stone-100 hover:bg-[#63474D] hover:text-white text-gray-600 flex items-center justify-center transition-all border border-stone-200"
                 >
-                  <span>{hasMultiple ? `View Report #${i + 1}` : 'View Event Report'}</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  {getSocialLogo(platform)}
                 </a>
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* ROW: Past Sponsors, Partners, Co-Organizers, and Speakers */}
-      {(() => {
-        const affiliations = application.affiliations;
-        const hasAffiliations = Boolean(
-          affiliations &&
-            ((affiliations.past_sponsors && affiliations.past_sponsors.length > 0) ||
-              (affiliations.partners && affiliations.partners.length > 0) ||
-              (affiliations.co_organizers && affiliations.co_organizers.length > 0) ||
-              (affiliations.speakers && affiliations.speakers.length > 0))
-        );
-
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-start py-5 border-b border-gray-200">
-            <div className="md:col-span-4 space-y-1">
-              <h2 className="font-serif text-lg sm:text-xl font-bold text-[#2D1F23]">
-                Past Sponsors, Partners, Co-Organizers, and Speakers
-              </h2>
-              <p className="text-xs text-gray-400">
-                Track record, previous sponsors, partners, co-organizers, and notable speakers
-              </p>
-              <div className="pt-1">
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#63474D] bg-[#63474D]/10 px-2.5 py-0.5 rounded-full">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#63474D]" />
-                  Verified Associations
-                </span>
-              </div>
-            </div>
-
-            <div className="md:col-span-8 space-y-5">
-              {hasAffiliations ? (
-                <div className="space-y-6">
-                  {/* Row 1: Past Sponsors & Partners */}
-                  {((affiliations?.past_sponsors && affiliations.past_sponsors.length > 0) ||
-                    (affiliations?.partners && affiliations.partners.length > 0)) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 items-start">
-                      {/* 1. Previously Sponsored By */}
-                      {affiliations?.past_sponsors && affiliations.past_sponsors.length > 0 ? (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2">
-                            <img src="/sponsor-icon.webp" alt="Past Sponsors" className="w-5 h-5 object-contain shrink-0" />
-                            <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-gray-700">
-                              Previously Sponsored By ({affiliations.past_sponsors.length})
-                            </span>
-                          </div>
-                          <div className="space-y-2">
-                            {affiliations.past_sponsors.map((ps, idx) => (
-                              <div
-                                key={idx}
-                                className="p-3 bg-stone-50 border border-stone-200 rounded-xl flex items-center justify-between gap-2 shadow-2xs hover:border-[#63474D]/40 transition-colors"
-                              >
-                                <span className="font-bold text-xs sm:text-sm text-gray-900 truncate">{ps.name}</span>
-                                {ps.website && (
-                                  <a
-                                    href={formatExternalLink(ps.website)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1 text-stone-400 hover:text-[#63474D] rounded-lg hover:bg-stone-200/60 transition-colors shrink-0"
-                                    title="Sponsor Website"
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : <div />}
-
-                      {/* 2. Partners & Collaborators */}
-                      {affiliations?.partners && affiliations.partners.length > 0 ? (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2">
-                            <img src="/partner-icon.webp" alt="Partners" className="w-5 h-5 object-contain shrink-0" />
-                            <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-gray-700">
-                              Partners & Collaborators ({affiliations.partners.length})
-                            </span>
-                          </div>
-                          <div className="space-y-2">
-                            {affiliations.partners.map((pt, idx) => (
-                              <div
-                                key={idx}
-                                className="p-3 bg-stone-50 border border-stone-200 rounded-xl flex items-center justify-between gap-2 shadow-2xs hover:border-[#63474D]/40 transition-colors"
-                              >
-                                <span className="font-bold text-xs sm:text-sm text-gray-900 truncate">{pt.name}</span>
-                                {pt.social && (
-                                  <a
-                                    href={formatExternalLink(pt.social)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1 text-stone-400 hover:text-[#63474D] rounded-lg hover:bg-stone-200/60 transition-colors shrink-0"
-                                    title="Partner Website / Profile"
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : <div />}
-                    </div>
-                  )}
-
-                  {/* Divider line between Row 1 and Row 2 */}
-                  {((affiliations?.past_sponsors && affiliations.past_sponsors.length > 0) ||
-                    (affiliations?.partners && affiliations.partners.length > 0)) &&
-                   ((affiliations?.co_organizers && affiliations.co_organizers.length > 0) ||
-                    (affiliations?.speakers && affiliations.speakers.length > 0)) && (
-                    <div className="border-t border-gray-200/90" />
-                  )}
-
-                  {/* Row 2: Co-Organizers & Speakers */}
-                  {((affiliations?.co_organizers && affiliations.co_organizers.length > 0) ||
-                    (affiliations?.speakers && affiliations.speakers.length > 0)) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-8 items-start">
-                      {/* 3. Event Co-Organizers */}
-                      {affiliations?.co_organizers && affiliations.co_organizers.length > 0 ? (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2">
-                            <img src="/co-organizer-icon.webp" alt="Co-Organizers" className="w-5 h-5 object-contain shrink-0" />
-                            <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-gray-700">
-                              Event Co-Organizers ({affiliations.co_organizers.length})
-                            </span>
-                          </div>
-                          <div className="space-y-2">
-                            {affiliations.co_organizers.map((co, idx) => (
-                              <div
-                                key={idx}
-                                className="p-3 bg-stone-50 border border-stone-200 rounded-xl flex items-center justify-between gap-2 shadow-2xs hover:border-[#63474D]/40 transition-colors"
-                              >
-                                <span className="font-bold text-xs sm:text-sm text-gray-900 truncate">
-                                  {co.name}
-                                </span>
-                                {co.social && (
-                                  <a
-                                    href={formatExternalLink(co.social)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1 text-stone-400 hover:text-[#63474D] rounded-lg hover:bg-stone-200/60 transition-colors shrink-0"
-                                    title="View Co-Organizer Profile / Website"
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : <div />}
-
-                      {/* 4. Featured & Potential Speakers */}
-                      {affiliations?.speakers && affiliations.speakers.length > 0 ? (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2">
-                            <img src="/speaker-icon.webp" alt="Speakers" className="w-5 h-5 object-contain shrink-0" />
-                            <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-gray-700">
-                              Featured & Potential Speakers ({affiliations.speakers.length})
-                            </span>
-                          </div>
-                          <div className="space-y-2">
-                            {affiliations.speakers.map((spk, idx) => (
-                              <div
-                                key={idx}
-                                className="p-3 bg-stone-50 border border-stone-200 rounded-xl flex items-start justify-between gap-2 shadow-2xs hover:border-[#63474D]/40 transition-colors"
-                              >
-                                <div className="min-w-0">
-                                  <span className="font-bold text-xs sm:text-sm text-gray-900 block truncate">
-                                    {spk.name}
-                                  </span>
-                                  {spk.role && (
-                                    <span className="text-[11px] text-gray-600 block line-clamp-1 mt-0.5">
-                                      {spk.role}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {spk.social && (
-                                  <a
-                                    href={formatExternalLink(spk.social)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-1 text-stone-400 hover:text-[#63474D] rounded-lg hover:bg-stone-200/60 transition-colors shrink-0"
-                                    title="View Speaker Profile / Social"
-                                  >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                  </a>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : <div />}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="p-4 bg-stone-50/70 border border-stone-200/80 rounded-xl text-xs text-stone-600 flex items-center gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-stone-400 shrink-0" />
-                  <span>
-                    Organized independently by <strong>{application.organizer_organization || application.organizer_name}</strong>. No external co-organizers or past sponsors listed for this pitch.
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ROW 3: Direct Organizer Contact Card (Structured like the before two) */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 items-start py-4 border-b border-gray-200">
-        <div className="md:col-span-4">
-          <h2 className="font-serif text-lg sm:text-xl font-bold text-[#2D1F23]">
-            Direct Organizer Contact Card
-          </h2>
-          <p className="text-xs text-gray-400 mt-0.5">Official communication channels and organizer rep</p>
-        </div>
-        <div className="md:col-span-8 flex justify-start md:justify-end">
-          <div className="w-full max-w-md bg-[#dedbd8] border border-stone-300 rounded-xl p-5 shadow-xs text-[#2D1F23] space-y-3">
-            {/* Header: Organizer & Verified Tag */}
-            <div className="flex items-start justify-between gap-3 border-b border-stone-300/80 pb-2.5">
-              <div>
-                <h3 className="font-serif font-bold text-base text-[#2D1F23]">
-                  {application.organizer_organization || application.organizer_name}
-                </h3>
-                {application.contact_name && (
-                  <p className="text-xs text-[#523e43] mt-0.5">
-                    Lead Rep: <strong className="font-semibold text-gray-900">{application.contact_name}</strong>
-                  </p>
-                )}
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300 shrink-0">
-                Verified Organizer
-              </span>
-            </div>
-
-            {/* Direct Contact Channels - NO rectangular boxes behind them */}
-            <div className="space-y-2 text-xs">
-              <a
-                href={`tel:${application.contact_phone}`}
-                className="flex items-center gap-2.5 text-gray-900 hover:text-[#63474D] transition-colors"
-              >
-                <img src="/phone-icon.webp" alt="Phone" className="w-4 h-4 object-contain shrink-0" />
-                <span className="font-semibold">{application.contact_phone}</span>
-              </a>
-
-              <a
-                href={`mailto:${application.contact_email}?subject=Sponsorship%20Inquiry%20-%20${encodeURIComponent(application.event_title)}`}
-                className="flex items-center gap-2.5 text-gray-900 hover:text-[#63474D] transition-colors"
-              >
-                <img src="/mail-icon.webp" alt="Email" className="w-4 h-4 object-contain shrink-0" />
-                <span className="font-semibold truncate">{application.contact_email}</span>
-              </a>
-
-              {application.contact_telegram && (
-                <a
-                  href={
-                    application.contact_telegram.startsWith('http')
-                      ? application.contact_telegram
-                      : `https://t.me/${application.contact_telegram.replace('@', '')}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 text-gray-900 hover:text-[#63474D] transition-colors"
-                >
-                  <TelegramIcon className="w-4 h-4 text-[#229ED9] shrink-0" />
-                  <span className="font-semibold">{application.contact_telegram}</span>
-                </a>
-              )}
-            </div>
-
-            {/* Social Logos instead of text names */}
-            {socialEntries.length > 0 && (
-              <div className="pt-2.5 border-t border-stone-300/80 flex items-center gap-2">
-                {socialEntries.map(([platform, link]) => {
-                  const strLink = String(link || '');
-                  const cleanLink = strLink.startsWith('http') ? strLink : `https://${strLink}`;
-                  return (
-                    <a
-                      key={platform}
-                      href={cleanLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={platform}
-                      aria-label={platform}
-                      className="w-7 h-7 rounded-lg bg-stone-200/70 hover:bg-white text-[#2D1F23] hover:text-[#63474D] border border-stone-300/80 flex items-center justify-center transition-all shadow-2xs hover:scale-105"
-                    >
-                      {getSocialLogo(platform)}
-                    </a>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Thick Grey Divider Line before Packages */}
-      <div className="w-full h-1 bg-gray-300/80 rounded-full my-8" />
-
-      {/* AVAILABLE PACKAGES SECTION: Differentiated by thick grey line, NOT in a card box */}
+      {/* Available Packages */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#2D1F23]">
-            Available Sponsorship Packages
+            Sponsorship Packages
           </h2>
           <span className="text-xs font-semibold text-gray-500">
-            Select a tier to pledge
+            Select a tier to apply
           </span>
         </div>
 
@@ -653,7 +433,7 @@ export const SponsorApplicationDetailPage: React.FC = () => {
                     setSelectedPackage(pkg.name);
                     setPledgedAmount(pkg.amount);
                   }}
-                  className={`p-4 sm:p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between gap-4 ${
+                  className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex items-start justify-between gap-4 ${
                     isSelected
                       ? 'border-[#63474D] bg-[#63474D]/5 ring-1 ring-[#63474D]'
                       : 'border-gray-200 hover:border-gray-300 bg-white'
@@ -689,51 +469,126 @@ export const SponsorApplicationDetailPage: React.FC = () => {
           </div>
         ) : (
           <p className="text-xs text-gray-500">
-            Custom sponsorship package based on total goal: {application.funding_goal.toLocaleString()} {application.currency}
+            Custom package based on total goal: {application.funding_goal.toLocaleString()} {application.currency}
           </p>
         )}
       </div>
 
-      {/* FEEDBACK ALERT */}
-      {feedbackMessage && (
-        <div
-          className={`p-4 rounded-2xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 max-w-lg mx-auto ${
-            feedbackMessage.type === 'success'
-              ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
-              : 'bg-red-50 border border-red-300 text-red-900'
-          }`}
-        >
-          {feedbackMessage.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+      {/* FORMAL SPONSORSHIP APPLICATION FORM (Active when no pending/approved deal or resubmitting) */}
+      {(!existingDeal || isRejected || isResubmitting) && (
+        <form onSubmit={handleFormalApplicationSubmit} className="bg-white rounded-3xl border border-[#E8DDD7] p-6 sm:p-8 shadow-xs space-y-6">
+          <div className="space-y-1 border-b border-gray-100 pb-4">
+            <h3 className="font-serif font-bold text-lg text-[#2D1F23] flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[#63474D]" />
+              <span>Submit Formal Sponsorship Proposal</span>
+            </h3>
+            <p className="text-xs text-[#756366]">
+              Every application is reviewed directly by Sheeba Administration. Once approved, the organizer is notified and granted access to your contact details.
+            </p>
+          </div>
+
+          {/* Package & Proposed Amount Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-[#2D1F23] mb-1.5">
+                Selected Sponsorship Tier <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={selectedPackage || 'Please select a package above'}
+                className="w-full px-3.5 py-2.5 text-xs bg-stone-100 border border-stone-200 rounded-xl font-bold text-[#2D1F23] cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#2D1F23] mb-1.5">
+                Proposed Sponsorship Amount ({application.currency}) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                required
+                min={100}
+                value={pledgedAmount !== undefined ? pledgedAmount : ''}
+                onChange={(e) => setPledgedAmount(e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="100,000"
+                className="w-full px-3.5 py-2.5 text-xs bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl focus:outline-none focus:border-[#63474D] font-bold text-[#63474D]"
+              />
+            </div>
+          </div>
+
+          {/* Proposal Message (Required) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-[#2D1F23]">
+                Proposal Message & Objectives <span className="text-red-500">*</span>
+              </label>
+              <span className="text-[10px] text-gray-400">Min 10 characters</span>
+            </div>
+            <textarea
+              required
+              rows={4}
+              value={proposalMessage}
+              onChange={(e) => setProposalMessage(e.target.value)}
+              placeholder="Explain your organization's sponsorship goals, requested brand placements, speaker nominations, or hackathon challenge requirements..."
+              className="w-full p-3 text-xs bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl focus:outline-none focus:border-[#63474D] focus:bg-white text-gray-900 leading-relaxed"
+            />
+          </div>
+
+          {/* Optional Sponsor Internal Notes */}
+          <div>
+            <label className="block text-xs font-bold text-[#2D1F23] mb-1.5">
+              Internal Team Notes <span className="text-gray-400 font-normal">(Optional, for your pipeline tracking)</span>
+            </label>
+            <input
+              type="text"
+              value={sponsorNotes}
+              onChange={(e) => setSponsorNotes(e.target.value)}
+              placeholder="e.g. Budget approved by marketing committee on Monday..."
+              className="w-full px-3.5 py-2.5 text-xs bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl focus:outline-none focus:border-[#63474D] text-gray-700"
+            />
+          </div>
+
+          {/* Feedback alert */}
+          {feedbackMessage && (
+            <div
+              className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center gap-2 ${
+                feedbackMessage.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                  : 'bg-red-50 border border-red-300 text-red-900'
+              }`}
+            >
+              {feedbackMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              )}
+              <span>{feedbackMessage.text}</span>
+            </div>
           )}
-          <span>{feedbackMessage.text}</span>
-        </div>
+
+          {/* Submission Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={handleDeclinePitch}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-stone-300 text-gray-600 hover:text-red-700 hover:border-red-300 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+            >
+              Decline Pitch
+            </button>
+
+            <button
+              type="submit"
+              disabled={actionLoading}
+              className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-[#63474D] hover:bg-[#4A3238] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <Send className="w-4 h-4 text-[#FFA686]" />
+              <span>{actionLoading ? 'Submitting Application...' : 'Submit Formal Application'}</span>
+            </button>
+          </div>
+        </form>
       )}
-
-      {/* ACTION BUTTONS: Just Decline (Red) and Mark as Interested (Green), Centered */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
-        <button
-          type="button"
-          disabled={actionLoading}
-          onClick={() => handleExpressInterestOrDecline('DECLINED')}
-          className="w-full sm:w-56 py-3.5 px-6 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-        >
-          <XCircle className="w-5 h-5" />
-          <span>Decline</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={actionLoading}
-          onClick={() => handleExpressInterestOrDecline('INTERESTED')}
-          className="w-full sm:w-56 py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-        >
-          <CheckCircle2 className="w-5 h-5" />
-          <span>Mark as Interested</span>
-        </button>
-      </div>
     </div>
   );
 };

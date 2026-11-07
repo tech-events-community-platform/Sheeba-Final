@@ -68,6 +68,25 @@ export const AdminUsersPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [statusModalUser, setStatusModalUser] = useState<AttendeeRecord | OrganizerRecord | SponsorRecord | null>(null);
+  const [reviewSponsor, setReviewSponsor] = useState<SponsorRecord | null>(null);
+  const [reviewLoading, setReviewLoading] = useState<boolean>(false);
+  const [imgError, setImgError] = useState<boolean>(false);
+
+  const handleOpenReview = async (sponsor: SponsorRecord) => {
+    setReviewSponsor(sponsor);
+    setImgError(false);
+    setReviewLoading(true);
+    try {
+      const details = await api.admin.getSponsorDetails(sponsor.id);
+      if (details) {
+        setReviewSponsor((prev) => (prev ? { ...prev, ...details } : details));
+      }
+    } catch (err) {
+      console.warn('Could not fetch detailed sponsor record, using row data:', err);
+    } finally {
+      setReviewLoading(false);
+    }
+  };
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [actionErrorMsg, setActionErrorMsg] = useState<string | null>(null);

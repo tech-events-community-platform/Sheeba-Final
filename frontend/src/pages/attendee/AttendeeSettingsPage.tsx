@@ -35,7 +35,16 @@ import {
 } from '../../schemas';
 
 export const AttendeeSettingsPage: React.FC = () => {
-  const { user, logout, refreshUser, applyForOrganizer, switchRole } = useAuth();
+  const { user, logout, refreshUser, applyForOrganizer, switchRole, addExhibitorRole } = useAuth();
+  const [targetSwitchRole, setTargetSwitchRole] = useState<'ORGANIZER' | 'EXHIBITOR'>('ORGANIZER');
+  const [showAddExhibitorModal, setShowAddExhibitorModal] = useState(false);
+  const [exhibitorCompanyName, setExhibitorCompanyName] = useState('');
+  const [exhibitorCategory, setExhibitorCategory] = useState('Tech & Software');
+  const [exhibitorPhone, setExhibitorPhone] = useState('');
+  const [exhibitorPassword, setExhibitorPassword] = useState('');
+  const [isAddingExhibitor, setIsAddingExhibitor] = useState(false);
+  const [addExhibitorError, setAddExhibitorError] = useState<string | null>(null);
+  const [addExhibitorSuccess, setAddExhibitorSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -93,6 +102,39 @@ export const AttendeeSettingsPage: React.FC = () => {
       window.history.replaceState({}, document.title);
     }
   }, [user, location.state]);
+
+  
+  const handleAddExhibitorRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!exhibitorCompanyName.trim()) {
+      setAddExhibitorError('Company / Organization name is required.');
+      return;
+    }
+    if (user?.hasPassword !== false && (!exhibitorPassword || exhibitorPassword.length < 6)) {
+      setAddExhibitorError('Please enter your account password (at least 6 characters).');
+      return;
+    }
+    setIsAddingExhibitor(true);
+    setAddExhibitorError(null);
+    try {
+      await addExhibitorRole({
+        companyName: exhibitorCompanyName.trim(),
+        industryCategory: exhibitorCategory,
+        companyPhone: exhibitorPhone.trim() || undefined,
+        password: exhibitorPassword,
+      });
+      setAddExhibitorSuccess('Exhibitor role activated successfully! You can now access the Exhibitor Workspace.');
+      setTimeout(() => {
+        setShowAddExhibitorModal(false);
+        setAddExhibitorSuccess(null);
+        if (refreshUser) refreshUser();
+      }, 1500);
+    } catch (err: any) {
+      setAddExhibitorError(err.message || 'Failed to activate Exhibitor role. Please verify your password.');
+    } finally {
+      setIsAddingExhibitor(false);
+    }
+  };
 
   const handleApplyOrganizer = async (e: React.FormEvent) => {
     if (e?.preventDefault) e.preventDefault();
@@ -159,9 +201,9 @@ export const AttendeeSettingsPage: React.FC = () => {
     setSwitchError(null);
 
     try {
-      await switchRole('ORGANIZER', switchPassword || undefined);
+      await switchRole(targetSwitchRole, switchPassword || undefined);
       setShowSwitchModal(false);
-      navigate('/organizer');
+      if (targetSwitchRole === 'EXHIBITOR') navigate('/exhibitor'); else navigate('/organizer');
     } catch (err: any) {
       setSwitchError(err.message || 'Authentication failed. Please verify your password.');
     } finally {
@@ -661,49 +703,86 @@ export const AttendeeSettingsPage: React.FC = () => {
         )}
       </div>
 
-      {/* 2b. Exhibitor Applications & Discovery */}
+      {/* 2b. Exhibitor Portals & Multi-Role Privileges */}
       <div className="pt-6 border-t border-[#E8DDD7] space-y-4 max-w-2xl">
         <div>
           <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
             <Store className="w-4 h-4 text-[#AA767C]" />
-            Exhibitor Portals & Booth Applications
+            Exhibitor Workspace & Booth Management
           </h2>
           <p className="text-xs text-[#756366] mt-0.5">
-            Showcase your company, products, or community initiatives at upcoming conferences and tech exhibitions.
+            Participate in major events as a company or brand with physical booth space. Add the Exhibitor role to this account without losing your attendee data.
           </p>
         </div>
 
-        {user?.hasExhibitorApplications ? (
-          <div className="p-4 bg-[#FAF7F5] border border-[#E8DDD7] rounded-2xl flex items-center justify-between gap-4">
-            <div className="space-y-0.5">
-              <span className="text-xs font-bold text-[#2D1F23] block">Active Exhibitor Applications</span>
-              <p className="text-[11px] text-gray-500">
-                You have active booth applications or bookings. Track status, upload payments, and manage leads in your Exhibitor Workspace.
-              </p>
+        {(user?.isExhibitor || user?.roles?.includes('EXHIBITOR')) ? (
+          <div className="p-5 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-2xl space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Store className="w-5 h-5 text-purple-700 shrink-0" />
+                <div>
+                  <h3 className="text-xs font-bold text-purple-950">Activated Exhibitor Account</h3>
+                  <p className="text-[11px] text-purple-800">
+                    {user?.companyName ? `Company: ${user.companyName}` : 'Authorized to book booths and capture visitor leads'}
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full border border-purple-200">
+                Activated
+              </span>
             </div>
-            <Link
-              to="/exhibitor/booths"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#63474D] text-white text-xs font-semibold hover:bg-[#523A3F] transition-colors shrink-0"
-            >
-              <span>Exhibitor Workspace</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
+
+            <p className="text-xs text-purple-900 leading-relaxed">
+              Your Exhibitor Workspace is active. Switch contexts to apply for event booth floor space, track confirmations, and capture badge leads.
+            </p>
+
+            <div className="pt-1 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setTargetSwitchRole('EXHIBITOR');
+                  setShowSwitchModal(true);
+                  setSwitchPassword('');
+                  setSwitchError(null);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#63474D] hover:bg-[#4E373C] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <Store className="w-4 h-4 text-[#FFA686]" />
+                <span>Launch Exhibitor Workspace</span>
+              </button>
+              <Link
+                to="/exhibitor/explore"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[#63474D] text-[#63474D] text-xs font-semibold hover:bg-[#63474D]/10 transition-colors"
+              >
+                <span>Browse Booth Calls</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         ) : (
-          <div className="p-4 bg-white border border-[#E8DDD7] rounded-2xl flex items-center justify-between gap-4">
-            <div className="space-y-0.5">
-              <span className="text-xs font-bold text-[#2D1F23] block">Discover Open Exhibitor Calls</span>
-              <p className="text-[11px] text-gray-500">
-                Explore events currently accepting booth applications and reserve your space.
-              </p>
+          <div className="p-5 bg-white border border-[#E8DDD7] rounded-2xl space-y-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold text-[#2D1F23]">Register as an Exhibitor</h3>
+                <p className="text-[11px] text-gray-500">
+                  Add the Exhibitor capability to your current Sheeba profile. No second account or alternate email required.
+                </p>
+              </div>
             </div>
-            <Link
-              to="/exhibitor/explore"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#63474D] text-[#63474D] text-xs font-semibold hover:bg-[#63474D]/10 transition-colors shrink-0"
-            >
-              <span>Explore Calls</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddExhibitorModal(true);
+                  setAddExhibitorError(null);
+                  setAddExhibitorSuccess(null);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#63474D] text-white rounded-xl text-xs font-bold hover:bg-[#523A3F] transition-all cursor-pointer"
+              >
+                <Store className="w-3.5 h-3.5 text-[#FFA686]" />
+                <span>Register as Exhibitor</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -989,6 +1068,136 @@ export const AttendeeSettingsPage: React.FC = () => {
         </button>
       </div>
 
+
+      {/* Add Exhibitor Role Modal */}
+      {showAddExhibitorModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+          <div
+            onClick={() => setShowAddExhibitorModal(false)}
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
+          />
+          <div className="relative bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#E8DDD7] z-10 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E8DDD7]">
+              <div className="flex items-center gap-2">
+                <Store className="w-5 h-5 text-[#63474D]" />
+                <h3 className="font-serif font-bold text-base text-[#2D1F23]">Activate Exhibitor Role</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddExhibitorModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#756366] leading-relaxed">
+              Add the Exhibitor capability to your account. Your attendee profile and ticket passes will remain completely intact.
+            </p>
+
+            {addExhibitorError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                {addExhibitorError}
+              </div>
+            )}
+            {addExhibitorSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
+                {addExhibitorSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleAddExhibitorRole} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Company / Organization Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Acme Tech Solutions"
+                  value={exhibitorCompanyName}
+                  onChange={(e) => setExhibitorCompanyName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Industry Category *
+                </label>
+                <select
+                  value={exhibitorCategory}
+                  onChange={(e) => setExhibitorCategory(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                >
+                  <option value="Tech & Software">Tech & Software</option>
+                  <option value="AI & Robotics">AI & Robotics</option>
+                  <option value="Fintech & Banking">Fintech & Banking</option>
+                  <option value="Education & Training">Education & Training</option>
+                  <option value="Retail & Hardware">Retail & Hardware</option>
+                  <option value="Creative Agency & Media">Creative Agency & Media</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Company Contact Phone
+                </label>
+                <input
+                  type="tel"
+                  placeholder="+251 9... (optional)"
+                  value={exhibitorPhone}
+                  onChange={(e) => setExhibitorPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
+              </div>
+
+              {user?.hasPassword !== false ? (
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                    Account Password *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Enter your existing account password"
+                    value={exhibitorPassword}
+                    onChange={(e) => setExhibitorPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-1">Confirm with your password to activate the Exhibitor role.</p>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                  You are signed in via Google OAuth. Confirm below to activate your Exhibitor role without a password.
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="primary"
+                  size="sm"
+                  disabled={isAddingExhibitor}
+                >
+                  {isAddingExhibitor ? 'Activating...' : 'Activate Exhibitor Role'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddExhibitorModal(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Switch to Organizer Credential Verification Modal */}
       {showSwitchModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
@@ -1000,7 +1209,7 @@ export const AttendeeSettingsPage: React.FC = () => {
             <div className="flex items-center justify-between pb-2 border-b border-[#E8DDD7]">
               <div className="flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-[#63474D]" />
-                <h3 className="font-serif font-bold text-base text-[#2D1F23]">Organizer Workspace</h3>
+                <h3 className="font-serif font-bold text-base text-[#2D1F23]">{targetSwitchRole === "EXHIBITOR" ? "Exhibitor Workspace" : "Organizer Workspace"}</h3>
               </div>
               <button
                 type="button"

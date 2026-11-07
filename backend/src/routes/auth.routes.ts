@@ -19,6 +19,7 @@ import {
   sponsorOtpRequestSchema,
   sponsorVerifyOtpSchema,
   sponsorResetPasswordOtpSchema,
+  addExhibitorRoleSchema,
 } from '../schemas/auth.schema';
 import { changePasswordSchema } from '../schemas/user.schema';
 
@@ -38,6 +39,7 @@ router.post('/apply-organizer', authenticate, validateBody(applyOrganizerSchema)
 router.post('/switch-role', authenticate, validateBody(switchRoleSchema), AuthController.switchRole);
 router.post('/change-password', authenticate, validateBody(changePasswordSchema), AuthController.changePassword);
 router.post('/logout', authenticate, AuthController.logout);
+router.post('/add-exhibitor-role', authenticate, validateBody(addExhibitorRoleSchema), AuthController.addExhibitorRole);
 
 // Sponsor Auth Endpoints (Completely decoupled role & portal)
 router.post('/sponsor/register', authLimiter, validateBody(sponsorRegisterSchema), AuthController.registerSponsor);
