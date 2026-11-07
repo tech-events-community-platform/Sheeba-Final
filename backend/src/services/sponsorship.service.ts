@@ -130,6 +130,30 @@ export class SponsorshipService {
   }
 
   /**
+   * Admin oversight: Retrieve all sponsorship pitches across the platform
+   */
+  static async getAllApplicationsForAdmin(): Promise<ISponsorshipApplication[]> {
+    const res = await query<ISponsorshipApplication>(
+      `SELECT 
+        sa.*,
+        u.organization AS organizer_organization,
+        u.full_name AS organizer_name,
+        u.avatar_url AS organizer_avatar,
+        u.email AS organizer_email,
+        COALESCE((
+          SELECT COUNT(*)::int 
+          FROM sponsorship_deals sd 
+          WHERE sd.application_id = sa.id AND sd.deleted_at IS NULL
+        ), 0) AS interested_sponsors_count
+      FROM sponsorship_applications sa
+      JOIN users u ON sa.organizer_id = u.id
+      WHERE sa.deleted_at IS NULL
+      ORDER BY sa.created_at DESC`
+    );
+    return res.rows;
+  }
+
+  /**
    * Explore open sponsorship applications (Sponsor Marketplace)
    */
   static async getAllOpenApplications(filters?: {

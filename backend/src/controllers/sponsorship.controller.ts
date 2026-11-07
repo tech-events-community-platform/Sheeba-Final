@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../types';
 import { SponsorshipService } from '../services/sponsorship.service';
+import { CacheService } from '../services/cache.service';
 import { sendSuccess, sendError } from '../utils/apiResponse';
 
 export class SponsorshipController {
@@ -41,11 +42,31 @@ export class SponsorshipController {
   }
 
   /**
+   * Admin retrieves all marketplace sponsorship pitches for oversight and take-down
+   */
+  static async getApplicationsForAdmin(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (req.user?.role !== 'admin') {
+        sendError(res, 'Admin authorization required.', 403);
+        return;
+      }
+      const applications = await SponsorshipService.getAllApplicationsForAdmin();
+      sendSuccess(res, applications, 'Sponsorship pitches retrieved for admin.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Sponsors explore open applications in the marketplace
    */
   static async exploreApplications(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { category, search, minBudget, maxBudget } = req.query;
+      const { category, search, minBudget, maxBudget, refresh } = req.query;
+      if (refresh === 'true') {
+        await CacheService.delPattern('sponsorship:explore*');
+      }
+
       const applications = await SponsorshipService.getAllOpenApplications({
         category: category as string,
         search: search as string,

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/admin.controller';
+import { SponsorshipController } from '../controllers/sponsorship.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { authorizeRoles } from '../middlewares/role.middleware';
 import { validateParams } from '../middlewares/validate.middleware';
@@ -17,5 +18,9 @@ router.patch('/users/:id/approve-sponsor', validateParams(idParamSchema), AdminC
 router.patch('/users/:id/reject-sponsor', validateParams(idParamSchema), AdminController.rejectSponsor);
 router.patch('/users/:id/status', validateParams(idParamSchema), AdminController.toggleUserStatus);
 router.get('/payments', AdminController.getPayments);
+
+// Sponsorship Pitch Moderation & Take-down
+router.get('/sponsorship-pitches', SponsorshipController.getApplicationsForAdmin);
+router.delete('/sponsorship-pitches/:id', validateParams(idParamSchema), SponsorshipController.deleteApplication);
 
 export default router;

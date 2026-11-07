@@ -660,6 +660,8 @@ export const api = {
       search?: string;
       minBudget?: number;
       maxBudget?: number;
+      refresh?: boolean;
+      skipCache?: boolean;
     }) => {
       const queryParts: string[] = [];
       if (params?.category && params.category !== 'All') {
@@ -674,8 +676,13 @@ export const api = {
       if (params?.maxBudget) {
         queryParts.push(`maxBudget=${encodeURIComponent(params.maxBudget)}`);
       }
+      if (params?.refresh) {
+        queryParts.push('refresh=true');
+      }
       const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
-      const res = await requestApi(`/sponsorships/explore${queryStr}`);
+      const res = await requestApi(`/sponsorships/explore${queryStr}`, {
+        skipCache: params?.skipCache || params?.refresh,
+      });
       return res.data || [];
     },
 
@@ -778,9 +785,11 @@ export const api = {
     },
 
     // Phase 2: Sponsor My Events Pipeline
-    getSponsorMyEvents: async (): Promise<ISponsorEventItem[]> => {
+    getSponsorMyEvents: async (refresh = false): Promise<ISponsorEventItem[]> => {
       try {
-        const res = await requestApi('/sponsorships/sponsor/my-events');
+        const res = await requestApi('/sponsorships/sponsor/my-events' + (refresh ? '?refresh=true' : ''), {
+          skipCache: refresh,
+        });
         return res.data || [];
       } catch (err) {
         console.warn('Backend getSponsorMyEvents fallback:', err);
@@ -2131,6 +2140,18 @@ export const api = {
       } catch {
         return [];
       }
+    },
+
+    getSponsorshipPitches: async () => {
+      const res = await requestApi('/admin/sponsorship-pitches', { skipCache: true });
+      return res.data || [];
+    },
+
+    takeDownSponsorshipPitch: async (id: string) => {
+      const res = await requestApi(`/admin/sponsorship-pitches/${id}`, {
+        method: 'DELETE',
+      });
+      return res.data;
     },
   },
 
