@@ -183,6 +183,14 @@ router.post(
   SponsorshipController.recordAttendeeResponse
 );
 
+// Phase 4: Sponsor Reports Summary Shell
+router.get(
+  '/sponsor/reports/summary',
+  authenticate,
+  authorizeRoles('sponsor', 'admin'),
+  SponsorshipController.getSponsorReportsSummary
+);
+
 // AI-Powered Sponsor-Event Matching & Recommendations
 router.get(
   ['/recommendations', '/matching/recommendations'],

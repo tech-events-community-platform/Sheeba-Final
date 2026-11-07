@@ -1383,4 +1383,50 @@ export class SponsorshipService {
       return null;
     }
   }
+
+  /**
+   * Phase 4: Retrieve genuine report summary for sponsor's granted activations
+   * (Real counts only: genuine attendee recordings, zero simulated charts).
+   */
+  static async getSponsorReportsSummary(sponsorId: string): Promise<any> {
+    await this.ensureQuestionnaireTables();
+
+    const myEvents = await this.getSponsorMyEvents(sponsorId);
+    const grantedEvents = myEvents.filter(
+      (e) => e.deal_status === 'DEAL_ACCEPTED' && e.allow_attendee_sharing
+    );
+
+    const summaries = await Promise.all(
+      grantedEvents.map(async (event) => {
+        let responsesCount = 0;
+        try {
+          const respRes = await query(
+            `SELECT COUNT(*)::int AS count
+             FROM sponsor_attendee_responses
+             WHERE deal_id = $1 AND sponsor_id = $2 AND status = 'COMPLETED'`,
+            [event.deal_id, sponsorId]
+          );
+          responsesCount = respRes.rows[0]?.count || 0;
+        } catch (err) {
+          responsesCount = 0;
+        }
+
+        return {
+          deal_id: event.deal_id,
+          event_title: event.event_title,
+          expected_date: event.expected_date,
+          location: event.location,
+          checked_in_count: event.checked_in_count || 0,
+          responses_count: responsesCount,
+          status: 'RECORDING_ACTIVE',
+        };
+      })
+    );
+
+    return {
+      total_granted_events: grantedEvents.length,
+      total_responses_recorded: summaries.reduce((sum, s) => sum + s.responses_count, 0),
+      events: summaries,
+    };
+  }
 }

@@ -327,7 +327,7 @@ export class SponsorshipController {
   static async getSponsorQuestionnaire(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const sponsorId = req.user?.userId;
-      const dealId = (req.params.dealId || req.params.id) as string;
+      const dealId = String(req.params.dealId || req.params.id);
 
       if (!sponsorId) {
         sendError(res, 'Authentication required.', 401);
@@ -347,7 +347,7 @@ export class SponsorshipController {
   static async saveSponsorQuestionnaire(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const sponsorId = req.user?.userId;
-      const dealId = (req.params.dealId || req.params.id) as string;
+      const dealId = String(req.params.dealId || req.params.id);
       const { title, questions } = req.body;
 
       if (!sponsorId) {
@@ -368,8 +368,8 @@ export class SponsorshipController {
   static async recordAttendeeResponse(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const sponsorId = req.user?.userId;
-      const dealId = (req.params.dealId || req.params.id) as string;
-      const attendeeId = req.params.attendeeId as string;
+      const dealId = String(req.params.dealId || req.params.id);
+      const attendeeId = String(req.params.attendeeId);
       const { answers, status } = req.body;
 
       if (!sponsorId) {
@@ -397,8 +397,8 @@ export class SponsorshipController {
   static async getAttendeeResponse(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const sponsorId = req.user?.userId;
-      const dealId = (req.params.dealId || req.params.id) as string;
-      const attendeeId = req.params.attendeeId as string;
+      const dealId = String(req.params.dealId || req.params.id);
+      const attendeeId = String(req.params.attendeeId);
 
       if (!sponsorId) {
         sendError(res, 'Authentication required.', 401);
@@ -407,6 +407,24 @@ export class SponsorshipController {
 
       const response = await SponsorshipService.getAttendeeResponse(dealId, sponsorId, attendeeId);
       sendSuccess(res, response, 'Attendee response retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Phase 4: Retrieve sponsor reports summary (genuine counts only)
+   */
+  static async getSponsorReportsSummary(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sponsorId = req.user?.userId;
+      if (!sponsorId) {
+        sendError(res, 'Authentication required.', 401);
+        return;
+      }
+
+      const summary = await SponsorshipService.getSponsorReportsSummary(sponsorId);
+      sendSuccess(res, summary, 'Sponsor reports summary retrieved successfully.');
     } catch (error) {
       next(error);
     }

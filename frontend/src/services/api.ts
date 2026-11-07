@@ -831,6 +831,24 @@ export const api = {
       return res.data;
     },
 
+    // Phase 4: Sponsor Reports Summary
+    getReportsSummary: async (): Promise<{
+      total_granted_events: number;
+      total_responses_recorded: number;
+      events: Array<{
+        deal_id: string;
+        event_title: string;
+        expected_date: string;
+        location: string;
+        checked_in_count: number;
+        responses_count: number;
+        status: string;
+      }>;
+    }> => {
+      const res = await requestApi('/sponsorships/sponsor/reports/summary');
+      return res.data || { total_granted_events: 0, total_responses_recorded: 0, events: [] };
+    },
+
     // AI-Powered Sponsor-Event Matching & Recommendations
     getRecommendations: async (params?: {
       limit?: number;
