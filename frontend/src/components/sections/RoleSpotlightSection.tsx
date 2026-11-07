@@ -1,4 +1,4 @@
-```tsx
+
 import React from 'react';
 import FadeIn from '../FadeIn';
 import { Award, Users, CalendarCheck, ShieldCheck, ArrowRight, Store } from 'lucide-react';
@@ -221,4 +221,3 @@ export const RoleSpotlightSection: React.FC = () => {
     </section>
   );
 };
-```
