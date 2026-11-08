@@ -32,6 +32,7 @@ import { EditEventModal } from '../../components/organizer/EditEventModal';
 import { ManualAddAttendeeModal } from '../../components/organizer/ManualAddAttendeeModal';
 import { ReviewsSection } from '../../components/reviews/ReviewsSection';
 import { EventExhibitorsTab } from '../../components/organizer/EventExhibitorsTab';
+import { EventScannersTab } from '../../components/organizer/EventScannersTab';
 import { getCalendarTile } from '../../utils/date';
 import { manualAttendeeFormSchema, awardBadgeFormSchema, validateForm } from '../../schemas';
 
@@ -48,7 +49,7 @@ export const EventDetailPage: React.FC = () => {
   // Search queries for both independent lists (Section 3)
   const [registeredSearch, setRegisteredSearch] = useState('');
   const [attendedSearch, setAttendedSearch] = useState('');
-  const [activeMainTab, setActiveMainTab] = useState<'attendees' | 'exhibitors'>('attendees');
+  const [activeMainTab, setActiveMainTab] = useState<'attendees' | 'exhibitors' | 'scanners'>('attendees');
 
   // Delete attendee confirmation toast state
   const [deleteConfirmToast, setDeleteConfirmToast] = useState<AttendeeRosterItem | null>(null);
@@ -897,6 +898,19 @@ export const EventDetailPage: React.FC = () => {
           <Store className="w-4 h-4" />
           <span>Exhibitors & Booths</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveMainTab('scanners')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeMainTab === 'scanners'
+              ? 'bg-[#63474D] text-white shadow-2xs'
+              : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
+          }`}
+        >
+          <QrCode className="w-4 h-4" />
+          <span>Door Staff & Scanners</span>
+        </button>
       </div>
 
       {activeMainTab === 'attendees' && (
@@ -1431,6 +1445,18 @@ export const EventDetailPage: React.FC = () => {
       {/* Exhibitors Tab Section */}
       {activeMainTab === 'exhibitors' && event && (
         <EventExhibitorsTab eventId={event.id} eventTitle={event.title} />
+      )}
+
+      {/* Door Staff & Scanners Tab Section (Specification v2.1) */}
+      {activeMainTab === 'scanners' && event && (
+        <EventScannersTab
+          eventId={event.id}
+          eventTitle={event.title}
+          initialRequiresScanners={event.requiresScanners}
+          onScannersToggled={(enabled) => {
+            setEvent((prev) => (prev ? { ...prev, requiresScanners: enabled } : null));
+          }}
+        />
       )}
 
       {/* Award Badge Modal (Shared action offering Participant / Winner / Speaker) */}

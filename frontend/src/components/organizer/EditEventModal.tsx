@@ -56,6 +56,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
     isPaid: false,
     ticketPrice: 0,
     requiresApproval: false,
+    requiresScanners: false,
     isPublicized: false,
     posterImageUrl: '',
   });
@@ -121,6 +122,7 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
         isPaid: Boolean(event.isPaid),
         ticketPrice: event.ticketPrice || 0,
         requiresApproval: Boolean(event.requiresApproval),
+        requiresScanners: Boolean(event.requiresScanners),
         isPublicized: Boolean(event.isPublicized),
         posterImageUrl: event.posterImageUrl || event.bannerUrl || '',
       });
@@ -611,6 +613,27 @@ export const EditEventModal: React.FC<EditEventModalProps> = ({
                   type="checkbox"
                   checked={formData.requiresApproval}
                   onChange={(e) => setFormData({ ...formData, requiresApproval: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#63474D]"></div>
+              </label>
+            </div>
+
+            {/* Do you need event scanners? Toggle (Specification v2.1) */}
+            <div className="pt-3 border-t border-gray-200/80 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-[#2D1F23] block">
+                  Do you need event scanners?
+                </span>
+                <span className="text-[11px] text-[#756366] block mt-0.5">
+                  Enable this option if you want to assign people to manage QR code scanning and attendee check-in at your event.
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.requiresScanners}
+                  onChange={(e) => setFormData({ ...formData, requiresScanners: e.target.checked })}
                   className="sr-only peer"
                 />
                 <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#63474D]"></div>

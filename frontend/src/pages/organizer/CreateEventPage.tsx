@@ -96,6 +96,29 @@ export const CreateEventPage: React.FC = () => {
     setPaymentMethods((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Scanner Staff Requirement & Assignments (Specification v2.1)
+  const [requiresScanners, setRequiresScanners] = useState<boolean>(false);
+  const [scannerEmails, setScannerEmails] = useState<string[]>(['']);
+
+  const handleAddScannerEmail = () => {
+    setScannerEmails((prev) => [...prev, '']);
+  };
+
+  const handleUpdateScannerEmail = (index: number, value: string) => {
+    setScannerEmails((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const handleRemoveScannerEmail = (index: number) => {
+    setScannerEmails((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [''];
+    });
+  };
+
   const [bannerSource, setBannerSource] = useState<'upload' | 'url'>('upload');
   const [isUploadingBanner, setIsUploadingBanner] = useState<boolean>(false);
   const [bannerUploadError, setBannerUploadError] = useState<string | null>(null);
@@ -337,6 +360,27 @@ export const CreateEventPage: React.FC = () => {
           order: idx + 1,
         }));
 
+      let cleanScannerEmails: string[] = [];
+      if (requiresScanners) {
+        cleanScannerEmails = scannerEmails
+          .map((e) => e.trim().toLowerCase())
+          .filter((e) => e.length > 0);
+
+        const emailSet = new Set(cleanScannerEmails);
+        if (emailSet.size !== cleanScannerEmails.length) {
+          setSubmitError('Duplicate scanner email address found. Each assigned scanner email must be unique.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const invalidEmail = cleanScannerEmails.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+        if (invalidEmail) {
+          setSubmitError(`Invalid scanner email address: "${invalidEmail}". Please enter a valid email.`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const newEvent = await api.events.create({
         title: formData.title,
         type: finalType,
@@ -358,6 +402,8 @@ export const CreateEventPage: React.FC = () => {
         organizerName: user?.organization || user?.name || 'GDG Addis',
         bannerUrl: formData.posterImageUrl,
         posterImageUrl: formData.posterImageUrl,
+        requiresScanners,
+        scannerEmails: cleanScannerEmails,
         customQuestions: formattedQuestions,
         includeDefaultQuestions,
       });
@@ -886,6 +932,76 @@ export const CreateEventPage: React.FC = () => {
                 />
                 <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#63474D]"></div>
               </label>
+            </div>
+
+            {/* Do you need event scanners? Toggle (Specification v2.1) */}
+            <div className="pt-3 border-t border-[#E8DDD7]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-[#2D1F23] block">
+                    Do you need event scanners?
+                  </span>
+                  <span className="text-[11px] text-[#756366] block mt-0.5">
+                    Enable this option if you want to assign people to manage QR code scanning and attendee check-in at your event.
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={requiresScanners}
+                    onChange={(e) => setRequiresScanners(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#63474D]"></div>
+                </label>
+              </div>
+
+              {/* Conditional Scanner Emails Section */}
+              {requiresScanners && (
+                <div className="mt-4 pt-3 border-t border-[#E8DDD7]/60 space-y-3 animate-fade-in bg-[#FAF7F5] p-3.5 rounded-2xl border border-[#E8DDD7]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#2D1F23]">
+                      Assign Scanner Email Addresses
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddScannerEmail}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#63474D] hover:text-[#2D1F23] cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Scanner
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {scannerEmails.map((email, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => handleUpdateScannerEmail(idx, e.target.value)}
+                          placeholder={`scanner${idx + 1}@example.com`}
+                          className="flex-1 text-xs px-3 py-2 bg-white border border-[#E8DDD7] rounded-xl focus:outline-none focus:border-[#63474D]"
+                        />
+                        {scannerEmails.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveScannerEmail(idx)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                            title="Remove scanner"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-[#756366] italic">
+                    💡 Invitations with login instructions and credentials will be sent automatically when you create this event.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

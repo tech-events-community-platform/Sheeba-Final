@@ -54,6 +54,7 @@ export interface User {
   mustChangePassword?: boolean;
   hasPassword?: boolean;
   stats?: AttendeeStats;
+  hasActiveScannerEvents?: boolean;
 }
 
 export interface OrganizerProfile {

@@ -14,6 +14,7 @@ import uploadRoutes from './upload.routes';
 import reviewRoutes from './review.routes';
 import exhibitorRoutes from './exhibitor.routes';
 import recycleBinRoutes from './recycleBin.routes';
+import scannerRoutes from './scanner.routes';
 
 const router = Router();
 
@@ -43,6 +44,7 @@ router.use('/upload', uploadRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/exhibitors', exhibitorRoutes);
 router.use('/recycle-bin', recycleBinRoutes);
+router.use('/scanner', scannerRoutes);
 
 export default router;
 

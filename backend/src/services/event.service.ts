@@ -5,6 +5,7 @@ import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
 import { PaymentService } from './payment.service';
 import { RecycleBinService } from './recycleBin.service';
+import { ScannerService } from './scanner.service';
 import { getFrontendUrl } from '../config/env';
 
 export class EventService {
@@ -76,6 +77,7 @@ export class EventService {
       currency: row.currency || 'ETB',
       paymentMethods: typeof row.payment_methods === 'string' ? JSON.parse(row.payment_methods) : row.payment_methods || [],
       requiresApproval: Boolean(row.requires_approval),
+      requiresScanners: Boolean(row.requires_scanners),
       shareLinkToken: row.share_link_token || row.id,
       customQuestions: typeof row.custom_questions === 'string' ? JSON.parse(row.custom_questions) : row.custom_questions || [],
       bannerUrl: posterUrl,
@@ -122,10 +124,19 @@ export class EventService {
       isPublicized = false,
       paymentMethods = [],
       requiresApproval = false,
+      requiresScanners = false,
+      requires_scanners,
+      scannerEmails = [],
+      scanner_emails,
       customQuestions = [],
       bannerUrl,
       posterImageUrl,
     } = data as any;
+
+    const effectiveRequiresScanners = Boolean(requiresScanners ?? requires_scanners ?? false);
+    const effectiveScannerEmails = (Array.isArray(scannerEmails) && scannerEmails.length > 0)
+      ? scannerEmails
+      : (Array.isArray(scanner_emails) ? scanner_emails : []);
 
     const poster = posterImageUrl || bannerUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
     const timeStr = `${startTime} - ${endTime} EAT`;
@@ -136,8 +147,9 @@ export class EventService {
         organizer_id, title, description, event_type, category, event_date,
         start_time, end_time, time_str, location, venue_name, capacity,
         status, is_paid, is_publicized, ticket_price, currency, share_link_token,
-        custom_questions, banner_url, poster_image_url, requires_approval, payment_methods
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, $15, 'ETB', $16, $17, $18, $19, $20, $21)
+        custom_questions, banner_url, poster_image_url, requires_approval, payment_methods,
+        requires_scanners
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, $15, 'ETB', $16, $17, $18, $19, $20, $21, $22)
       RETURNING *`,
       [
         organizerId,
@@ -161,10 +173,20 @@ export class EventService {
         poster,
         Boolean(requiresApproval),
         JSON.stringify(paymentMethods || []),
+        effectiveRequiresScanners,
       ]
     );
 
     const insertedEvent = result.rows[0];
+
+    // Assign scanners if enabled and provided
+    if (effectiveRequiresScanners && effectiveScannerEmails.length > 0) {
+      await ScannerService.assignScanners({
+        eventId: insertedEvent.id,
+        organizerId,
+        emails: effectiveScannerEmails,
+      });
+    }
     const userRes = await query('SELECT full_name, organization, email FROM users WHERE id = $1', [organizerId]);
     const userRow = userRes.rows[0] || {};
 
@@ -366,6 +388,7 @@ export class EventService {
       'custom_questions',
       'requires_approval',
       'payment_methods',
+      'requires_scanners',
     ];
 
     const inputData: any = { ...data };
@@ -373,6 +396,16 @@ export class EventService {
       const sTime = inputData.startTime || (existing.rows[0] as any).start_time || '09:00 AM';
       const eTime = inputData.endTime || (existing.rows[0] as any).end_time || '05:00 PM';
       inputData.time_str = `${sTime} - ${eTime} EAT`;
+    }
+
+    // If scanners explicitly disabled via updateEvent, deactivate existing assignments immediately (Specification v2.1)
+    if (inputData.requiresScanners === false || inputData.requires_scanners === false) {
+      await ScannerService.toggleScanners({
+        eventId: realId,
+        organizerId: userId,
+        enabled: false,
+        userRole,
+      });
     }
 
     for (const [key, value] of Object.entries(inputData)) {
@@ -405,11 +438,13 @@ export class EventService {
                                   ? 'is_publicized'
                                   : key === 'requiresApproval'
                                     ? 'requires_approval'
-                                    : key;
+                                    : key === 'requiresScanners' || key === 'requires_scanners'
+                                      ? 'requires_scanners'
+                                      : key;
       if (allowedFields.includes(dbKey)) {
         fields.push(`${dbKey} = $${counter++}`);
         values.push(
-          dbKey === 'requires_approval'
+          dbKey === 'requires_approval' || dbKey === 'requires_scanners'
             ? Boolean(value)
             : dbKey === 'custom_questions' || dbKey === 'payment_methods'
               ? typeof value === 'string'

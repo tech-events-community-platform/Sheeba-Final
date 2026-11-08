@@ -607,3 +607,33 @@ CREATE INDEX IF NOT EXISTS idx_sponsorship_deliverables_deal_id ON sponsorship_d
 CREATE INDEX IF NOT EXISTS idx_sponsorship_deliverables_sponsor_id ON sponsorship_deliverables(sponsor_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_deal_deliverable ON sponsorship_deliverables (deal_id) WHERE deal_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_sponsor_default_deliverable ON sponsorship_deliverables (sponsor_id) WHERE deal_id IS NULL;
+
+-- =========================================================================
+-- Stage 5: Event Gate Delegation & Scanner Staff Management (Specification v2.1)
+-- =========================================================================
+
+-- 1. Opt-in scanner requirement flag on events
+ALTER TABLE events ADD COLUMN IF NOT EXISTS requires_scanners BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- 2. Event-specific scanner assignments table
+CREATE TABLE IF NOT EXISTS event_scanners (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    scanner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    assigned_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Fast lookup index for active gate verification
+CREATE INDEX IF NOT EXISTS idx_event_scanners_active_lookup 
+ON event_scanners(event_id, scanner_user_id) 
+WHERE is_active = TRUE;
+
+-- Fast index for user active assignments count (powers the navbar Scanner Portal link)
+CREATE INDEX IF NOT EXISTS idx_event_scanners_user_active 
+ON event_scanners(scanner_user_id) 
+WHERE is_active = TRUE;
+

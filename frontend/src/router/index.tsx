@@ -5,6 +5,7 @@ import { PublicLayout } from '../layouts/PublicLayout';
 import { AttendeeLayout } from '../layouts/AttendeeLayout';
 import { OrganizerLayout } from '../layouts/OrganizerLayout';
 import { AdminLayout } from '../layouts/AdminLayout';
+import { ScannerLayout } from '../layouts/ScannerLayout';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
 // Public Pages
@@ -64,6 +65,7 @@ import { ApplyToSponsorsPage } from '../pages/organizer/ApplyToSponsorsPage';
 import { OrganizerExhibitorsPage } from '../pages/organizer/OrganizerExhibitorsPage';
 
 import { ScannerPage } from '../pages/organizer/ScannerPage';
+import { ScannerPortalPage } from '../pages/scanner/ScannerPortalPage';
 
 // Admin Pages
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
@@ -220,6 +222,20 @@ export const router = createBrowserRouter([
       { path: 'recycle-bin', element: <ExhibitorRecycleBinPage /> },
       { path: 'settings', element: <ExhibitorSettingsPage /> },
       { path: 'change-password', element: <ChangePasswordPage /> },
+    ],
+  },
+  // Dedicated Gate Scanner Portal Routes (/scanner - Specification v2.1)
+  {
+    path: '/scanner',
+    element: <ProtectedRoute requireScannerAccess={true} />,
+    children: [
+      {
+        element: <ScannerLayout />,
+        children: [
+          { index: true, element: <ScannerPortalPage /> },
+          { path: ':id', element: <ScannerPortalPage /> },
+        ],
+      },
     ],
   },
   // Fallback redirect

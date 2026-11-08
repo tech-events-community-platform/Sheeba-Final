@@ -953,6 +953,8 @@ export const api = {
             ticketPrice: Number(data.ticketPrice) || 0,
             currency: 'ETB',
             requiresApproval: Boolean(data.requiresApproval),
+            requiresScanners: Boolean(data.requiresScanners),
+            scannerEmails: data.scannerEmails || [],
             customQuestions: data.customQuestions || [],
             includeDefaultQuestions: data.includeDefaultQuestions !== undefined ? data.includeDefaultQuestions : true,
             bannerUrl: data.bannerUrl,
@@ -1420,6 +1422,48 @@ export const api = {
   // Alias for checkin
   get checkin() {
     return this.checkIn;
+  },
+
+  // Gate Delegation & Scanner Staff (Specification v2.1)
+  scanners: {
+    getEventScanners: async (eventId: string) => {
+      const res = await requestApi(`/events/${eventId}/scanners`);
+      return res.data;
+    },
+    assignScanners: async (eventId: string, emails: string[]) => {
+      const res = await requestApi(`/events/${eventId}/scanners`, {
+        method: 'POST',
+        body: JSON.stringify({ emails }),
+      });
+      return res.data;
+    },
+    toggleScanners: async (eventId: string, enabled: boolean) => {
+      const res = await requestApi(`/events/${eventId}/scanners/toggle`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled }),
+      });
+      return res.data;
+    },
+    removeScanner: async (eventId: string, scannerId: string) => {
+      const res = await requestApi(`/events/${eventId}/scanners/${scannerId}`, {
+        method: 'DELETE',
+      });
+      return res.data;
+    },
+    resendInvite: async (eventId: string, scannerId: string) => {
+      const res = await requestApi(`/events/${eventId}/scanners/${scannerId}/resend`, {
+        method: 'POST',
+      });
+      return res.data;
+    },
+    getMyAssignedEvents: async () => {
+      const res = await requestApi('/scanner/my-events');
+      return res.data;
+    },
+    getScannerEventAttendance: async (eventId: string) => {
+      const res = await requestApi(`/scanner/events/${eventId}/attendance`);
+      return res.data;
+    },
   },
 
   // Badge Awards (Section 6 & 7)

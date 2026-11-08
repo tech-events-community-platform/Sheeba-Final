@@ -53,6 +53,7 @@ export class AuthService {
       organizerApprovalStatus,
       isExhibitor,
       hasExhibitorApplications,
+      hasActiveScannerEvents: Boolean(user.has_active_scanner_events),
       mustChangePassword: Boolean(user.must_change_password),
       applicantType: user.applicant_type || undefined,
       organizationType: user.organization_type || undefined,
@@ -492,6 +493,7 @@ export class AuthService {
     const result = await query<IUser>(
       `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
+              (SELECT EXISTS(SELECT 1 FROM event_scanners es JOIN events e ON e.id = es.event_id WHERE es.scanner_user_id = users.id AND es.is_active = TRUE AND e.requires_scanners = TRUE AND e.deleted_at IS NULL)) AS has_active_scanner_events,
               created_at, updated_at
        FROM users WHERE LOWER(email) = LOWER($1)`,
       [email]
@@ -666,6 +668,7 @@ export class AuthService {
     const result = await query<IUser>(
       `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at, (password_hash IS NOT NULL) AS has_password,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
+              (SELECT EXISTS(SELECT 1 FROM event_scanners es JOIN events e ON e.id = es.event_id WHERE es.scanner_user_id = users.id AND es.is_active = TRUE AND e.requires_scanners = TRUE AND e.deleted_at IS NULL)) AS has_active_scanner_events,
               created_at, updated_at
        FROM users WHERE id = $1`,
       [userId]

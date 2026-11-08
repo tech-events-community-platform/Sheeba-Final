@@ -118,6 +118,10 @@ export const createEventSchema = z
     payment_methods: z.array(paymentDestinationSchema).optional(),
     requiresApproval: z.boolean().optional().default(false),
     requires_approval: z.boolean().optional(),
+    requiresScanners: z.boolean().optional().default(false),
+    requires_scanners: z.boolean().optional(),
+    scannerEmails: z.array(z.string().trim().email('Invalid scanner email address.')).optional().default([]),
+    scanner_emails: z.array(z.string().trim().email('Invalid scanner email address.')).optional(),
     customQuestions: z.array(registrationQuestionSchema).optional().default([]),
     custom_questions: z.array(registrationQuestionSchema).optional(),
     includeDefaultQuestions: z.boolean().optional().default(true),
@@ -132,6 +136,8 @@ export const createEventSchema = z
     const isPublicized = data.isPublicized ?? data.is_publicized ?? false;
     const ticketPrice = data.ticketPrice ?? data.ticket_price ?? 0;
     const requiresApproval = data.requiresApproval ?? data.requires_approval ?? false;
+    const requiresScanners = data.requiresScanners ?? data.requires_scanners ?? false;
+    const scannerEmails = data.scannerEmails.length > 0 ? data.scannerEmails : (data.scanner_emails || []);
     const banner = data.posterImageUrl || data.poster_image_url || data.bannerUrl || data.banner_url || '';
     const venue = data.venueName || data.venue_name || data.location;
     const questions = data.customQuestions.length > 0 ? data.customQuestions : (data.custom_questions || []);
@@ -147,6 +153,10 @@ export const createEventSchema = z
       paymentMethods: isPaid ? paymentDestinations : [],
       requiresApproval,
       requires_approval: requiresApproval,
+      requiresScanners,
+      requires_scanners: requiresScanners,
+      scannerEmails,
+      scanner_emails: scannerEmails,
       bannerUrl: banner || undefined,
       posterImageUrl: banner || undefined,
       venueName: venue,
@@ -226,6 +236,8 @@ export const updateEventSchema = z
     ticket_price: z.coerce.number().optional(),
     requiresApproval: z.boolean().optional(),
     requires_approval: z.boolean().optional(),
+    requiresScanners: z.boolean().optional(),
+    requires_scanners: z.boolean().optional(),
     currency: z.string().trim().optional(),
     paymentMethods: z.array(paymentDestinationSchema).optional(),
     payment_methods: z.array(paymentDestinationSchema).optional(),

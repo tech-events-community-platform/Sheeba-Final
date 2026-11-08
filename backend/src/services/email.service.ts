@@ -1394,4 +1394,127 @@ export class EmailService {
 
     await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
+
+  /**
+   * Scanner Assignment Email for Existing Sheeba Users (Specification v2.1)
+   */
+  static async sendScannerAssignmentExistingUserEmail(params: {
+    toEmail: string;
+    fullName: string;
+    eventTitle: string;
+    organizerName: string;
+    eventDate: string;
+    location: string;
+  }): Promise<void> {
+    const { toEmail, fullName, eventTitle, organizerName, eventDate, location } = params;
+    const frontendUrl = getFrontendUrl();
+    const scannerUrl = `${frontendUrl}/scanner`;
+
+    const subject = `You've been assigned as a Ticket Scanner for ${eventTitle}`;
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Gate & Ticket Verification</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Scanner Assignment Invitation</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Hello ${fullName || 'there'},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            <strong>${organizerName || 'The organizer'}</strong> has assigned you to manage gate check-ins and QR code scanning for:
+          </p>
+          <div style="background-color: #FAF7F5; border-left: 4px solid #63474D; padding: 14px 16px; margin: 16px 0; border-radius: 0 8px 8px 0;">
+            <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: bold; color: #2D1F23;">${eventTitle}</p>
+            <p style="margin: 0 0 4px 0; font-size: 13px; color: #756366;">📅 Date: ${eventDate || 'See event details'}</p>
+            <p style="margin: 0; font-size: 13px; color: #756366;">📍 Location: ${location || 'Venue'}</p>
+          </div>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            You can log in to Sheeba using your <strong>existing account credentials</strong> to access the Scanner Portal.
+          </p>
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${scannerUrl}" style="background-color: #63474D; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+              Open Scanner Portal
+            </a>
+          </div>
+        </div>
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 24px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Scanner Assignment Email for New Users with Temporary Password (Specification v2.1)
+   */
+  static async sendScannerAssignmentNewUserEmail(params: {
+    toEmail: string;
+    fullName: string;
+    eventTitle: string;
+    organizerName: string;
+    eventDate: string;
+    location: string;
+    initialPassword: string;
+  }): Promise<void> {
+    const { toEmail, fullName, eventTitle, organizerName, eventDate, location, initialPassword } = params;
+    const frontendUrl = getFrontendUrl();
+    const loginUrl = `${frontendUrl}/login`;
+
+    const subject = `Your Sheeba Scanner Account for ${eventTitle}`;
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Gate & Ticket Verification</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Your Scanner Staff Account</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Hello ${fullName || 'Scanner Staff'},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            <strong>${organizerName || 'The organizer'}</strong> has assigned you to manage gate check-ins and QR code scanning for:
+          </p>
+          <div style="background-color: #FAF7F5; border-left: 4px solid #63474D; padding: 14px 16px; margin: 16px 0; border-radius: 0 8px 8px 0;">
+            <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: bold; color: #2D1F23;">${eventTitle}</p>
+            <p style="margin: 0 0 4px 0; font-size: 13px; color: #756366;">📅 Date: ${eventDate || 'See event details'}</p>
+            <p style="margin: 0; font-size: 13px; color: #756366;">📍 Location: ${location || 'Venue'}</p>
+          </div>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            A Sheeba account has been created for you. Log in using the credentials below to start scanning:
+          </p>
+          <div style="background-color: #FAF7F5; border: 1px solid #E8DDD7; border-radius: 12px; padding: 18px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0; font-size: 14px; color: #2D1F23;">
+              <strong>Email:</strong> <span style="font-family: monospace; color: #63474D;">${toEmail}</span>
+            </p>
+            <p style="margin: 0; font-size: 14px; color: #2D1F23;">
+              <strong>Temporary Password:</strong>
+              <code style="font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 15px; font-weight: bold; background-color: #FFFFFF; padding: 4px 10px; border-radius: 6px; border: 1px solid #E8DDD7; color: #63474D; display: inline-block; margin-left: 6px;">${initialPassword}</code>
+            </p>
+          </div>
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${loginUrl}" style="background-color: #63474D; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+              Log In to Sheeba
+            </a>
+          </div>
+          <p style="font-size: 12px; color: #756366; line-height: 1.5; margin: 16px 0 0 0; text-align: center;">
+            💡 Tip: You can easily copy your temporary password above and sign in at the gate using your mobile phone camera.
+          </p>
+        </div>
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 24px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
 }
