@@ -17,6 +17,7 @@ import {
   Sparkles,
   Trash2,
   AlertTriangle,
+  ArrowRight,
 } from 'lucide-react';
 import {
   LinkedInIcon,
@@ -127,8 +128,15 @@ export const SponsorApplicationDetailPage: React.FC = () => {
         pledged_amount: pledgedAmount,
       });
 
-      // Navigate to deals and pledges tab
-      navigate('/sponsor/deals');
+      setApplication({
+        ...application,
+        user_deal_status: status,
+      });
+
+      // Navigate to events tab for interested, or deals tab for declined
+      setTimeout(() => {
+        navigate(status === 'INTERESTED' ? '/sponsor/events' : '/sponsor/deals');
+      }, 800);
     } catch (err: any) {
       console.error('Failed to express interest or decline:', err);
       const isConstraintErr =
@@ -755,40 +763,74 @@ export const SponsorApplicationDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* ACTION BUTTONS: Just Decline (Red) and Mark as Interested (Green), Centered */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
-        <button
-          type="button"
-          disabled={activeAction !== null}
-          onClick={() => handleExpressInterestOrDecline('DECLINED')}
-          className={`w-full sm:w-56 py-3.5 px-6 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeAction === 'DECLINED'
-              ? 'opacity-80 cursor-wait ring-2 ring-red-400'
-              : activeAction === 'INTERESTED'
-              ? 'pointer-events-none'
-              : ''
-          }`}
-        >
-          <XCircle className={`w-5 h-5 ${activeAction === 'DECLINED' ? 'animate-spin' : ''}`} />
-          <span>{activeAction === 'DECLINED' ? 'Declining...' : 'Decline'}</span>
-        </button>
+      {/* INTERACTED STATUS NOTICE OR ACTION BUTTONS */}
+      {application?.user_deal_status === 'DECLINED' ? (
+        <div className="flex flex-col items-center justify-center p-6 bg-red-50 border border-red-200 rounded-3xl text-center space-y-2 max-w-lg mx-auto shadow-xs pt-6">
+          <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center">
+            <XCircle className="w-6 h-6" />
+          </div>
+          <p className="font-bold text-red-900 text-base">You have declined this pitch before</p>
+          <p className="text-xs text-red-700">This sponsorship pitch has been marked as declined in your records.</p>
+        </div>
+      ) : application?.user_deal_status === 'INTERESTED' || application?.user_deal_status === 'PENDING' || application?.user_deal_status === 'DEAL_ACCEPTED' ? (
+        <div className="flex flex-col items-center justify-center p-6 bg-emerald-50 border border-emerald-200 rounded-3xl text-center space-y-2 max-w-lg mx-auto shadow-xs pt-6">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <p className="font-bold text-emerald-900 text-base">
+            {application.user_deal_status === 'DEAL_ACCEPTED'
+              ? 'Deal Accepted'
+              : 'You have marked this pitch as Interested before'}
+          </p>
+          <p className="text-xs text-emerald-700 max-w-md">
+            {application.user_deal_status === 'DEAL_ACCEPTED'
+              ? 'The organizer has accepted your sponsorship deal! You can view verified attendee data and deliverables in My Events.'
+              : 'You expressed interest in this sponsorship pitch. The organizer will review your profile and reach out directly.'}
+          </p>
+          <Link
+            to="/sponsor/events"
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs"
+          >
+            <span>View in My Events</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      ) : (
+        /* ACTION BUTTONS: Decline (Red) and Mark as Interested (Green), Centered */
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
+          <button
+            type="button"
+            disabled={activeAction !== null}
+            onClick={() => handleExpressInterestOrDecline('DECLINED')}
+            className={`w-full sm:w-56 py-3.5 px-6 rounded-2xl text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 ${
+              activeAction === 'DECLINED'
+                ? 'bg-red-700 opacity-90 cursor-wait ring-2 ring-red-400'
+                : activeAction === 'INTERESTED'
+                ? 'bg-red-600 opacity-100 pointer-events-none'
+                : 'bg-red-600 hover:bg-red-700 hover:shadow-lg cursor-pointer'
+            }`}
+          >
+            <XCircle className={`w-5 h-5 ${activeAction === 'DECLINED' ? 'animate-spin' : ''}`} />
+            <span>{activeAction === 'DECLINED' ? 'Declining...' : 'Decline'}</span>
+          </button>
 
-        <button
-          type="button"
-          disabled={activeAction !== null}
-          onClick={() => handleExpressInterestOrDecline('INTERESTED')}
-          className={`w-full sm:w-56 py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeAction === 'INTERESTED'
-              ? 'opacity-80 cursor-wait ring-2 ring-emerald-400'
-              : activeAction === 'DECLINED'
-              ? 'pointer-events-none'
-              : ''
-          }`}
-        >
-          <CheckCircle2 className={`w-5 h-5 ${activeAction === 'INTERESTED' ? 'animate-spin' : ''}`} />
-          <span>{activeAction === 'INTERESTED' ? 'Submitting...' : 'Mark as Interested'}</span>
-        </button>
-      </div>
+          <button
+            type="button"
+            disabled={activeAction !== null}
+            onClick={() => handleExpressInterestOrDecline('INTERESTED')}
+            className={`w-full sm:w-56 py-3.5 px-6 rounded-2xl text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 ${
+              activeAction === 'INTERESTED'
+                ? 'bg-emerald-700 opacity-90 cursor-wait ring-2 ring-emerald-400'
+                : activeAction === 'DECLINED'
+                ? 'bg-emerald-600 opacity-100 pointer-events-none'
+                : 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg cursor-pointer'
+            }`}
+          >
+            <CheckCircle2 className={`w-5 h-5 ${activeAction === 'INTERESTED' ? 'animate-spin' : ''}`} />
+            <span>{activeAction === 'INTERESTED' ? 'Submitting...' : 'Mark as Interested'}</span>
+          </button>
+        </div>
+      )}
 
       {/* Admin Take-down Modal */}
       {showAdminTakeDownModal && application && (

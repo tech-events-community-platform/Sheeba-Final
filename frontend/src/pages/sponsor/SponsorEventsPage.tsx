@@ -158,26 +158,29 @@ export const SponsorEventsPage: React.FC = () => {
     setIsAttendeesModalOpen(true);
   };
 
+  // Status check helpers
+  const isAccepted = (st?: string) => st === 'DEAL_ACCEPTED' || st === 'APPROVED';
+  const isInterested = (st?: string) => st === 'INTERESTED' || st === 'PENDING';
+  const isDeclined = (st?: string) => st === 'DECLINED' || st === 'REJECTED' || st === 'WITHDRAWN';
+
   // Metrics
-  const activeDealsCount = events.filter((e) => e.deal_status === 'DEAL_ACCEPTED').length;
+  const activeDealsCount = events.filter((e) => isAccepted(e.deal_status)).length;
   const sharingGrantedCount = events.filter(
-    (e) => e.deal_status === 'DEAL_ACCEPTED' && e.allow_attendee_sharing
+    (e) => isAccepted(e.deal_status) && e.allow_attendee_sharing
   ).length;
-  const pendingCount = events.filter((e) => e.deal_status === 'INTERESTED').length;
-  const declinedCount = events.filter(
-    (e) => e.deal_status === 'DECLINED' || e.deal_status === 'REJECTED' || e.deal_status === 'WITHDRAWN'
-  ).length;
+  const pendingCount = events.filter((e) => isInterested(e.deal_status)).length;
+  const declinedCount = events.filter((e) => isDeclined(e.deal_status)).length;
   const totalCheckedIn = events.reduce((sum, e) => sum + (e.checked_in_count || 0), 0);
 
   // Filtered Events matching Organizer table structure
   const filteredEvents = events.filter((e) => {
-    if (statusFilter === 'DEAL_ACCEPTED' && e.deal_status !== 'DEAL_ACCEPTED') {
+    if (statusFilter === 'DEAL_ACCEPTED' && !isAccepted(e.deal_status)) {
       return false;
     }
-    if (statusFilter === 'INTERESTED' && e.deal_status !== 'INTERESTED') {
+    if (statusFilter === 'INTERESTED' && !isInterested(e.deal_status)) {
       return false;
     }
-    if (statusFilter === 'DECLINED' && e.deal_status !== 'DECLINED' && e.deal_status !== 'REJECTED' && e.deal_status !== 'WITHDRAWN') {
+    if (statusFilter === 'DECLINED' && !isDeclined(e.deal_status)) {
       return false;
     }
 

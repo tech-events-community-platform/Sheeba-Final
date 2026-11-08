@@ -29,10 +29,10 @@ export const PendingApprovalPage: React.FC = () => {
         setStatusMessage('Your account is approved! Redirecting to your Organizer Workspace...');
         setTimeout(() => navigate('/organizer'), 1200);
       } else {
-        setStatusMessage('Your registration is still under review. You will be using this system in 1 hour.');
+        setStatusMessage('Your application is being approved by Sheeba Administration.');
       }
     } catch {
-      setStatusMessage('Your registration is still awaiting Admin approval. You will be using this system in 1 hour.');
+      setStatusMessage('Your application is being approved by Sheeba Administration.');
     } finally {
       setIsChecking(false);
     }
@@ -57,10 +57,10 @@ export const PendingApprovalPage: React.FC = () => {
             Organizer Approval Pending
           </Badge>
           <h1 className="font-serif text-3xl sm:text-4xl font-extrabold text-[#2D1F23]">
-            you will be using this sytem in 1 hour
+            Your Application is Being Approved by Sheeba Administration
           </h1>
           <p className="text-sm text-[#756366] max-w-md mx-auto">
-            Your organizer registration has been received and forwarded to the <strong>Platform Admin</strong> for approval.
+            Your organizer application has been received and is currently under review by <strong>Sheeba Administration</strong>.
           </p>
         </div>
 

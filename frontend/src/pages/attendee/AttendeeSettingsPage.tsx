@@ -38,6 +38,7 @@ import {
 } from '../../schemas';
 import { uploadToCloudinary } from '../../utils/cloudinary';
 import { ORGANIZATION_TYPES, ORGANIZER_APPLICANT_TYPES } from '../../schemas/auth.schema';
+import { formatPhoneInput } from '../../utils/phone';
 
 export const AttendeeSettingsPage: React.FC = () => {
   const { user, logout, refreshUser, applyForOrganizer, switchRole, addExhibitorRole } = useAuth();
@@ -424,9 +425,10 @@ export const AttendeeSettingsPage: React.FC = () => {
               </label>
               <input
                 type="tel"
+                maxLength={10}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+251 9... (optional)"
+                onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+                placeholder="0912345678"
                 className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
               />
             </div>
@@ -757,9 +759,10 @@ export const AttendeeSettingsPage: React.FC = () => {
                       <input
                         type="tel"
                         required
-                        placeholder="+251 9... or 09..."
+                        maxLength={10}
+                        placeholder="0912345678"
                         value={orgPhone}
-                        onChange={(e) => setOrgPhone(e.target.value)}
+                        onChange={(e) => setOrgPhone(formatPhoneInput(e.target.value))}
                         className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                       />
                     </div>
@@ -1458,9 +1461,10 @@ export const AttendeeSettingsPage: React.FC = () => {
                 </label>
                 <input
                   type="tel"
-                  placeholder="+251 9... (optional)"
+                  maxLength={10}
+                  placeholder="0912345678"
                   value={exhibitorPhone}
-                  onChange={(e) => setExhibitorPhone(e.target.value)}
+                  onChange={(e) => setExhibitorPhone(formatPhoneInput(e.target.value))}
                   className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                 />
               </div>

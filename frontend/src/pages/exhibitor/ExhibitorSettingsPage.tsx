@@ -13,6 +13,7 @@ import {
   AlertCircle,
   FileText,
 } from 'lucide-react';
+import { formatPhoneInput } from '../../utils/phone';
 
 export const ExhibitorSettingsPage: React.FC = () => {
   const { user, refreshUser, switchRole } = useAuth();
@@ -179,8 +180,10 @@ export const ExhibitorSettingsPage: React.FC = () => {
               <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="tel"
+                maxLength={10}
+                placeholder="0912345678"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                 className="w-full pl-9 pr-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
               />
             </div>

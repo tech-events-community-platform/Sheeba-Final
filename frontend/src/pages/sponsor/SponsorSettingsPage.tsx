@@ -20,7 +20,11 @@ import {
   Plus,
   X,
   FileText,
+  Upload,
+  Loader2,
 } from 'lucide-react';
+import { formatPhoneInput } from '../../utils/phone';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 
 const OBJECTIVES_OPTIONS = [
   'Brand awareness',
@@ -94,6 +98,35 @@ export const SponsorSettingsPage: React.FC = () => {
   const [companyWebsite, setCompanyWebsite] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
   const [maxBudget, setMaxBudget] = useState<string>('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setLogoUploadError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setLogoUploadError(null);
+    try {
+      const url = await uploadToCloudinary(file, { folder: 'sheeba_sponsor_logos' });
+      setCompanyLogo(url);
+    } catch (err: any) {
+      setLogoUploadError(err.message || 'Failed to upload company logo.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
 
   const [objectives, setObjectives] = useState<string[]>([]);
   const [targetAudience, setTargetAudience] = useState<string[]>([]);
@@ -330,29 +363,52 @@ export const SponsorSettingsPage: React.FC = () => {
                 Contact Phone
               </label>
               <input
-                type="text"
+                type="tel"
+                maxLength={10}
                 value={companyPhone}
-                onChange={(e) => setCompanyPhone(e.target.value)}
-                placeholder="+251 911 000 000"
+                onChange={(e) => setCompanyPhone(formatPhoneInput(e.target.value))}
+                placeholder="0912345678"
                 className="w-full px-3.5 py-2.5 text-xs bg-stone-50 border border-gray-300 rounded-xl focus:border-[#63474D] focus:outline-none"
               />
             </div>
           </div>
 
-          {/* Logo URL & Live Preview */}
+          {/* Logo Upload & Live Preview */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <Image className="w-3.5 h-3.5 text-gray-400" />
-              Company Logo URL
+              Company Logo (PNG, JPG, WebP up to 5MB)
             </label>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <input
-                type="url"
-                value={companyLogo}
-                onChange={(e) => setCompanyLogo(e.target.value)}
-                placeholder="https://example.com/logo.png"
-                className="flex-1 w-full px-3.5 py-2.5 text-xs bg-stone-50 border border-gray-300 rounded-xl focus:border-[#63474D] focus:outline-none"
-              />
+              <div className="flex-1 w-full space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    value={companyLogo}
+                    onChange={(e) => setCompanyLogo(e.target.value)}
+                    placeholder="https://example.com/logo.png"
+                    className="flex-1 px-3.5 py-2.5 text-xs bg-stone-50 border border-gray-300 rounded-xl focus:border-[#63474D] focus:outline-none"
+                  />
+                  <label className="px-3 py-2.5 bg-stone-100 hover:bg-stone-200 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer flex items-center gap-1.5 shrink-0 transition-colors">
+                    {isUploadingLogo ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#63474D]" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5 text-gray-600" />
+                    )}
+                    <span>{isUploadingLogo ? 'Uploading...' : 'Upload'}</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      disabled={isUploadingLogo}
+                      onChange={handleLogoUpload}
+                    />
+                  </label>
+                </div>
+                {logoUploadError && (
+                  <p className="text-[11px] text-red-600">{logoUploadError}</p>
+                )}
+              </div>
 
               <div className="flex items-center gap-3 shrink-0">
                 <span className="text-[11px] text-gray-400">Preview:</span>

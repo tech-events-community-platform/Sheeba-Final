@@ -96,6 +96,7 @@ router.post(
 router.post(
   '/deals',
   authenticate,
+  authorizeRoles('sponsor', 'admin'),
   validateBody(createDealSchema),
   SponsorshipController.expressInterestOrDecline
 );

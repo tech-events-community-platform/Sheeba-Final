@@ -74,7 +74,8 @@ export class SponsorshipController {
   static async getApplication(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = req.params.id as string;
-      const application = await SponsorshipService.getApplicationById(id);
+      const userId = req.user?.userId;
+      const application = await SponsorshipService.getApplicationById(id, userId);
       sendSuccess(res, application, 'Application details retrieved.');
     } catch (error) {
       next(error);

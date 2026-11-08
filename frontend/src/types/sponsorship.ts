@@ -64,6 +64,8 @@ export interface ISponsorshipApplication {
   organizer_avatar?: string;
   interested_sponsors_count?: number;
   approved_sponsors_count?: number;
+  user_deal_status?: string | null;
+  user_deal?: any;
 }
 
 export type SponsorshipDealStatus =

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { IExhibitorBooth, IExhibitorBoothVisitor, IBoothReceipt } from '../../types/exhibitor';
+import { formatPhoneInput } from '../../utils/phone';
 import { Button } from '../../components/ui/Button';
 import {
   Calendar,
@@ -1342,9 +1343,10 @@ export const ExhibitorBoothsPage: React.FC = () => {
                   <label className="block font-bold text-[#2D1F23] mb-1">Phone</label>
                   <input
                     type="tel"
-                    placeholder="+251 9..."
+                    maxLength={10}
+                    placeholder="0912345678"
                     value={visitorPhone}
-                    onChange={(e) => setVisitorPhone(e.target.value)}
+                    onChange={(e) => setVisitorPhone(formatPhoneInput(e.target.value))}
                     className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                   />
                 </div>

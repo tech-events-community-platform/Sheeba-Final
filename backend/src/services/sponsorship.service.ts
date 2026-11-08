@@ -224,44 +224,72 @@ export class SponsorshipService {
   /**
    * Get single application details with organizer track record
    */
-  static async getApplicationById(id: string): Promise<ISponsorshipApplication & { organizer_events_count?: number }> {
+  static async getApplicationById(
+    id: string,
+    userId?: string
+  ): Promise<ISponsorshipApplication & { organizer_events_count?: number; user_deal_status?: string; user_deal?: any }> {
     const cacheKey = `sponsorship:app:${id}`;
-    const cached = await CacheService.get<any>(cacheKey);
-    if (cached) {
-      return cached;
+    let appData = await CacheService.get<any>(cacheKey);
+    if (!appData) {
+      const res = await query<any>(
+        `SELECT 
+          sa.*,
+          u.organization AS organizer_organization,
+          u.full_name AS organizer_name,
+          u.avatar_url AS organizer_avatar,
+          u.email AS organizer_account_email,
+          COALESCE((
+            SELECT COUNT(*)::int 
+            FROM events e 
+            WHERE e.organizer_id = sa.organizer_id
+          ), 0) AS organizer_events_count,
+          COALESCE((
+            SELECT COUNT(*)::int 
+            FROM sponsorship_deals sd 
+            WHERE sd.application_id = sa.id AND sd.status IN ('APPROVED', 'INTERESTED', 'DEAL_ACCEPTED') AND sd.deleted_at IS NULL
+          ), 0) AS interested_sponsors_count
+        FROM sponsorship_applications sa
+        JOIN users u ON sa.organizer_id = u.id
+        WHERE sa.id = $1`,
+        [id]
+      );
+
+      if (!res.rowCount || res.rowCount === 0) {
+        const err: any = new Error('Sponsorship application not found.');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      appData = res.rows[0];
+      await CacheService.set(cacheKey, appData, 60);
     }
 
-    const res = await query<any>(
-      `SELECT 
-        sa.*,
-        u.organization AS organizer_organization,
-        u.full_name AS organizer_name,
-        u.avatar_url AS organizer_avatar,
-        u.email AS organizer_account_email,
-        COALESCE((
-          SELECT COUNT(*)::int 
-          FROM events e 
-          WHERE e.organizer_id = sa.organizer_id
-        ), 0) AS organizer_events_count,
-        COALESCE((
-          SELECT COUNT(*)::int 
-          FROM sponsorship_deals sd 
-          WHERE sd.application_id = sa.id AND sd.status IN ('APPROVED', 'INTERESTED') AND sd.deleted_at IS NULL
-        ), 0) AS interested_sponsors_count
-      FROM sponsorship_applications sa
-      JOIN users u ON sa.organizer_id = u.id
-      WHERE sa.id = $1`,
-      [id]
-    );
-
-    if (!res.rowCount || res.rowCount === 0) {
-      const err: any = new Error('Sponsorship application not found.');
-      err.statusCode = 404;
-      throw err;
+    let userDeal = null;
+    let userDealStatus = null;
+    if (userId) {
+      try {
+        const dealRes = await query<any>(
+          `SELECT id, status, package_name, pledged_amount, allow_attendee_sharing, created_at, updated_at
+           FROM sponsorship_deals
+           WHERE application_id = $1 AND sponsor_id = $2 AND deleted_at IS NULL
+           ORDER BY updated_at DESC
+           LIMIT 1`,
+          [id, userId]
+        );
+        if (dealRes.rowCount && dealRes.rowCount > 0) {
+          userDeal = dealRes.rows[0];
+          userDealStatus = dealRes.rows[0].status;
+        }
+      } catch (dealErr) {
+        // Safe fallback
+      }
     }
 
-    await CacheService.set(cacheKey, res.rows[0], 60);
-    return res.rows[0];
+    return {
+      ...appData,
+      user_deal: userDeal,
+      user_deal_status: userDealStatus,
+    };
   }
 
   /**
@@ -300,6 +328,11 @@ export class SponsorshipService {
     }
 
     const pitch = appRes.rows[0];
+    if (pitch.organizer_id === sponsorId) {
+      const err: any = new Error('Organizers cannot submit sponsorship applications to their own pitches.');
+      err.statusCode = 400;
+      throw err;
+    }
     if (pitch.status === 'CLOSED') {
       const err: any = new Error('This sponsorship pitch has been closed by the organizer.');
       err.statusCode = 400;
@@ -451,10 +484,19 @@ export class SponsorshipService {
     }
   ): Promise<ISponsorshipDeal> {
     // Check if pitch exists
-    const appRes = await query('SELECT id FROM sponsorship_applications WHERE id = $1 AND deleted_at IS NULL', [applicationId]);
+    const appRes = await query<{ id: string; organizer_id: string }>(
+      'SELECT id, organizer_id FROM sponsorship_applications WHERE id = $1 AND deleted_at IS NULL',
+      [applicationId]
+    );
     if (!appRes.rowCount || appRes.rowCount === 0) {
       const err: any = new Error('Application does not exist.');
       err.statusCode = 404;
+      throw err;
+    }
+
+    if (appRes.rows[0].organizer_id === sponsorId) {
+      const err: any = new Error('Organizers cannot express sponsorship interest in their own pitches.');
+      err.statusCode = 400;
       throw err;
     }
 
@@ -828,6 +870,7 @@ export class SponsorshipService {
           sd.package_name,
           sd.pledged_amount,
           sd.sponsor_notes,
+          sd.allow_attendee_sharing,
           sd.created_at AS interest_expressed_at,
           sd.updated_at AS deal_updated_at,
           sa.event_title,
@@ -852,7 +895,7 @@ export class SponsorshipService {
         FROM sponsorship_deals sd
         JOIN sponsorship_applications sa ON sd.application_id = sa.id
         JOIN users u ON sd.sponsor_id = u.id
-        WHERE sa.organizer_id = $1 AND sd.deleted_at IS NULL AND sa.deleted_at IS NULL
+        WHERE sa.organizer_id = $1 AND sd.sponsor_id != sa.organizer_id AND sd.deleted_at IS NULL AND sa.deleted_at IS NULL
         ORDER BY sd.updated_at DESC
       `;
 
@@ -1209,6 +1252,7 @@ export class SponsorshipService {
           sd.package_name,
           sd.pledged_amount,
           sd.sponsor_notes,
+          sd.allow_attendee_sharing,
           sd.created_at AS interest_expressed_at,
           sd.updated_at AS deal_updated_at,
           sa.event_title,
@@ -1242,6 +1286,11 @@ export class SponsorshipService {
             if (match) {
               dealStatus = match[1];
             }
+          }
+          if (dealStatus === 'PENDING') {
+            dealStatus = 'INTERESTED';
+          } else if (dealStatus === 'APPROVED') {
+            dealStatus = 'DEAL_ACCEPTED';
           }
 
           const allowSharing = Boolean(

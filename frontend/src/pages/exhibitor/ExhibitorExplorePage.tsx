@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { RegistrationQuestion } from '../../types/event';
 import type { IExhibitorBooth } from '../../types/exhibitor';
+import { formatPhoneInput } from '../../utils/phone';
 
 export const ExhibitorExplorePage: React.FC = () => {
   const { user } = useAuth();
@@ -782,9 +783,10 @@ export const ExhibitorExplorePage: React.FC = () => {
                   </label>
                   <input
                     type="tel"
-                    placeholder="+251 91 123 4567"
+                    maxLength={10}
+                    placeholder="0912345678"
                     value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
+                    onChange={(e) => setContactPhone(formatPhoneInput(e.target.value))}
                     className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                   />
                 </div>

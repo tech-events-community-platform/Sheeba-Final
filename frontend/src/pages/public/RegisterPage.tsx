@@ -23,6 +23,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import type { UserRole } from '../../types/user';
 import { registerSchema, validateForm, ORGANIZATION_TYPES } from '../../schemas';
 import { uploadToCloudinary } from '../../utils/cloudinary';
+import { formatPhoneInput } from '../../utils/phone';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -341,9 +342,10 @@ export const RegisterPage: React.FC = () => {
                 type="tel"
                 required={selectedRole === 'ORGANIZER'}
                 tabIndex={3}
-                placeholder="+251 9..."
+                maxLength={10}
+                placeholder="0912345678"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                 className="w-full pl-9 pr-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs sm:text-sm text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] focus:bg-white transition-all"
               />
             </div>
@@ -485,7 +487,7 @@ export const RegisterPage: React.FC = () => {
 
                   <div>
                     <label htmlFor="reg-org-website" className="block text-xs font-semibold text-[#2D1F23] mb-1 cursor-pointer">
-                      Website or Social Link <span className="text-[#756366] font-normal">(Optional)</span>
+                      Website or Social Link
                     </label>
                     <div className="relative">
                       <Globe className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#756366] pointer-events-none select-none" />
@@ -504,7 +506,7 @@ export const RegisterPage: React.FC = () => {
                   {/* Organization Logo Upload */}
                   <div>
                     <label className="block text-xs font-semibold text-[#2D1F23] mb-1">
-                      Organization Logo <span className="text-[#756366] font-normal">(Optional - PNG, JPG, WebP up to 5MB)</span>
+                      Organization Logo (PNG, JPG, WebP up to 5MB)
                     </label>
                     {organizationLogo ? (
                       <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
@@ -637,7 +639,7 @@ export const RegisterPage: React.FC = () => {
             className="mt-2 py-2.5 text-xs sm:text-sm font-bold rounded-xl shadow-xs hover:shadow-sm transition-all cursor-pointer"
           >
             {selectedRole === 'ORGANIZER'
-              ? 'Submit Organizer Registration'
+              ? 'Submit Organizer Application'
               : 'Register as Attendee'}
           </Button>
         </form>

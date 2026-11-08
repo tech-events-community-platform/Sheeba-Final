@@ -125,6 +125,12 @@ export const registerSchema = z
             message: 'Phone number is required.',
             path: ['phone'],
           });
+        } else if (!/^0\d{9}$/.test(data.phone.replace(/[\s-]/g, ''))) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Phone number must be exactly 10 digits starting with 0 (e.g., 0912345678).',
+            path: ['phone'],
+          });
         }
 
         if (data.applicant_type === 'Individual Organizer') {
@@ -330,6 +336,12 @@ export const applyOrganizerSchema = z
         message: 'Phone number is required.',
         path: ['phone'],
       });
+    } else if (!/^0\d{9}$/.test(data.phone.replace(/[\s-]/g, ''))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Phone number must be exactly 10 digits starting with 0 (e.g., 0912345678).',
+        path: ['phone'],
+      });
     }
 
     if (data.applicant_type === 'Individual Organizer') {
@@ -533,6 +545,12 @@ export const sponsorRegisterSchema = z
     }
     if (!data.company_phone) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Company phone is required.', path: ['company_phone'] });
+    } else if (!/^0\d{9}$/.test(data.company_phone.replace(/[\s-]/g, ''))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Company phone must be exactly 10 digits starting with 0 (e.g., 0912345678).',
+        path: ['company_phone'],
+      });
     }
     if (!data.company_description) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Company description is required.', path: ['company_description'] });
