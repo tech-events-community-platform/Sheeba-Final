@@ -118,10 +118,17 @@ export const SponsorDealsPage: React.FC = () => {
           </span>
         );
       case 'APPROVED':
+      case 'DEAL_ACCEPTED':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            Approved Sponsorship
+            Deal Accepted ✓
+          </span>
+        );
+      case 'WITHDRAWN':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-stone-100 text-stone-600 border border-stone-200">
+            Withdrawn
           </span>
         );
       case 'REJECTED':
@@ -332,6 +339,23 @@ export const SponsorDealsPage: React.FC = () => {
 
                   {/* Actions based on status */}
                   <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+                    {(deal.status === 'DEAL_ACCEPTED' || deal.status === 'APPROVED') && (
+                      <div className="flex items-center gap-2">
+                        <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          <span>Deal Confirmed</span>
+                        </div>
+                        <Link
+                          to="/sponsor/events"
+                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 transition-colors shadow-xs"
+                          title="Open My Events to view granted activations and attendees"
+                        >
+                          <span>Go to My Events</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    )}
+
                     {deal.status === 'REJECTED' && (
                       <Link
                         to={`/sponsor/applications/${pitchId}`}

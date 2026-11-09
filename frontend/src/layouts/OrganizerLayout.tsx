@@ -11,7 +11,9 @@ export const OrganizerLayout: React.FC = () => {
     if (path === '/organizer') return location.pathname === '/organizer';
     if (path === '/organizer/events/create') return location.pathname === '/organizer/events/create';
     if (path === '/organizer/exhibitors') return location.pathname.startsWith('/organizer/exhibitors');
-    if (path === '/organizer/apply-sponsors') return location.pathname.startsWith('/organizer/apply-sponsors');
+    if (path === '/organizer/sponsors' || path === '/organizer/apply-sponsors') {
+      return location.pathname.startsWith('/organizer/sponsors') || location.pathname.startsWith('/organizer/apply-sponsors');
+    }
     if (path === '/organizer/recycle-bin') return location.pathname.startsWith('/organizer/recycle-bin');
     if (path === '/organizer/check-in') {
       return location.pathname.startsWith('/organizer/check-in') || location.pathname.includes('/scanner');
@@ -67,13 +69,13 @@ export const OrganizerLayout: React.FC = () => {
             Exhibitors
           </Link>
           <Link
-            to="/organizer/apply-sponsors"
+            to="/organizer/sponsors"
             className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1 ${
-              isTabActive('/organizer/apply-sponsors') ? 'bg-[#AA767C] text-white' : 'text-[#E8DDD7]'
+              isTabActive('/organizer/sponsors') ? 'bg-[#AA767C] text-white' : 'text-[#E8DDD7]'
             }`}
           >
             <HandCoins className="w-3.5 h-3.5 text-[#FFA686]" />
-            Apply to Sponsors
+            Sponsors
           </Link>
           <Link
             to="/organizer/check-in"

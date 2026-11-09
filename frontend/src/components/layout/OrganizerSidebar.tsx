@@ -35,7 +35,7 @@ export const OrganizerSidebar: React.FC = () => {
     { label: 'Dashboard', path: '/organizer', icon: LayoutDashboard },
     { label: 'Create Event', path: '/organizer/events/create', icon: PlusCircle },
     { label: 'Exhibitors', path: '/organizer/exhibitors', icon: Store },
-    { label: 'Apply to Sponsors', path: '/organizer/apply-sponsors', icon: HandCoins },
+    { label: 'Sponsors', path: '/organizer/sponsors', icon: HandCoins },
     { label: 'Check-in', path: '/organizer/check-in', icon: QrCode },
     { label: 'Badges', path: '/organizer/badges', icon: Award },
     { label: 'Reports', path: '/organizer/reports', icon: BarChart3 },
@@ -47,7 +47,9 @@ export const OrganizerSidebar: React.FC = () => {
     if (path === '/organizer') return location.pathname === '/organizer';
     if (path === '/organizer/events/create') return location.pathname === '/organizer/events/create';
     if (path === '/organizer/exhibitors') return location.pathname.startsWith('/organizer/exhibitors');
-    if (path === '/organizer/apply-sponsors') return location.pathname.startsWith('/organizer/apply-sponsors');
+    if (path === '/organizer/sponsors' || path === '/organizer/apply-sponsors') {
+      return location.pathname.startsWith('/organizer/sponsors') || location.pathname.startsWith('/organizer/apply-sponsors');
+    }
     if (path === '/organizer/recycle-bin') return location.pathname.startsWith('/organizer/recycle-bin');
     if (path === '/organizer/check-in') {
       return location.pathname.startsWith('/organizer/check-in') || location.pathname.includes('/scanner');

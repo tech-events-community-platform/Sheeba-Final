@@ -14,6 +14,8 @@ import {
   ChevronRight,
   ChevronLeft,
   Trash2,
+  CalendarCheck,
+  BarChart3,
 } from 'lucide-react';
 
 export const SponsorLayout: React.FC = () => {
@@ -46,10 +48,16 @@ export const SponsorLayout: React.FC = () => {
       subtitle: 'Marketplace',
     },
     {
-      name: 'Deals & Pledges',
-      path: '/sponsor/deals',
-      icon: HandCoins,
-      subtitle: 'Interested & Pipeline',
+      name: 'My Events',
+      path: '/sponsor/events',
+      icon: CalendarCheck,
+      subtitle: 'Granted Activations & Pipeline',
+    },
+    {
+      name: 'Reports',
+      path: '/sponsor/reports',
+      icon: BarChart3,
+      subtitle: 'Engagement Reports',
     },
     {
       name: 'Brand Deliverables and Contact',

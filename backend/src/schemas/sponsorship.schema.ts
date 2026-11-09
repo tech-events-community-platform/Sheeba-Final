@@ -3,9 +3,12 @@ import { z } from 'zod';
 /**
  * Deal status enum for sponsorship deals pipeline and formal applications
  */
-export const dealStatusEnum = z.enum(['PENDING', 'APPROVED', 'REJECTED', 'INTERESTED', 'DECLINED'], {
-  message: "Status must be 'PENDING', 'APPROVED', 'REJECTED', 'INTERESTED', or 'DECLINED'.",
-});
+export const dealStatusEnum = z.enum(
+  ['INTERESTED', 'DECLINED', 'DEAL_ACCEPTED', 'REJECTED', 'WITHDRAWN', 'PENDING', 'APPROVED'],
+  {
+    message: "Status must be 'INTERESTED', 'DECLINED', 'DEAL_ACCEPTED', 'REJECTED', 'WITHDRAWN', 'PENDING', or 'APPROVED'.",
+  }
+);
 
 export type DealStatusInput = z.infer<typeof dealStatusEnum>;
 
@@ -213,6 +216,43 @@ export const updateDealSchema = z.object({
 export type UpdateDealInput = z.infer<typeof updateDealSchema>;
 
 /**
+/**
+ * Phase 3: Sponsor Questionnaire Schemas
+ */
+export const sponsorQuestionTypeEnum = z.enum([
+  'SHORT_TEXT',
+  'LONG_TEXT',
+  'SINGLE_CHOICE',
+  'MULTIPLE_CHOICE',
+  'RATING',
+]);
+
+export const sponsorQuestionSchema = z.object({
+  id: z.string().trim().min(1).default(() => `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`),
+  question: z.string().trim().min(1, { message: 'Question prompt cannot be empty.' }),
+  type: sponsorQuestionTypeEnum,
+  options: z.array(z.string().trim()).optional().default([]),
+  required: z.boolean().default(false),
+});
+
+export const saveSponsorQuestionnaireSchema = z.object({
+  title: z.string().trim().min(1).optional().default('Attendee Engagement Questionnaire'),
+  questions: z.array(sponsorQuestionSchema).min(1, { message: 'At least one question is required.' }),
+});
+
+export type SaveSponsorQuestionnaireInput = z.infer<typeof saveSponsorQuestionnaireSchema>;
+
+/**
+ * Phase 3: Record Attendee Questionnaire Response Schema
+ */
+export const recordAttendeeResponseSchema = z.object({
+  answers: z.record(z.string(), z.any()),
+  status: z.enum(['COMPLETED', 'DRAFT']).optional().default('COMPLETED'),
+});
+
+export type RecordAttendeeResponseInput = z.infer<typeof recordAttendeeResponseSchema>;
+
+/**
  * Deliverables Schemas (Stage 4)
  */
 export const deliverableStatusEnum = z.enum(['DRAFT', 'SUBMITTED', 'IN_PROGRESS', 'FULFILLED']);
@@ -249,4 +289,3 @@ export const saveDeliverableSchema = z.object({
 });
 
 export type SaveDeliverableInput = z.infer<typeof saveDeliverableSchema>;
-
