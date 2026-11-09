@@ -3,13 +3,14 @@ import { Link, useLocation } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { Event } from '../../types/event';
 import type { BadgeAward } from '../../types/attendance';
-import type { PaymentIssueRecord } from '../../types/admin';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Pagination } from '../../components/ui/Pagination';
 import {
   Award,
   ShieldCheck,
-  CreditCard,
+  Search,
+  Filter,
   AlertTriangle,
 } from 'lucide-react';
 
@@ -17,20 +18,75 @@ export const AdminDashboardPage: React.FC = () => {
   const location = useLocation();
   const [events, setEvents] = useState<Event[]>([]);
   const [badges, setBadges] = useState<BadgeAward[]>([]);
-  const [payments, setPayments] = useState<PaymentIssueRecord[]>([]);
+  const [badgePage, setBadgePage] = useState<number>(1);
+  const [badgeTotalPages, setBadgeTotalPages] = useState<number>(1);
+  const [badgeTotal, setBadgeTotal] = useState<number>(0);
+  const [badgeSearch, setBadgeSearch] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+  const [badgeStatus, setBadgeStatus] = useState<'all' | 'active' | 'revoked'>('all');
+  const [badgesLoading, setBadgesLoading] = useState<boolean>(false);
+  const [activeBadgeCount, setActiveBadgeCount] = useState<number>(0);
+
   const [revokedNotice, setRevokedNotice] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(badgeSearch);
+      setBadgePage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [badgeSearch]);
+
+  const fetchBadges = async (page: number, status: string, search: string) => {
+    setBadgesLoading(true);
+    try {
+      const res = await api.badges.getAllBadgeAwards({
+        page,
+        limit: 15,
+        status,
+        search,
+      });
+      if (res && res.badges && res.pagination) {
+        setBadges(res.badges);
+        setBadgeTotal(res.pagination.total);
+        setBadgeTotalPages(res.pagination.totalPages);
+      } else if (Array.isArray(res)) {
+        setBadges(res);
+        setBadgeTotal(res.length);
+        setBadgeTotalPages(Math.ceil(res.length / 15) || 1);
+      }
+    } catch (err) {
+      console.error('Failed to fetch badges:', err);
+    } finally {
+      setBadgesLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      const evts = await api.events.getAll();
-      const bdgs = await api.badges.getAllBadgeAwards();
-      const pays = await api.admin.getPaymentIssues();
-      setEvents(evts);
-      setBadges(bdgs);
-      setPayments(pays);
+    const fetchInitialData = async () => {
+      try {
+        const [evts, allBadges] = await Promise.all([
+          api.events.getAll(),
+          api.badges.getAllBadgeAwards(),
+        ]);
+        setEvents(evts);
+        if (Array.isArray(allBadges)) {
+          setActiveBadgeCount(allBadges.filter((b) => !b.revokedAt).length);
+        } else if (allBadges && (allBadges as any).badges) {
+          setActiveBadgeCount((allBadges as any).badges.filter((b: any) => !b.revokedAt).length);
+        }
+      } catch (err) {
+        console.error('Initial data fetch error:', err);
+      }
     };
-    fetchData();
+    fetchInitialData();
   }, []);
+
+  useEffect(() => {
+    fetchBadges(badgePage, badgeStatus, debouncedSearch);
+  }, [badgePage, badgeStatus, debouncedSearch]);
 
   useEffect(() => {
     if (location.hash) {
@@ -43,15 +99,33 @@ export const AdminDashboardPage: React.FC = () => {
     }
   }, [location.hash, location.pathname]);
 
-  const handleRevokeBadge = async (badgeId: string) => {
+  const handleRevokeBadge = async (badge: BadgeAward) => {
+    setActionLoadingId(badge.id);
     try {
-      await api.badges.adminRevokeBadge(badgeId);
-      setRevokedNotice(`Badge ${badgeId} was successfully revoked.`);
+      await api.badges.adminRevokeBadge(badge.id);
+      setRevokedNotice(`"${badge.badgeLabel}" badge for ${badge.attendeeName} was successfully revoked.`);
       setTimeout(() => setRevokedNotice(null), 4000);
-      const updated = await api.badges.getAllBadgeAwards();
-      setBadges(updated);
+      setActiveBadgeCount((prev) => Math.max(0, prev - 1));
+      await fetchBadges(badgePage, badgeStatus, debouncedSearch);
     } catch (e: any) {
       alert(e.message || 'Revocation failed.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleGrantBadge = async (badge: BadgeAward) => {
+    setActionLoadingId(badge.id);
+    try {
+      await api.badges.adminReinstateBadge(badge.id);
+      setRevokedNotice(`"${badge.badgeLabel}" badge for ${badge.attendeeName} was successfully granted again.`);
+      setTimeout(() => setRevokedNotice(null), 4000);
+      setActiveBadgeCount((prev) => prev + 1);
+      await fetchBadges(badgePage, badgeStatus, debouncedSearch);
+    } catch (e: any) {
+      alert(e.message || 'Granting badge failed.');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -110,7 +184,7 @@ export const AdminDashboardPage: React.FC = () => {
         <div className="bg-white p-5 rounded-2xl border border-[#E8DDD7] shadow-xs space-y-1">
           <span className="text-[10px] uppercase font-bold text-[#756366]">Active Badge Awards</span>
           <p className="font-serif text-3xl font-extrabold text-[#FFA686]">
-            {badges.filter((b) => !b.revokedAt).length}
+            {activeBadgeCount}
           </p>
           <p className="text-[10px] text-[#756366]">Organizer credential issuances</p>
         </div>
@@ -118,7 +192,7 @@ export const AdminDashboardPage: React.FC = () => {
 
       {/* Badge Revocation Queue (SRS Section 7.3 & 11.1) */}
       <div id="badges" className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E8DDD7] shadow-xs space-y-4 scroll-mt-6">
-        <div className="flex items-center justify-between pb-3 border-b border-[#E8DDD7]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E8DDD7] gap-3">
           <div>
             <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
               <Award className="w-4 h-4 text-[#63474D]" />
@@ -128,9 +202,71 @@ export const AdminDashboardPage: React.FC = () => {
               Organizers request badge revocations directly with admin. Revoking erases credential from public profile immediately.
             </p>
           </div>
-          <Badge variant="primary">{badges.length} Records</Badge>
+          <Badge variant="primary">{badgeTotal} Records</Badge>
         </div>
 
+        {/* Filter Controls: Search and Status Sub-Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+          {/* Sub-tab Filter Pills */}
+          <div className="flex items-center gap-1.5 p-1 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl self-start">
+            <button
+              type="button"
+              onClick={() => {
+                setBadgeStatus('all');
+                setBadgePage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                badgeStatus === 'all'
+                  ? 'bg-white text-[#2D1F23] shadow-xs border border-[#E8DDD7]'
+                  : 'text-[#756366] hover:text-[#2D1F23]'
+              }`}
+            >
+              All Badges
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBadgeStatus('active');
+                setBadgePage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                badgeStatus === 'active'
+                  ? 'bg-emerald-50 text-emerald-800 shadow-xs border border-emerald-200'
+                  : 'text-[#756366] hover:text-[#2D1F23]'
+              }`}
+            >
+              Active Badges
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBadgeStatus('revoked');
+                setBadgePage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                badgeStatus === 'revoked'
+                  ? 'bg-red-50 text-red-800 shadow-xs border border-red-200'
+                  : 'text-[#756366] hover:text-[#2D1F23]'
+              }`}
+            >
+              Revoked Badges
+            </button>
+          </div>
+
+          {/* Backend Search Input */}
+          <div className="relative w-full sm:w-72">
+            <Search className="w-3.5 h-3.5 text-[#756366] absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search attendee, event, or badge..."
+              value={badgeSearch}
+              onChange={(e) => setBadgeSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:bg-white focus:border-[#63474D]"
+            />
+          </div>
+        </div>
+
+        {/* Badges Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
@@ -144,92 +280,78 @@ export const AdminDashboardPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DDD7] text-[#2D1F23]">
-              {badges.map((b) => (
-                <tr key={b.id} className="hover:bg-[#FAF7F5]/50">
-                  <td className="py-3 px-4 font-bold">
-                    <Badge variant="secondary" className="capitalize text-[10px]">
-                      {b.badgeLabel}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-4">
-                    <p className="font-semibold">{b.attendeeName}</p>
-                    <p className="text-[10px] text-[#756366]">{b.attendeeEmail}</p>
-                  </td>
-                  <td className="py-3 px-4 max-w-xs truncate">{b.eventTitle}</td>
-                  <td className="py-3 px-4">{b.issuerName}</td>
-                  <td className="py-3 px-4">
-                    {b.revokedAt ? (
-                      <Badge variant="error">REVOKED</Badge>
-                    ) : (
-                      <Badge variant="success">ACTIVE</Badge>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    {!b.revokedAt ? (
-                      <button
-                        onClick={() => handleRevokeBadge(b.id)}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors"
-                      >
-                        Revoke Badge
-                      </button>
-                    ) : (
-                      <span className="text-[11px] text-[#756366] italic">Revoked</span>
-                    )}
+              {badgesLoading ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-xs text-[#756366]">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-[#63474D] border-t-transparent rounded-full animate-spin" />
+                      <span>Loading badges...</span>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : badges.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-xs text-[#756366]">
+                    No badges found matching your filter.
+                  </td>
+                </tr>
+              ) : (
+                badges.map((b) => (
+                  <tr key={b.id} className="hover:bg-[#FAF7F5]/50 transition-colors">
+                    <td className="py-3 px-4 font-bold">
+                      <Badge variant="secondary" className="capitalize text-[10px]">
+                        {b.badgeLabel}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <p className="font-semibold">{b.attendeeName}</p>
+                      <p className="text-[10px] text-[#756366]">{b.attendeeEmail}</p>
+                    </td>
+                    <td className="py-3 px-4 max-w-xs truncate">{b.eventTitle}</td>
+                    <td className="py-3 px-4">{b.issuerName}</td>
+                    <td className="py-3 px-4">
+                      {b.revokedAt ? (
+                        <Badge variant="error">REVOKED</Badge>
+                      ) : (
+                        <Badge variant="success">ACTIVE</Badge>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      {!b.revokedAt ? (
+                        <button
+                          type="button"
+                          disabled={actionLoadingId === b.id}
+                          onClick={() => handleRevokeBadge(b)}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          {actionLoadingId === b.id ? 'Revoking...' : 'Revoke Badge'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={actionLoadingId === b.id}
+                          onClick={() => handleGrantBadge(b)}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          {actionLoadingId === b.id ? 'Granting...' : 'Grant Badge'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Chapa Payment Settlement & Issues Log (SRS Section 5.2 & 11.1) */}
-      <div id="payments" className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E8DDD7] shadow-xs space-y-4 scroll-mt-6">
-        <div className="flex items-center justify-between pb-3 border-b border-[#E8DDD7]">
-          <div>
-            <h2 className="font-serif font-bold text-base text-[#2D1F23] flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-[#63474D]" />
-              Chapa ETB Payment Issues & Split Fee Logs
-            </h2>
-            <p className="text-xs text-[#756366] mt-0.5">
-              3% Sheba platform commission + Chapa gateway fee deductions.
-            </p>
-          </div>
-          <Badge variant="tertiary">ETB Gateway</Badge>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-[#FAF7F5] border-b border-[#E8DDD7] text-[10px] font-bold uppercase tracking-wider text-[#756366]">
-                <th className="py-3 px-4">Tx ID</th>
-                <th className="py-3 px-4">Event</th>
-                <th className="py-3 px-4">Payer</th>
-                <th className="py-3 px-4">Amount</th>
-                <th className="py-3 px-4">Commission (3%)</th>
-                <th className="py-3 px-4">Org Payout</th>
-                <th className="py-3 px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E8DDD7] text-[#2D1F23]">
-              {payments.map((p) => (
-                <tr key={p.id} className="hover:bg-[#FAF7F5]/50">
-                  <td className="py-3 px-4 font-mono font-bold text-[#63474D]">{p.transactionId}</td>
-                  <td className="py-3 px-4 max-w-xs truncate">{p.eventTitle}</td>
-                  <td className="py-3 px-4 text-[#756366]">{p.attendeeEmail}</td>
-                  <td className="py-3 px-4 font-bold">{p.amount} ETB</td>
-                  <td className="py-3 px-4 text-[#AA767C] font-mono">{p.commissionAmount} ETB</td>
-                  <td className="py-3 px-4 text-[#2A7B5F] font-bold font-mono">{p.organizerPayout} ETB</td>
-                  <td className="py-3 px-4">
-                    <Badge variant={p.status === 'SETTLED' ? 'success' : 'error'}>
-                      {p.status}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* Backend Pagination for Badges */}
+        <Pagination
+          currentPage={badgePage}
+          totalPages={badgeTotalPages}
+          onPageChange={setBadgePage}
+          totalItems={badgeTotal}
+          itemsPerPage={15}
+        />
       </div>
     </div>
   );

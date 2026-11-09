@@ -5,6 +5,7 @@ import { PublicLayout } from '../layouts/PublicLayout';
 import { AttendeeLayout } from '../layouts/AttendeeLayout';
 import { OrganizerLayout } from '../layouts/OrganizerLayout';
 import { AdminLayout } from '../layouts/AdminLayout';
+import { ScannerLayout } from '../layouts/ScannerLayout';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
 // Public Pages
@@ -66,11 +67,14 @@ import { ApplyToSponsorsPage } from '../pages/organizer/ApplyToSponsorsPage';
 import { OrganizerExhibitorsPage } from '../pages/organizer/OrganizerExhibitorsPage';
 
 import { ScannerPage } from '../pages/organizer/ScannerPage';
+import { ScannerPortalPage } from '../pages/scanner/ScannerPortalPage';
 
 // Admin Pages
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { AdminEventsPage } from '../pages/admin/AdminEventsPage';
 import { AdminUsersPage } from '../pages/admin/AdminUsersPage';
+import { AdminModerationPage } from '../pages/admin/AdminModerationPage';
+import { AdminSponsorshipApplicationsPage } from '../pages/admin/AdminSponsorshipApplicationsPage';
 
 // Recycle Bin Pages
 import { OrganizerRecycleBinPage } from '../pages/organizer/OrganizerRecycleBinPage';
@@ -78,6 +82,7 @@ import { AttendeeRecycleBinPage } from '../pages/attendee/AttendeeRecycleBinPage
 import { SponsorRecycleBinPage } from '../pages/sponsor/SponsorRecycleBinPage';
 import { ExhibitorRecycleBinPage } from '../pages/exhibitor/ExhibitorRecycleBinPage';
 import { AdminRecycleBinPage } from '../pages/admin/AdminRecycleBinPage';
+import { AdminAuditLogsPage } from '../pages/admin/AdminAuditLogsPage';
 
 export const router = createBrowserRouter([
   // Public Routes (SRS Section 18)
@@ -182,6 +187,9 @@ export const router = createBrowserRouter([
           { path: 'organizers', element: <AdminUsersPage /> },
           { path: 'reports', element: <AdminDashboardPage /> },
           { path: 'recycle-bin', element: <AdminRecycleBinPage /> },
+          { path: 'audit-logs', element: <AdminAuditLogsPage /> },
+          { path: 'moderation', element: <AdminModerationPage /> },
+          { path: 'sponsorship-applications', element: <AdminSponsorshipApplicationsPage /> },
           { path: 'profile', element: <AccountSettingsPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
           { path: 'change-password', element: <ChangePasswordPage /> },
@@ -225,6 +233,20 @@ export const router = createBrowserRouter([
       { path: 'recycle-bin', element: <ExhibitorRecycleBinPage /> },
       { path: 'settings', element: <ExhibitorSettingsPage /> },
       { path: 'change-password', element: <ChangePasswordPage /> },
+    ],
+  },
+  // Dedicated Gate Scanner Portal Routes (/scanner - Specification v2.1)
+  {
+    path: '/scanner',
+    element: <ProtectedRoute requireScannerAccess={true} />,
+    children: [
+      {
+        element: <ScannerLayout />,
+        children: [
+          { index: true, element: <ScannerPortalPage /> },
+          { path: ':id', element: <ScannerPortalPage /> },
+        ],
+      },
     ],
   },
   // Fallback redirect

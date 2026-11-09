@@ -12,6 +12,7 @@ import {
   Home,
   ArrowLeft,
   LogIn,
+  QrCode,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -109,6 +110,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAttendeeDrawer: _onOpenAtt
               </>
             )}
 
+            {isAuthenticated && user?.hasActiveScannerEvents && (
+              <Link
+                to="/scanner"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  isActive('/scanner')
+                    ? 'bg-[#63474D] text-white shadow-xs'
+                    : 'bg-[#FAF7F5] text-[#63474D] hover:bg-[#63474D] hover:text-white border border-[#E8DDD7]'
+                }`}
+                title="Scanner Gate Portal"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>Scanner Portal</span>
+              </Link>
+            )}
+
             {isAuthenticated && role === 'ADMIN' && (
               <Link
                 to="/admin"
@@ -198,6 +214,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAttendeeDrawer: _onOpenAtt
       {isMobileMenuOpen && (
         <div className="pointer-events-auto md:hidden mt-2 mx-auto max-w-lg w-full rounded-3xl border border-[#E8DDD7] bg-[#FAF7F5]/98 backdrop-blur-xl px-5 pt-4 pb-6 space-y-3 animate-fade-in shadow-2xl">
           <nav className="flex flex-col space-y-1">
+            {isAuthenticated && user?.hasActiveScannerEvents && (
+              <Link
+                to="/scanner"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                  isActive('/scanner')
+                    ? 'bg-[#63474D] text-white'
+                    : 'text-[#63474D] bg-[#E8DDD7]/40 hover:bg-[#63474D] hover:text-white'
+                }`}
+              >
+                <QrCode className="w-4 h-4" />
+                <span>Scanner Portal</span>
+              </Link>
+            )}
+
             {!isAuthenticated ? (
               <>
                 <button

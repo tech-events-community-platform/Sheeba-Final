@@ -120,6 +120,10 @@ export interface IEvent {
   poster_image_url?: string | null;
   requires_approval?: boolean;
   is_publicized?: boolean;
+  is_publicity_moderated?: boolean;
+  publicity_takedown_reason?: string | null;
+  publicity_moderated_at?: Date | string | null;
+  publicity_moderated_by?: string | null;
   created_at: Date;
   updated_at: Date;
   // Computed / Joined fields
@@ -399,15 +403,36 @@ export interface ISponsorshipApplication {
   socials?: Record<string, string>;
   affiliations?: IApplicationAffiliations;
   status: SponsorshipApplicationStatus;
+  is_taken_down?: boolean;
+  takedown_reason?: string | null;
+  taken_down_at?: Date | string | null;
+  taken_down_by?: string | null;
   created_at: Date;
   updated_at: Date;
   // Joined fields
   organizer_name?: string;
   organizer_organization?: string;
   organizer_avatar?: string;
+  organizer_email?: string;
+  organizer_phone?: string;
   interested_sponsors_count?: number;
 }
 
+export interface IContentModerationLog {
+  id: string;
+  content_type: 'publicized_event' | 'sponsorship_pitch';
+  content_id: string;
+  action: 'takedown' | 'restore';
+  reason: string;
+  performed_by: string;
+  performer_name?: string;
+  performer_email?: string;
+  content_title?: string;
+  metadata?: Record<string, any>;
+  created_at: Date | string;
+}
+
+export type SponsorshipDealStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'INTERESTED' | 'DECLINED';
 export type SponsorshipDealStatus =
   | 'INTERESTED'
   | 'DECLINED'

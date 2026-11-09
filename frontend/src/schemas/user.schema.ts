@@ -25,6 +25,15 @@ export type AttendeeProfileFormData = z.infer<typeof attendeeProfileFormSchema>;
 export const organizerProfileFormSchema = z.object({
   name: z.string().trim().min(1, { message: 'Name cannot be empty.' }),
   organization: z.string().optional(),
+  applicantType: z.string().optional(),
+  organizationType: z.string().optional(),
+  applicantPosition: z.string().optional(),
+  phone: z.string().optional(),
+  bio: z.string().optional(),
+  organizationDescription: z.string().optional(),
+  organizationWebsite: z.string().optional(),
+  organizationLogo: z.string().optional(),
+  socials: z.record(z.string(), z.string()).optional(),
 });
 
 export type OrganizerProfileFormData = z.infer<typeof organizerProfileFormSchema>;

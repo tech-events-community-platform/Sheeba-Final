@@ -30,11 +30,41 @@ import {
   EyeOff,
 } from 'lucide-react';
 
+// Helper to guarantee redirect target is a safe internal relative path and prevent open redirects
+function getSafeRedirectUrl(target: string | null | undefined): string | null {
+  if (!target || typeof target !== 'string') return null;
+  const trimmed = target.trim();
+  // Must be an internal path starting with a single '/' and not '//' or '/\'
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/\\')) {
+    try {
+      const dummyUrl = new URL(trimmed, 'http://localhost');
+      return dummyUrl.pathname + dummyUrl.search + dummyUrl.hash;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const redirectTarget = searchParams.get('redirect');
+
+  // Extract raw redirect from query parameter, router location state, or scanner role flag
+  const fromState = (location.state as any)?.from;
+  const statePath = typeof fromState === 'string'
+    ? fromState
+    : fromState?.pathname
+    ? `${fromState.pathname}${fromState.search || ''}`
+    : null;
+
+  const rawRedirect =
+    searchParams.get('redirect') ||
+    statePath ||
+    (searchParams.get('role') === 'scanner' ? '/scanner' : null);
+
+  const redirectTarget = getSafeRedirectUrl(rawRedirect);
   const isRegisterRoute = location.pathname === '/register';
   const initialMode = (searchParams.get('mode') === 'signup' || isRegisterRoute) ? 'signup' : 'login';
   const initialRole = (searchParams.get('role')?.toUpperCase() === 'ORGANIZER' || searchParams.get('portal') === 'organizer') ? 'ORGANIZER' : 'ATTENDEE';
@@ -67,6 +97,9 @@ export const LoginPage: React.FC = () => {
       setLoginRole('ORGANIZER');
     }
 
+    if ((location.state as any)?.error) {
+      setErrorMsg((location.state as any).error);
+    }
     if ((location.state as any)?.successMessage) {
       setSuccessMsg((location.state as any).successMessage);
       // Clean up history state so message isn't sticky on manual reload

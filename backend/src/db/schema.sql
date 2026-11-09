@@ -607,3 +607,89 @@ CREATE INDEX IF NOT EXISTS idx_sponsorship_deliverables_deal_id ON sponsorship_d
 CREATE INDEX IF NOT EXISTS idx_sponsorship_deliverables_sponsor_id ON sponsorship_deliverables(sponsor_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_deal_deliverable ON sponsorship_deliverables (deal_id) WHERE deal_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_sponsor_default_deliverable ON sponsorship_deliverables (sponsor_id) WHERE deal_id IS NULL;
+
+-- =========================================================================
+-- Stage 5: Event Gate Delegation & Scanner Staff Management (Specification v2.1)
+-- =========================================================================
+
+-- 1. Opt-in scanner requirement flag on events
+ALTER TABLE events ADD COLUMN IF NOT EXISTS requires_scanners BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- 2. Event-specific scanner assignments table
+CREATE TABLE IF NOT EXISTS event_scanners (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    scanner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    assigned_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Fast lookup index for active gate verification
+CREATE INDEX IF NOT EXISTS idx_event_scanners_active_lookup 
+ON event_scanners(event_id, scanner_user_id) 
+WHERE is_active = TRUE;
+
+-- Fast index for user active assignments count (powers the navbar Scanner Portal link)
+CREATE INDEX IF NOT EXISTS idx_event_scanners_user_active 
+ON event_scanners(scanner_user_id) 
+WHERE is_active = TRUE;
+
+-- =========================================================================
+-- CONTENT MODERATION SYSTEM (Publicized Events & Organizer Sponsorship Pitches)
+-- =========================================================================
+
+-- 1. Event Public Discovery Moderation Fields
+ALTER TABLE events ADD COLUMN IF NOT EXISTS is_publicity_moderated BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS publicity_takedown_reason TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS publicity_moderated_at TIMESTAMPTZ;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS publicity_moderated_by UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_events_publicity_moderated ON events(is_publicity_moderated) WHERE is_publicity_moderated = TRUE;
+
+-- 2. Sponsorship Pitch Moderation Fields
+ALTER TABLE sponsorship_applications ADD COLUMN IF NOT EXISTS is_taken_down BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE sponsorship_applications ADD COLUMN IF NOT EXISTS takedown_reason TEXT;
+ALTER TABLE sponsorship_applications ADD COLUMN IF NOT EXISTS taken_down_at TIMESTAMPTZ;
+ALTER TABLE sponsorship_applications ADD COLUMN IF NOT EXISTS taken_down_by UUID REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_sponsorship_applications_taken_down ON sponsorship_applications(is_taken_down) WHERE is_taken_down = TRUE;
+
+-- 3. Dedicated Immutable Content Moderation Logs Table
+CREATE TABLE IF NOT EXISTS content_moderation_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    content_type VARCHAR(50) NOT NULL, -- 'publicized_event' | 'sponsorship_pitch'
+    content_id UUID NOT NULL,
+    action VARCHAR(50) NOT NULL,       -- 'takedown' | 'restore'
+    reason TEXT NOT NULL,
+    performed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    content_title VARCHAR(255),
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_content_moderation_logs_content ON content_moderation_logs(content_type, content_id);
+CREATE INDEX IF NOT EXISTS idx_content_moderation_logs_created_at ON content_moderation_logs(created_at);
+
+-- 4. Central Immutable System Audit Logs Table
+CREATE TABLE IF NOT EXISTS system_audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    action VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    entity_id VARCHAR(255) NOT NULL,
+    entity_title VARCHAR(255),
+    performed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    performed_by_name VARCHAR(255),
+    performed_by_email VARCHAR(255),
+    performed_by_role VARCHAR(50),
+    details TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_system_audit_logs_created_at ON system_audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_system_audit_logs_category ON system_audit_logs(category);
+CREATE INDEX IF NOT EXISTS idx_system_audit_logs_action ON system_audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_system_audit_logs_entity ON system_audit_logs(entity_type, entity_id);
+
+
+

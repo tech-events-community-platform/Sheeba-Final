@@ -57,4 +57,21 @@ router.post(
   BadgeController.revokeBadge
 );
 
+// Admin Grant / Reinstate Badge
+router.post(
+  '/:id/reinstate',
+  authenticate,
+  authorizeRoles('admin'),
+  validateParams(idParamSchema),
+  BadgeController.reinstateBadge
+);
+
+router.post(
+  '/:id/grant',
+  authenticate,
+  authorizeRoles('admin'),
+  validateParams(idParamSchema),
+  BadgeController.reinstateBadge
+);
+
 export default router;

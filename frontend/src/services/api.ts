@@ -1101,6 +1101,8 @@ export const api = {
             ticketPrice: Number(data.ticketPrice) || 0,
             currency: 'ETB',
             requiresApproval: Boolean(data.requiresApproval),
+            requiresScanners: Boolean(data.requiresScanners),
+            scannerEmails: data.scannerEmails || [],
             customQuestions: data.customQuestions || [],
             includeDefaultQuestions: data.includeDefaultQuestions !== undefined ? data.includeDefaultQuestions : true,
             bannerUrl: data.bannerUrl,
@@ -1570,6 +1572,48 @@ export const api = {
     return this.checkIn;
   },
 
+  // Gate Delegation & Scanner Staff (Specification v2.1)
+  scanners: {
+    getEventScanners: async (eventId: string) => {
+      const res = await requestApi(`/events/${eventId}/scanners`);
+      return res.data;
+    },
+    assignScanners: async (eventId: string, emails: string[]) => {
+      const res = await requestApi(`/events/${eventId}/scanners`, {
+        method: 'POST',
+        body: JSON.stringify({ emails }),
+      });
+      return res.data;
+    },
+    toggleScanners: async (eventId: string, enabled: boolean) => {
+      const res = await requestApi(`/events/${eventId}/scanners/toggle`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled }),
+      });
+      return res.data;
+    },
+    removeScanner: async (eventId: string, scannerId: string) => {
+      const res = await requestApi(`/events/${eventId}/scanners/${scannerId}`, {
+        method: 'DELETE',
+      });
+      return res.data;
+    },
+    resendInvite: async (eventId: string, scannerId: string) => {
+      const res = await requestApi(`/events/${eventId}/scanners/${scannerId}/resend`, {
+        method: 'POST',
+      });
+      return res.data;
+    },
+    getMyAssignedEvents: async () => {
+      const res = await requestApi('/scanner/my-events');
+      return res.data;
+    },
+    getScannerEventAttendance: async (eventId: string) => {
+      const res = await requestApi(`/scanner/events/${eventId}/attendance`);
+      return res.data;
+    },
+  },
+
   // Badge Awards (Section 6 & 7)
   badges: {
     getAttendedHolders: async (eventId: string): Promise<AttendeeRosterItem[]> => {
@@ -1692,10 +1736,22 @@ export const api = {
       return badgeAwardsStore.filter((b) => b.attendeeId === attendeeId && !b.revokedAt);
     },
 
-    getAllBadgeAwards: async (): Promise<BadgeAward[]> => {
+    getAllBadgeAwards: async (params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+    }): Promise<any> => {
       try {
-        const res = await requestApi('/badges');
-        if (res.data && Array.isArray(res.data)) return res.data;
+        const queryParts: string[] = [];
+        if (params?.page) queryParts.push(`page=${params.page}`);
+        if (params?.limit) queryParts.push(`limit=${params.limit}`);
+        if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+        if (params?.status && params.status !== 'all') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+        const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+
+        const res = await requestApi(`/badges${queryStr}`);
+        if (res.data) return res.data;
       } catch {
         // fallback
       }
@@ -1720,6 +1776,20 @@ export const api = {
         const award = badgeAwardsStore.find((b) => b.id === badgeId);
         if (award) {
           award.revokedAt = new Date().toISOString();
+          return true;
+        }
+        return false;
+      }
+    },
+
+    adminReinstateBadge: async (badgeId: string): Promise<boolean> => {
+      try {
+        await requestApi(`/badges/${badgeId}/reinstate`, { method: 'POST' });
+        return true;
+      } catch {
+        const award = badgeAwardsStore.find((b) => b.id === badgeId);
+        if (award) {
+          award.revokedAt = null;
           return true;
         }
         return false;
@@ -2099,6 +2169,32 @@ export const api = {
         if (data.visibility !== undefined) payload.visibility = data.visibility;
         if (data.organization !== undefined) payload.organization = data.organization;
         if (data.avatarUrl !== undefined) payload.avatar_url = data.avatarUrl;
+        if ((data as any).avatar_url !== undefined) payload.avatar_url = (data as any).avatar_url;
+        if ((data as any).applicantType !== undefined) payload.applicant_type = (data as any).applicantType;
+        if ((data as any).applicant_type !== undefined) payload.applicant_type = (data as any).applicant_type;
+        if ((data as any).organizationType !== undefined) payload.organization_type = (data as any).organizationType;
+        if ((data as any).organization_type !== undefined) payload.organization_type = (data as any).organization_type;
+        if ((data as any).applicantPosition !== undefined) payload.applicant_position = (data as any).applicantPosition;
+        if ((data as any).applicant_position !== undefined) payload.applicant_position = (data as any).applicant_position;
+        if ((data as any).organizationDescription !== undefined) payload.organization_description = (data as any).organizationDescription;
+        if ((data as any).organization_description !== undefined) payload.organization_description = (data as any).organization_description;
+        if ((data as any).organizationWebsite !== undefined) payload.organization_website = (data as any).organizationWebsite;
+        if ((data as any).organization_website !== undefined) payload.organization_website = (data as any).organization_website;
+        if ((data as any).organizationLogo !== undefined) payload.organization_logo = (data as any).organizationLogo;
+        if ((data as any).organization_logo !== undefined) payload.organization_logo = (data as any).organization_logo;
+        if ((data as any).organizerBio !== undefined) payload.organizer_bio = (data as any).organizerBio;
+        if ((data as any).organizer_bio !== undefined) payload.organizer_bio = (data as any).organizer_bio;
+        if ((data as any).organizerSocials !== undefined) payload.organizer_socials = (data as any).organizerSocials;
+        if ((data as any).organizer_socials !== undefined) payload.organizer_socials = (data as any).organizer_socials;
+        if ((data as any).socials !== undefined) payload.organizer_socials = (data as any).socials;
+        if ((data as any).companyName !== undefined) payload.company_name = (data as any).companyName;
+        if ((data as any).company_name !== undefined) payload.company_name = (data as any).company_name;
+        if ((data as any).industryCategory !== undefined) payload.industry_category = (data as any).industryCategory;
+        if ((data as any).industry_category !== undefined) payload.industry_category = (data as any).industry_category;
+        if ((data as any).companyPhone !== undefined) payload.company_phone = (data as any).companyPhone;
+        if ((data as any).company_phone !== undefined) payload.company_phone = (data as any).company_phone;
+        if ((data as any).companyWebsite !== undefined) payload.company_website = (data as any).companyWebsite;
+        if ((data as any).company_website !== undefined) payload.company_website = (data as any).company_website;
 
         const res = await requestApi('/users/me', {
           method: 'PATCH',
@@ -2209,8 +2305,21 @@ export const api = {
       return res.data;
     },
 
-    getUsers: async () => {
-      const res = await requestApi('/admin/users');
+    getUsers: async (params?: {
+      role?: 'organizer' | 'sponsor' | 'attendee';
+      status?: 'pending' | 'approved' | 'rejected' | 'all';
+      search?: string;
+      page?: number;
+      limit?: number;
+    }) => {
+      const queryParts: string[] = [];
+      if (params?.role) queryParts.push(`role=${encodeURIComponent(params.role)}`);
+      if (params?.status && params.status !== 'all') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+      if (params?.search && params.search.trim()) queryParts.push(`search=${encodeURIComponent(params.search.trim())}`);
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/admin/users${queryStr}`);
       return res.data;
     },
 
@@ -2305,6 +2414,111 @@ export const api = {
       }
     },
 
+    // Content Moderation (Publicized Events & Organizer Sponsorship Pitches)
+    getPublicizedEventsForModeration: async (params?: { search?: string; status?: string; page?: number; limit?: number }) => {
+      const queryParts: string[] = [];
+      if (params?.status && params.status !== 'ALL') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/admin/moderation/events${queryStr}`);
+      return res.data || { events: [], total: 0, page: 1, totalPages: 1 };
+    },
+
+    takedownEventPublicity: async (eventId: string, reason: string) => {
+      const res = await requestApi(`/admin/moderation/events/${eventId}/takedown`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    restoreEventPublicity: async (eventId: string, reason?: string) => {
+      const res = await requestApi(`/admin/moderation/events/${eventId}/restore`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    getOrganizerPitchesForModeration: async (params?: { search?: string; status?: string; page?: number; limit?: number }) => {
+      const queryParts: string[] = [];
+      if (params?.status && params.status !== 'ALL') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/admin/moderation/pitches${queryStr}`);
+      return res.data || { pitches: [], total: 0, page: 1, totalPages: 1 };
+    },
+
+    takedownOrganizerPitch: async (pitchId: string, reason: string) => {
+      const res = await requestApi(`/admin/moderation/pitches/${pitchId}/takedown`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    restoreOrganizerPitch: async (pitchId: string, reason?: string) => {
+      const res = await requestApi(`/admin/moderation/pitches/${pitchId}/restore`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    getContentModerationHistory: async (params?: { contentType?: string; contentId?: string; limit?: number }) => {
+      const queryParts: string[] = [];
+      if (params?.contentType) queryParts.push(`contentType=${encodeURIComponent(params.contentType)}`);
+      if (params?.contentId) queryParts.push(`contentId=${encodeURIComponent(params.contentId)}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/admin/moderation/history${queryStr}`);
+      return res.data || [];
+    },
+
+    getAuditLogs: async (params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      category?: string;
+      action?: string;
+    }): Promise<{
+      logs: Array<{
+        id: string;
+        action: string;
+        category: string;
+        entityType: string;
+        entityId: string;
+        entityTitle?: string;
+        performedBy?: string;
+        performedByName: string;
+        performedByEmail?: string;
+        performedByRole?: string;
+        details?: string;
+        metadata: Record<string, any>;
+        createdAt: string;
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+      categoryCounts: Record<string, number>;
+    }> => {
+      const queryParts: string[] = [];
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+      if (params?.category && params.category !== 'ALL') queryParts.push(`category=${encodeURIComponent(params.category)}`);
+      if (params?.action && params.action !== 'ALL') queryParts.push(`action=${encodeURIComponent(params.action)}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi<{ success: boolean; data: any }>(`/admin/audit-logs${queryStr}`);
+      return res.data || { logs: [], pagination: { page: 1, limit: 15, total: 0, totalPages: 1 }, categoryCounts: { ALL: 0 } };
+    },
     getSponsorshipPitches: async () => {
       const res = await requestApi('/admin/sponsorship-pitches', { skipCache: true });
       return res.data || [];
@@ -2623,6 +2837,23 @@ export const api = {
       company_website?: string;
       avatarUrl?: string;
       visibility?: 'public' | 'private';
+      applicantType?: string;
+      applicant_type?: string;
+      organizationType?: string;
+      organization_type?: string;
+      applicantPosition?: string;
+      applicant_position?: string;
+      organizationDescription?: string;
+      organization_description?: string;
+      organizationWebsite?: string;
+      organization_website?: string;
+      organizationLogo?: string;
+      organization_logo?: string;
+      organizerBio?: string;
+      organizer_bio?: string;
+      organizerSocials?: any;
+      organizer_socials?: any;
+      socials?: any;
     }): Promise<User> => {
       const res = await requestApi<{ success: boolean; data: User }>('/users/me', {
         method: 'PATCH',

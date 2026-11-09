@@ -4,6 +4,7 @@ import { IExhibitorCall, IEventVendor, ExhibitorPricingMode, RegistrationQuestio
 import { PaymentService } from './payment.service';
 import { CacheService } from './cache.service';
 import { RecycleBinService } from './recycleBin.service';
+import { AuditService } from './audit.service';
 
 
 export class ExhibitorService {
@@ -670,6 +671,19 @@ export class ExhibitorService {
 
       await client.query('COMMIT');
 
+      if (targetStatus && targetStatus !== current.status) {
+        await AuditService.logAction({
+          action: `EXHIBITOR_APPLICATION_${targetStatus.toUpperCase()}`,
+          category: 'ORGANIZER_SPONSOR',
+          entityType: 'event_vendor',
+          entityId: vendorId,
+          entityTitle: current.business_name,
+          performedBy: organizerId,
+          details: `Booth application status changed from "${current.status}" to "${targetStatus}" for "${current.business_name}"`,
+          metadata: { eventId, vendorId, oldStatus: current.status, newStatus: targetStatus },
+        });
+      }
+
       await CacheService.delPattern(`exhibitors:public:${eventId}*`);
       await CacheService.delPattern(`event:${eventId}*`);
       await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
@@ -1140,6 +1154,19 @@ export class ExhibitorService {
 
       await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
       await CacheService.delPattern(`*http:*user:${userId}*`);
+
+      await AuditService.logAction({
+        action: 'EXHIBITOR_APPLICATION_SUBMITTED',
+        category: 'ORGANIZER_SPONSOR',
+        entityType: 'event_vendor',
+        entityId: res.rows[0].id,
+        entityTitle: data.businessName,
+        performedBy: userId,
+        performedByName: data.contactName,
+        performedByEmail: data.contactEmail,
+        details: `Exhibitor booth application submitted for "${call.event_title}" (${data.spaceSqm} sqm)`,
+        metadata: { eventId, businessName: data.businessName, spaceSqm: data.spaceSqm },
+      });
 
       return this.mapVendorRow(res.rows[0]);
     } catch (error: any) {
@@ -2085,6 +2112,17 @@ export class ExhibitorService {
 
       await client.query('COMMIT');
 
+      await AuditService.logAction({
+        action: 'PAYMENT_SETTLED',
+        category: 'PAYMENTS',
+        entityType: 'payment',
+        entityId: payment.id,
+        entityTitle: `Booth Payment: ${vendor.business_name}`,
+        performedBy: organizerId,
+        details: `Offline booth receipt verified and marked SETTLED for ${vendor.business_name}`,
+        metadata: { eventId, vendorId, amount: payment.amount },
+      });
+
       await CacheService.delPattern(`exhibitors:public:${eventId}*`);
       await CacheService.delPattern(`event:${eventId}*`);
       await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
@@ -2206,6 +2244,17 @@ export class ExhibitorService {
 
       // Vendor remains accepted_awaiting_payment, unpaid.
       await client.query('COMMIT');
+
+      await AuditService.logAction({
+        action: 'PAYMENT_RECEIPT_REJECTED',
+        category: 'PAYMENTS',
+        entityType: 'payment',
+        entityId: payment.id,
+        entityTitle: `Booth Payment: ${vendor.business_name}`,
+        performedBy: organizerId,
+        details: `Offline booth payment receipt rejected. Reason: ${reason?.trim() || 'Invalid transaction receipt'}`,
+        metadata: { eventId, vendorId, reason: reason?.trim() },
+      });
 
       await CacheService.delPattern(`exhibitors:public:${eventId}*`);
       await CacheService.delPattern(`event:${eventId}*`);

@@ -36,7 +36,10 @@ import {
   DollarSign,
   ChevronDown,
   ChevronUp,
+  Upload,
+  Loader2,
 } from 'lucide-react';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 
 const INDUSTRY_OPTIONS = [
   'Fintech & Financial Services',
@@ -83,6 +86,35 @@ export const SponsorAuthPage: React.FC = () => {
   // Stage 1: Extended Company & Preference Fields
   const [companyDescription, setCompanyDescription] = useState('');
   const [companyLogo, setCompanyLogo] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setLogoUploadError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setLogoUploadError(null);
+    try {
+      const url = await uploadToCloudinary(file, { folder: 'sheeba_sponsor_logos' });
+      setCompanyLogo(url);
+    } catch (err: any) {
+      setLogoUploadError(err.message || 'Failed to upload company logo.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
   const [sponsorshipObjectives, setSponsorshipObjectives] = useState<string[]>([]);
   const [targetAudience, setTargetAudience] = useState<string[]>([]);
   const [preferredEventCategories, setPreferredEventCategories] = useState<string[]>([]);
@@ -504,21 +536,55 @@ export const SponsorAuthPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Company Logo URL */}
+                      {/* Company Logo Upload (via Cloudinary) */}
                       <div>
                         <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                          Company Logo URL <span className="text-gray-400 font-normal">(Recommended)</span>
+                          Company Logo <span className="text-gray-400 font-normal">(Optional - PNG, JPG, WebP up to 5MB)</span>
                         </label>
-                        <div className="relative">
-                          <Globe className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-                          <input
-                            type="url"
-                            value={companyLogo}
-                            onChange={(e) => setCompanyLogo(e.target.value)}
-                            placeholder="https://.../logo.png"
-                            className="w-full pl-9 pr-3 py-2 text-xs bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl focus:outline-none focus:border-[#63474D] focus:bg-white text-[#2D1F23]"
-                          />
-                        </div>
+                        {companyLogo ? (
+                          <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                            <img
+                              src={companyLogo}
+                              alt="Company Logo"
+                              className="w-10 h-10 rounded-xl object-contain bg-white border border-[#E8DDD7] p-0.5"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-[#2D1F23] flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                                <span>Logo uploaded</span>
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setCompanyLogo('')}
+                              className="p-1 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
+                              title="Remove logo"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex items-center justify-center gap-2 p-2.5 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
+                            {isUploadingLogo ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
+                            ) : (
+                              <Upload className="w-4 h-4 text-[#756366]" />
+                            )}
+                            <span className="text-xs font-medium text-[#756366]">
+                              {isUploadingLogo ? 'Uploading logo...' : 'Click to upload company logo'}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/jpg,image/webp"
+                              className="hidden"
+                              disabled={isUploadingLogo}
+                              onChange={handleLogoUpload}
+                            />
+                          </label>
+                        )}
+                        {logoUploadError && (
+                          <p className="text-[11px] text-red-600 mt-1">{logoUploadError}</p>
+                        )}
                       </div>
                     </div>
 
@@ -839,11 +905,11 @@ export const SponsorAuthPage: React.FC = () => {
                 fullWidth
                 size="md"
                 variant="primary"
-                disabled={isLoading}
+                disabled={isLoading || isUploadingLogo}
                 className="mt-2 font-bold py-3 shadow-md"
               >
-                {isLoading ? (
-                  <span>Processing...</span>
+                {isLoading || isUploadingLogo ? (
+                  <span>{isUploadingLogo ? 'Uploading Logo...' : 'Processing...'}</span>
                 ) : authMode === 'login' ? (
                   <span>Sign In to Sponsor Dashboard</span>
                 ) : (

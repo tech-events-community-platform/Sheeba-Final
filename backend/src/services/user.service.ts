@@ -2,6 +2,7 @@ import { query } from '../config/db';
 import { AuthService } from './auth.service';
 import { BadgeService } from './badge.service';
 import { RecycleBinService } from './recycleBin.service';
+import { AuditService } from './audit.service';
 
 export class UserService {
   static async getUserProfile(userId: string) {
@@ -69,11 +70,19 @@ export class UserService {
       bio?: string;
       organization?: string;
       visibility?: 'public' | 'private';
-      avatar_url?: string;
+      avatar_url?: string | null;
       company_name?: string | null;
       industry_category?: string | null;
       company_phone?: string | null;
       company_website?: string | null;
+      applicant_type?: string | null;
+      organization_type?: string | null;
+      applicant_position?: string | null;
+      organization_description?: string | null;
+      organization_website?: string | null;
+      organization_logo?: string | null;
+      organizer_bio?: string | null;
+      organizer_socials?: Record<string, string> | null;
     }
   ) {
     const fields: string[] = [];
@@ -116,9 +125,51 @@ export class UserService {
       fields.push(`visibility = $${counter++}`);
       values.push(data.visibility);
     }
+    if (data.applicant_type !== undefined) {
+      fields.push(`applicant_type = $${counter++}`);
+      values.push(data.applicant_type);
+    }
+    if (data.organization_type !== undefined) {
+      fields.push(`organization_type = $${counter++}`);
+      values.push(data.organization_type);
+    }
+    if (data.applicant_position !== undefined) {
+      fields.push(`applicant_position = $${counter++}`);
+      values.push(data.applicant_position);
+    }
+    if (data.organization_description !== undefined) {
+      fields.push(`organization_description = $${counter++}`);
+      values.push(data.organization_description);
+    }
+    if (data.organization_website !== undefined) {
+      fields.push(`organization_website = $${counter++}`);
+      values.push(data.organization_website);
+    }
+    if (data.organization_logo !== undefined) {
+      const cleanLogo = data.organization_logo && data.organization_logo.trim() ? data.organization_logo.trim() : null;
+      fields.push(`organization_logo = $${counter++}`);
+      values.push(cleanLogo);
+      if (data.avatar_url === undefined) {
+        fields.push(`avatar_url = $${counter++}`);
+        values.push(cleanLogo);
+      }
+    }
     if (data.avatar_url !== undefined) {
+      const cleanAvatar = data.avatar_url && data.avatar_url.trim() ? data.avatar_url.trim() : null;
       fields.push(`avatar_url = $${counter++}`);
-      values.push(data.avatar_url);
+      values.push(cleanAvatar);
+    }
+    if (data.organizer_bio !== undefined) {
+      fields.push(`organizer_bio = $${counter++}`);
+      values.push(data.organizer_bio);
+      if (data.bio === undefined && data.organizer_bio) {
+        fields.push(`bio = $${counter++}`);
+        values.push(data.organizer_bio);
+      }
+    }
+    if (data.organizer_socials !== undefined) {
+      fields.push(`organizer_socials = $${counter++}`);
+      values.push(typeof data.organizer_socials === 'object' ? JSON.stringify(data.organizer_socials) : data.organizer_socials);
     }
 
     if (fields.length === 0) {
@@ -132,7 +183,7 @@ export class UserService {
       UPDATE users
       SET ${fields.join(', ')}
       WHERE id = $${counter}
-      RETURNING id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, created_at, updated_at
+      RETURNING id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, sponsor_preferences, created_at, updated_at
     `;
 
     const result = await query(queryText, values);
@@ -143,8 +194,38 @@ export class UserService {
       throw err;
     }
 
+    const rawUser = result.rows[0];
     const stats = await AuthService.computeUserStats(userId);
-    return AuthService.formatUserResponse(result.rows[0], stats);
+    const formatted = AuthService.formatUserResponse(rawUser, stats);
+
+    // Audit log profile update
+    const isOrg = rawUser.is_organizer || rawUser.role?.toLowerCase() === 'organizer';
+    const isSpn = rawUser.role?.toLowerCase() === 'sponsor';
+    if (isOrg || isSpn) {
+      await AuditService.logAction({
+        action: isOrg ? 'ORGANIZER_PROFILE_UPDATED' : 'SPONSOR_PROFILE_UPDATED',
+        category: 'ORGANIZER_SPONSOR',
+        entityType: 'user',
+        entityId: rawUser.id,
+        entityTitle: rawUser.organization || rawUser.company_name || rawUser.full_name,
+        performedBy: rawUser.id,
+        performedByName: rawUser.full_name,
+        performedByEmail: rawUser.email,
+        performedByRole: rawUser.role,
+        details: isOrg
+          ? `Organizer profile & onboarding info updated by ${rawUser.full_name}`
+          : `Sponsor profile updated by ${rawUser.full_name}`,
+        metadata: {
+          organization: rawUser.organization,
+          companyName: rawUser.company_name,
+          applicantType: rawUser.applicant_type,
+          organizationType: rawUser.organization_type,
+          industryCategory: rawUser.industry_category,
+        },
+      });
+    }
+
+    return formatted;
   }
 
   static async updateVisibility(userId: string, visibility: 'public' | 'private') {
