@@ -18,17 +18,17 @@ const TRUSTED_SLIDES: SlideItem[] = [
   },
   {
     id: 'tech-ai-summit',
-    posterUrl: '/trusted-demo-1.webp',
-    title: 'National Tech & AI Summit (Hosted by Ethiopian Innovation Hub)',
+    posterUrl: '/mint.png',
+    title: 'MINT’s 50 year milestone',
     description:
-      'Admitted over 3,500 attendees and developers with seamless sub-second door check-ins and verified participation badges.',
+      'celebration of MINT’s 50 year milestone.',
   },
   {
     id: 'fintech-forum',
-    posterUrl: '/trusted-demo-2.webp',
-    title: 'Addis Business & FinTech Forum (Hosted by FinTech Leaders)',
+    posterUrl: '/hackathon.png',
+    title: 'IS Hub × Vision Vertex',
     description:
-      'Enterprise exhibition showcases and turnout analytics trusted by leading financial and corporate institutions.',
+      'A hackathon bringing university students together to design and build innovative agentic AI solutions.',
   },
 ];
 
@@ -166,11 +166,10 @@ export const StrideMilestoneCard: React.FC<StrideMilestoneCardProps> = ({
               type="button"
               onClick={() => setCurrentIndex(idx)}
               aria-label={`Go to slide ${idx + 1}`}
-              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                currentIndex === idx
-                  ? 'w-7 bg-white'
-                  : 'w-2 bg-white/40 hover:bg-white/70'
-              }`}
+              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${currentIndex === idx
+                ? 'w-7 bg-white'
+                : 'w-2 bg-white/40 hover:bg-white/70'
+                }`}
             />
           ))}
         </div>

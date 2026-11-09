@@ -32,15 +32,7 @@ export class UserController {
   static async updateProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.userId;
-      const { full_name, phone, bio, organization, visibility, avatar_url } = req.body;
-      const updatedUser = await UserService.updateUserProfile(userId, {
-        full_name,
-        phone,
-        bio,
-        organization,
-        visibility,
-        avatar_url,
-      });
+      const updatedUser = await UserService.updateUserProfile(userId, req.body);
 
       return sendSuccess(res, updatedUser, 'Profile updated successfully.');
     } catch (error) {

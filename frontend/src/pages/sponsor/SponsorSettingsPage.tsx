@@ -22,8 +22,22 @@ import {
   FileText,
   Upload,
   Loader2,
+  Users,
 } from 'lucide-react';
 import { uploadToCloudinary } from '../../utils/cloudinary';
+
+const INDUSTRY_CATEGORIES = [
+  'Technology',
+  'Finance & Banking',
+  'Telecom',
+  'Healthcare',
+  'Education',
+  'Consumer Goods',
+  'Media & Entertainment',
+  'Energy & Infrastructure',
+  'Agriculture',
+  'Entrepreneurship',
+];
 
 const OBJECTIVES_OPTIONS = [
   'Brand awareness',
@@ -90,6 +104,7 @@ export const SponsorSettingsPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Form states
+  const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [industryCategory, setIndustryCategory] = useState('');
   const [companyDescription, setCompanyDescription] = useState('');
@@ -144,10 +159,14 @@ export const SponsorSettingsPage: React.FC = () => {
       setErrorMessage(null);
       const data = await api.sponsorship.getPreferences();
 
+      setFullName((data as any).fullName || user?.name || '');
       setCompanyName(data.companyName || user?.companyName || user?.organization || '');
       setIndustryCategory(data.industryCategory || user?.industryCategory || 'Technology');
       setCompanyDescription(data.bio || user?.bio || '');
-      setCompanyLogo(data.avatarUrl || user?.avatarUrl || '');
+      const cleanAvatar = (data.avatarUrl && !data.avatarUrl.includes('ui-avatars.com')) 
+        ? data.avatarUrl 
+        : ((user?.avatarUrl && !user.avatarUrl.includes('ui-avatars.com')) ? user.avatarUrl : '');
+      setCompanyLogo(cleanAvatar || '');
       setCompanyWebsite(data.companyWebsite || user?.companyWebsite || '');
       setCompanyPhone(data.companyPhone || user?.companyPhone || user?.phone || '');
 
@@ -226,7 +245,9 @@ export const SponsorSettingsPage: React.FC = () => {
 
     try {
       const payload = {
+        fullName: fullName.trim() || undefined,
         companyName: companyName.trim() || undefined,
+        industryCategory: industryCategory.trim() || undefined,
         companyDescription: companyDescription.trim(),
         companyLogo: companyLogo.trim() || null,
         companyWebsite: companyWebsite.trim() || null,
@@ -330,16 +351,34 @@ export const SponsorSettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Industry Category
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-gray-400" />
+                Contact Representative Name
               </label>
               <input
                 type="text"
-                readOnly
-                value={industryCategory}
-                className="w-full px-3.5 py-2.5 text-xs bg-stone-100 border border-stone-200 rounded-xl text-gray-600 font-medium cursor-not-allowed"
-                title="Assigned during verification"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Full name of representative"
+                className="w-full px-3.5 py-2.5 text-xs bg-stone-50 border border-gray-300 rounded-xl focus:border-[#63474D] focus:outline-none font-medium"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                Industry Category
+              </label>
+              <select
+                value={industryCategory}
+                onChange={(e) => setIndustryCategory(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-xs bg-stone-50 border border-gray-300 rounded-xl focus:border-[#63474D] focus:outline-none font-medium cursor-pointer"
+              >
+                {INDUSTRY_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

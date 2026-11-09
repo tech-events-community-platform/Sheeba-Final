@@ -13,6 +13,7 @@ import {
   Globe,
   ArrowRight,
   TrendingUp,
+  Edit,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -70,6 +71,11 @@ export const SponsorDashboardPage: React.FC = () => {
             <Link to="/sponsor/explore">
               <Button size="md" variant="accent" icon={<Sparkles className="w-4 h-4" />}>
                 Explore Pitches
+              </Button>
+            </Link>
+            <Link to="/sponsor/settings">
+              <Button size="md" variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/20" icon={<Edit className="w-4 h-4" />}>
+                Edit Profile
               </Button>
             </Link>
           </div>

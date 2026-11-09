@@ -14,6 +14,10 @@ import {
   Trash2,
   AlertCircle,
   X,
+  Edit,
+  Globe,
+  Building2,
+  User,
 } from 'lucide-react';
 
 export const OrganizerDashboardPage: React.FC = () => {
@@ -170,18 +174,62 @@ export const OrganizerDashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-        <div className="space-y-1">
-          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-[#2D1F23]">
-            {user?.organization || 'GDG Addis'}
-          </h1>
-          <p className="text-xs text-gray-500 font-light">
-            Organizer Dashboard • Verified attendance, door check-in, and authentic badge issuance.
-          </p>
+      {/* 1. Header Banner & Profile Overview */}
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#E8DDD7] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-start sm:items-center gap-4 min-w-0">
+          <div className="w-16 h-16 rounded-2xl bg-[#63474D]/10 border border-[#63474D]/20 overflow-hidden shrink-0 flex items-center justify-center">
+            {user?.organizationLogo || (user?.avatarUrl && !user.avatarUrl.includes('ui-avatars.com')) ? (
+              <img
+                src={user.organizationLogo || user.avatarUrl}
+                alt={user?.organization || user?.name || 'Organizer Logo'}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <Building2 className="w-8 h-8 text-[#63474D]" />
+            )}
+          </div>
+          <div className="space-y-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#2D1F23] truncate">
+                {user?.organization || user?.name || 'Organizer Profile'}
+              </h1>
+              {user?.applicantType && (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#63474D]/10 text-[#63474D]">
+                  {user.applicantType}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 font-medium">
+              {user?.organizationType && <span>{user.organizationType}</span>}
+              {user?.applicantPosition && <span>• {user.applicantPosition}</span>}
+              {user?.phone && <span>• {user.phone}</span>}
+              {user?.organizationWebsite && (
+                <a
+                  href={user.organizationWebsite.startsWith('http') ? user.organizationWebsite : `https://${user.organizationWebsite}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#63474D] hover:underline flex items-center gap-1"
+                >
+                  <Globe className="w-3 h-3" />
+                  Website
+                </a>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 font-light pt-0.5 line-clamp-1 max-w-xl">
+              {user?.organizationDescription || user?.bio || 'Verified Organizer • Door check-in, authentic badges, and community events.'}
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Link to="/organizer/settings">
+            <Button variant="outline" size="sm" icon={<Edit className="w-4 h-4 text-[#63474D]" />}>
+              Edit Profile
+            </Button>
+          </Link>
           <Link to="/organizer/check-in">
             <Button variant="accent" size="sm" icon={<QrCode className="w-4 h-4" />}>
               Door Check-in

@@ -9,6 +9,7 @@ import { rankEventsForSponsor } from './rankingEngine';
 import { EmbeddingService } from './embeddingService';
 import { computeEventDayExpiration } from '../../utils/qr.util';
 import { CacheService } from '../cache.service';
+import { AuditService } from '../audit.service';
 
 export class SponsorMatchingService {
   /**
@@ -163,6 +164,8 @@ export class SponsorMatchingService {
     const newWebsite = payload.companyWebsite;
     const newPhone = payload.companyPhone;
     const newCompanyName = payload.companyName;
+    const newFullName = payload.fullName !== undefined ? payload.fullName : payload.full_name;
+    const newIndustry = payload.industryCategory !== undefined ? payload.industryCategory : payload.industry_category;
 
     // 2. Build updated preferences object
     const skillsList = payload.targetSkills !== undefined
@@ -200,27 +203,49 @@ export class SponsorMatchingService {
     }
 
     // 3. Persist to PostgreSQL
+    const updateClauses: string[] = ['sponsor_preferences = $1', 'updated_at = NOW()'];
+    const updateValues: any[] = [JSON.stringify(updatedPreferences)];
+    let paramIdx = 2;
+
+    if (newBio !== undefined) {
+      updateClauses.push(`bio = $${paramIdx++}`);
+      updateValues.push(newBio && newBio.trim() ? newBio.trim() : null);
+    }
+    if (newAvatar !== undefined) {
+      updateClauses.push(`avatar_url = $${paramIdx++}`);
+      updateValues.push(newAvatar && newAvatar.trim() ? newAvatar.trim() : null);
+    }
+    if (newWebsite !== undefined) {
+      updateClauses.push(`company_website = $${paramIdx++}`);
+      updateValues.push(newWebsite && newWebsite.trim() ? newWebsite.trim() : null);
+    }
+    if (newPhone !== undefined) {
+      updateClauses.push(`company_phone = $${paramIdx++}`);
+      updateValues.push(newPhone && newPhone.trim() ? newPhone.trim() : null);
+    }
+    if (newCompanyName !== undefined) {
+      const cleanCompany = newCompanyName && newCompanyName.trim() ? newCompanyName.trim() : null;
+      updateClauses.push(`company_name = $${paramIdx++}`);
+      updateValues.push(cleanCompany);
+      updateClauses.push(`organization = $${paramIdx++}`);
+      updateValues.push(cleanCompany);
+    }
+    if (newFullName !== undefined) {
+      updateClauses.push(`full_name = $${paramIdx++}`);
+      updateValues.push(newFullName && newFullName.trim() ? newFullName.trim() : null);
+    }
+    if (newIndustry !== undefined) {
+      updateClauses.push(`industry_category = $${paramIdx++}`);
+      updateValues.push(newIndustry && newIndustry.trim() ? newIndustry.trim() : null);
+    }
+
+    updateValues.push(userId);
     const res = await query(
       `UPDATE users 
-       SET bio = COALESCE($1, bio),
-           avatar_url = COALESCE($2, avatar_url),
-           company_website = COALESCE($3, company_website),
-           company_phone = COALESCE($4, company_phone),
-           company_name = COALESCE($5, company_name),
-           organization = COALESCE($5, organization),
-           sponsor_preferences = $6,
-           updated_at = NOW() 
-       WHERE id = $7 AND deleted_at IS NULL
-       RETURNING id, role, company_name, organization, industry_category, bio, avatar_url, company_phone, company_website, sponsor_preferences`,
-      [
-        newBio !== undefined ? (newBio ? newBio.trim() : null) : null,
-        newAvatar !== undefined ? (newAvatar ? newAvatar.trim() : null) : null,
-        newWebsite !== undefined ? (newWebsite ? newWebsite.trim() : null) : null,
-        newPhone !== undefined ? (newPhone ? newPhone.trim() : null) : null,
-        newCompanyName !== undefined ? (newCompanyName ? newCompanyName.trim() : null) : null,
-        JSON.stringify(updatedPreferences),
-        userId,
-      ]
+       SET ${updateClauses.join(', ')}
+       WHERE id = $${paramIdx} AND deleted_at IS NULL
+       RETURNING id, role, email, full_name, company_name, organization, industry_category, bio, avatar_url, company_phone, company_website, sponsor_preferences`,
+      updateValues
     );
 
     if (!res.rowCount || res.rowCount === 0) {
@@ -228,6 +253,26 @@ export class SponsorMatchingService {
       err.statusCode = 404;
       throw err;
     }
+
+    const updatedRow = res.rows[0];
+
+    // Audit log sponsor profile & preferences update
+    await AuditService.logAction({
+      action: 'SPONSOR_PROFILE_UPDATED',
+      category: 'ORGANIZER_SPONSOR',
+      entityType: 'user',
+      entityId: userId,
+      entityTitle: updatedRow.company_name || 'Sponsor',
+      performedBy: userId,
+      performedByName: updatedRow.full_name || updatedRow.company_name,
+      performedByEmail: updatedRow.email,
+      performedByRole: 'sponsor',
+      details: `Sponsor profile and preferences updated for ${updatedRow.company_name}`,
+      metadata: {
+        companyName: updatedRow.company_name,
+        industryCategory: updatedRow.industry_category,
+      },
+    });
 
     // 4. Invalidate all recommendation and sponsorship caches for this sponsor
     await CacheService.delPattern(`matching:recommendations:${userId}*`);
@@ -237,12 +282,13 @@ export class SponsorMatchingService {
 
     return {
       preferences: updatedPreferences,
-      companyName: res.rows[0].company_name || current.companyName,
-      industryCategory: res.rows[0].industry_category || current.industryCategory,
-      bio: res.rows[0].bio || '',
-      avatarUrl: res.rows[0].avatar_url || '',
-      companyPhone: res.rows[0].company_phone || '',
-      companyWebsite: res.rows[0].company_website || '',
+      companyName: updatedRow.company_name || current.companyName,
+      fullName: updatedRow.full_name || '',
+      industryCategory: updatedRow.industry_category || current.industryCategory,
+      bio: updatedRow.bio || '',
+      avatarUrl: updatedRow.avatar_url || '',
+      companyPhone: updatedRow.company_phone || '',
+      companyWebsite: updatedRow.company_website || '',
       isCustomized: true,
     };
   }

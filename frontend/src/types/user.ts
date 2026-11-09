@@ -34,6 +34,8 @@ export interface User {
   companyPhone?: string;
   exhibitorDescription?: string;
   socials?: OrganizerSocials;
+  organizerSocials?: OrganizerSocials;
+  sponsorPreferences?: any;
   approvalStatus?: ApprovalStatus;
   isOrganizer?: boolean;
   isExhibitor?: boolean;
@@ -64,5 +66,7 @@ export interface OrganizerProfile {
   contactPhone?: string;
   bio?: string;
   socials?: OrganizerSocials;
+  organizerSocials?: OrganizerSocials;
+  sponsorPreferences?: any;
 }
 

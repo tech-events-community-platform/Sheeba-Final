@@ -2021,6 +2021,32 @@ export const api = {
         if (data.visibility !== undefined) payload.visibility = data.visibility;
         if (data.organization !== undefined) payload.organization = data.organization;
         if (data.avatarUrl !== undefined) payload.avatar_url = data.avatarUrl;
+        if ((data as any).avatar_url !== undefined) payload.avatar_url = (data as any).avatar_url;
+        if ((data as any).applicantType !== undefined) payload.applicant_type = (data as any).applicantType;
+        if ((data as any).applicant_type !== undefined) payload.applicant_type = (data as any).applicant_type;
+        if ((data as any).organizationType !== undefined) payload.organization_type = (data as any).organizationType;
+        if ((data as any).organization_type !== undefined) payload.organization_type = (data as any).organization_type;
+        if ((data as any).applicantPosition !== undefined) payload.applicant_position = (data as any).applicantPosition;
+        if ((data as any).applicant_position !== undefined) payload.applicant_position = (data as any).applicant_position;
+        if ((data as any).organizationDescription !== undefined) payload.organization_description = (data as any).organizationDescription;
+        if ((data as any).organization_description !== undefined) payload.organization_description = (data as any).organization_description;
+        if ((data as any).organizationWebsite !== undefined) payload.organization_website = (data as any).organizationWebsite;
+        if ((data as any).organization_website !== undefined) payload.organization_website = (data as any).organization_website;
+        if ((data as any).organizationLogo !== undefined) payload.organization_logo = (data as any).organizationLogo;
+        if ((data as any).organization_logo !== undefined) payload.organization_logo = (data as any).organization_logo;
+        if ((data as any).organizerBio !== undefined) payload.organizer_bio = (data as any).organizerBio;
+        if ((data as any).organizer_bio !== undefined) payload.organizer_bio = (data as any).organizer_bio;
+        if ((data as any).organizerSocials !== undefined) payload.organizer_socials = (data as any).organizerSocials;
+        if ((data as any).organizer_socials !== undefined) payload.organizer_socials = (data as any).organizer_socials;
+        if ((data as any).socials !== undefined) payload.organizer_socials = (data as any).socials;
+        if ((data as any).companyName !== undefined) payload.company_name = (data as any).companyName;
+        if ((data as any).company_name !== undefined) payload.company_name = (data as any).company_name;
+        if ((data as any).industryCategory !== undefined) payload.industry_category = (data as any).industryCategory;
+        if ((data as any).industry_category !== undefined) payload.industry_category = (data as any).industry_category;
+        if ((data as any).companyPhone !== undefined) payload.company_phone = (data as any).companyPhone;
+        if ((data as any).company_phone !== undefined) payload.company_phone = (data as any).company_phone;
+        if ((data as any).companyWebsite !== undefined) payload.company_website = (data as any).companyWebsite;
+        if ((data as any).company_website !== undefined) payload.company_website = (data as any).company_website;
 
         const res = await requestApi('/users/me', {
           method: 'PATCH',
@@ -2652,6 +2678,23 @@ export const api = {
       company_website?: string;
       avatarUrl?: string;
       visibility?: 'public' | 'private';
+      applicantType?: string;
+      applicant_type?: string;
+      organizationType?: string;
+      organization_type?: string;
+      applicantPosition?: string;
+      applicant_position?: string;
+      organizationDescription?: string;
+      organization_description?: string;
+      organizationWebsite?: string;
+      organization_website?: string;
+      organizationLogo?: string;
+      organization_logo?: string;
+      organizerBio?: string;
+      organizer_bio?: string;
+      organizerSocials?: any;
+      organizer_socials?: any;
+      socials?: any;
     }): Promise<User> => {
       const res = await requestApi<{ success: boolean; data: User }>('/users/me', {
         method: 'PATCH',

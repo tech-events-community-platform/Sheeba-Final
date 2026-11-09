@@ -33,12 +33,15 @@ export class AuthService {
       ...(isExhibitor || hasExhibitorApplications ? ['EXHIBITOR'] : []),
     ];
 
+    const rawAvatar = user.avatar_url && !user.avatar_url.includes('ui-avatars.com') ? user.avatar_url : undefined;
+    const finalOrgLogo = user.organization_logo || (isOrganizer ? rawAvatar : undefined);
+
     return {
       id: user.id,
       name: user.full_name,
       email: user.email,
       role: (user.role || 'attendee').toUpperCase(),
-      avatarUrl: user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.company_name || user.full_name)}&background=63474D&color=fff`,
+      avatarUrl: user.avatar_url || finalOrgLogo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.company_name || user.full_name)}&background=63474D&color=fff`,
       memberSince: user.member_since || 'August 2026',
       visibility: user.visibility || 'public',
       organization: user.organization || user.company_name || undefined,
@@ -61,8 +64,9 @@ export class AuthService {
       applicantPosition: user.applicant_position || undefined,
       organizationDescription: user.organization_description || undefined,
       organizationWebsite: user.organization_website || undefined,
-      organizationLogo: user.organization_logo || undefined,
+      organizationLogo: finalOrgLogo,
       personalIntroduction: user.bio || user.organizer_bio || undefined,
+      organizerSocials: user.organizer_socials ? (typeof user.organizer_socials === 'string' ? JSON.parse(user.organizer_socials) : user.organizer_socials) : (user.socials || undefined),
       organizerRejectionReason: user.organizer_rejection_reason || undefined,
       organizerInfoRequestedNotes: user.organizer_info_requested_notes || undefined,
       organizerAppliedAt: user.organizer_applied_at || undefined,
@@ -695,7 +699,7 @@ export class AuthService {
 
   static async getCurrentUser(userId: string): Promise<any> {
     const result = await query<IUser>(
-      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at, (password_hash IS NOT NULL) AS has_password,
+      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at, sponsor_preferences, (password_hash IS NOT NULL) AS has_password,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
               (SELECT EXISTS(SELECT 1 FROM event_scanners es JOIN events e ON e.id = es.event_id WHERE es.scanner_user_id = users.id AND es.is_active = TRUE AND e.requires_scanners = TRUE AND e.deleted_at IS NULL)) AS has_active_scanner_events,
               created_at, updated_at

@@ -15,13 +15,31 @@ import {
   Lock,
   X,
   KeyRound,
+  Upload,
+  Loader2,
+  Globe,
+  Phone,
+  FileText,
+  Image,
+  CheckCircle2,
+  ShieldCheck,
+  Briefcase,
 } from 'lucide-react';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 import { TelegramIcon, XIcon, TikTokIcon, YouTubeIcon } from '../../components/ui/SocialIcons';
 import { OrganizerDefaultQuestionsSettings } from '../../components/organizer/OrganizerDefaultQuestionsSettings';
 import { organizerProfileFormSchema, switchRoleSchema, validateForm } from '../../schemas';
 
+const ORGANIZATION_TYPES = [
+  'University / Educational Institution',
+  'Company / Business',
+  'Community / Student Club',
+  'NGO',
+  'Other',
+];
+
 export const AccountSettingsPage: React.FC = () => {
-  const { user, logout, switchRole } = useAuth();
+  const { user, logout, switchRole, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -34,6 +52,16 @@ export const AccountSettingsPage: React.FC = () => {
   const [name, setName] = useState(user?.name || '');
   const [organization, setOrganization] = useState(user?.organization || '');
   const [email] = useState(user?.email || '');
+  const [applicantType, setApplicantType] = useState<'Organization / Institution' | 'Individual Organizer'>('Organization / Institution');
+  const [organizationType, setOrganizationType] = useState('Company / Business');
+  const [applicantPosition, setApplicantPosition] = useState('');
+  const [phone, setPhone] = useState('');
+  const [bio, setBio] = useState('');
+  const [organizationWebsite, setOrganizationWebsite] = useState('');
+  const [organizationLogo, setOrganizationLogo] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+
   const [telegram, setTelegram] = useState('');
   const [xHandle, setXHandle] = useState('');
   const [tiktok, setTiktok] = useState('');
@@ -71,23 +99,72 @@ export const AccountSettingsPage: React.FC = () => {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setLogoUploadError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setLogoUploadError(null);
+    try {
+      const url = await uploadToCloudinary(file, { folder: 'sheeba_organization_logos' });
+      setOrganizationLogo(url);
+    } catch (err: any) {
+      setLogoUploadError(err.message || 'Failed to upload organization logo.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       setName(user.name || '');
       setOrganization(user.organization || '');
-      try {
-        const stored =
-          localStorage.getItem(`sheeba_organizer_socials_${user.id}`) ||
-          localStorage.getItem('sheeba_organizer_socials');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setTelegram(parsed.telegram || '');
-          setXHandle(parsed.x || '');
-          setTiktok(parsed.tiktok || '');
-          setYoutube(parsed.youtube || '');
+      const rawType = (user.applicantType || '').toLowerCase();
+      setApplicantType(rawType.includes('individual') ? 'Individual Organizer' : 'Organization / Institution');
+      setOrganizationType(user.organizationType || 'Company / Business');
+      setApplicantPosition(user.applicantPosition || '');
+      setPhone(user.phone || '');
+      setBio(user.organizationDescription || user.bio || user.personalIntroduction || '');
+      setOrganizationWebsite(user.organizationWebsite || '');
+
+      const initialLogo =
+        user.organizationLogo ||
+        (user.avatarUrl && !user.avatarUrl.includes('ui-avatars.com') ? user.avatarUrl : '') ||
+        '';
+      setOrganizationLogo(initialLogo);
+
+      const s = user.organizerSocials || user.socials;
+      if (s) {
+        setTelegram(s.telegram || '');
+        setXHandle(s.x || '');
+        setTiktok(s.tiktok || '');
+        setYoutube(s.youtube || '');
+      } else {
+        try {
+          const stored =
+            localStorage.getItem(`sheeba_organizer_socials_${user.id}`) ||
+            localStorage.getItem('sheeba_organizer_socials');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            setTelegram(parsed.telegram || '');
+            setXHandle(parsed.x || '');
+            setTiktok(parsed.tiktok || '');
+            setYoutube(parsed.youtube || '');
+          }
+        } catch (e) {
+          console.error(e);
         }
-      } catch (e) {
-        console.error(e);
       }
     }
 
@@ -101,36 +178,76 @@ export const AccountSettingsPage: React.FC = () => {
     e.preventDefault();
     if (!user) return;
 
-    const profileData = {
-      name: name.trim(),
-      organization: organization.trim(),
-    };
+    const isOrgUser = user.role === 'ORGANIZER';
+    const isIndividual = applicantType === 'Individual Organizer';
 
-    const validation = validateForm(organizerProfileFormSchema, profileData);
-    if (!validation.success) {
-      const firstError = Object.values(validation.errors)[0] || 'Invalid profile data.';
-      alert(firstError);
+    if (!name.trim()) {
+      alert('Full Name is required.');
       return;
     }
 
-    setIsSavingProfile(true);
-    try {
-      await api.account.updateProfile(user.id, {
-        name: profileData.name,
-        organization: profileData.organization,
-      });
+    if (!isIndividual && !organization.trim()) {
+      alert('Organization Name is required.');
+      return;
+    }
 
+    // Validate website URL if provided
+    if (organizationWebsite && organizationWebsite.trim()) {
+      try {
+        new URL(organizationWebsite.trim().startsWith('http') ? organizationWebsite.trim() : `https://${organizationWebsite.trim()}`);
+      } catch {
+        alert('Please enter a valid website URL.');
+        return;
+      }
+    }
+
+    setIsSavingProfile(true);
+    setSaveMsg(null);
+
+    try {
       const socialsData = {
         telegram: telegram.trim(),
         x: xHandle.trim(),
         tiktok: tiktok.trim(),
         youtube: youtube.trim(),
       };
+
+      const cleanLogo = organizationLogo && organizationLogo.trim() ? organizationLogo.trim() : null;
+
+      const payload: any = {
+        name: name.trim() || undefined,
+        full_name: name.trim() || undefined,
+        phone: phone.trim() || null,
+        bio: bio.trim() || null,
+        organization: isIndividual ? (name.trim() || 'Individual Organizer') : (organization.trim() || undefined),
+        avatarUrl: cleanLogo,
+        avatar_url: cleanLogo,
+      };
+
+      if (isOrgUser) {
+        payload.applicant_type = applicantType;
+        payload.organization_type = isIndividual ? null : (organizationType.trim() || null);
+        payload.applicant_position = isIndividual ? null : (applicantPosition.trim() || null);
+        payload.organization_description = bio.trim() || null;
+        payload.organization_website = organizationWebsite.trim() || null;
+        payload.organization_logo = cleanLogo;
+        payload.organizer_bio = bio.trim() || null;
+        payload.organizer_socials = socialsData;
+      }
+
+      await api.account.updateProfile(user.id, payload);
+
       localStorage.setItem(`sheeba_organizer_socials_${user.id}`, JSON.stringify(socialsData));
       localStorage.setItem('sheeba_organizer_socials', JSON.stringify(socialsData));
 
-      setSaveMsg('Profile & socials updated successfully.');
-      setTimeout(() => setSaveMsg(null), 3500);
+      if (refreshUser) {
+        await refreshUser();
+      }
+
+      setSaveMsg(isOrgUser 
+        ? 'Organizer profile & onboarding information updated successfully!' 
+        : 'Profile & socials updated successfully.');
+      setTimeout(() => setSaveMsg(null), 4000);
     } catch (err: any) {
       alert(err.message || 'Failed to update profile.');
     } finally {
@@ -236,125 +353,515 @@ export const AccountSettingsPage: React.FC = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSaveProfile} className="space-y-5 max-w-3xl">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {user?.role === 'ORGANIZER' ? (
+          <form onSubmit={handleSaveProfile} className="space-y-6 max-w-3xl">
+            {/* 1. Applicant Type Switcher */}
             <div>
+              <label className="block text-xs font-bold text-[#2D1F23] mb-2 uppercase tracking-wider">
+                Organizer Capacity & Type
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setApplicantType('Organization / Institution');
+                    if (organization === 'Individual Organizer') setOrganization('');
+                  }}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                    applicantType === 'Organization / Institution'
+                      ? 'border-[#63474D] bg-[#63474D]/5 ring-2 ring-[#63474D]/20'
+                      : 'border-[#E8DDD7] bg-[#FAF7F5] hover:border-gray-400'
+                  }`}
+                >
+                  <div className={`p-2 rounded-xl shrink-0 ${applicantType === 'Organization / Institution' ? 'bg-[#63474D] text-white' : 'bg-gray-200 text-gray-600'}`}>
+                    <Building className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#2D1F23]">Organization / Institution</span>
+                    <span className="text-[11px] text-[#756366] leading-tight block mt-0.5">
+                      Company, tech community, university club, or registered NGO.
+                    </span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setApplicantType('Individual Organizer')}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                    applicantType === 'Individual Organizer'
+                      ? 'border-[#63474D] bg-[#63474D]/5 ring-2 ring-[#63474D]/20'
+                      : 'border-[#E8DDD7] bg-[#FAF7F5] hover:border-gray-400'
+                  }`}
+                >
+                  <div className={`p-2 rounded-xl shrink-0 ${applicantType === 'Individual Organizer' ? 'bg-[#63474D] text-white' : 'bg-gray-200 text-gray-600'}`}>
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="block text-xs font-bold text-[#2D1F23]">Individual Organizer</span>
+                    <span className="text-[11px] text-[#756366] leading-tight block mt-0.5">
+                      Independent organizer hosting events under your personal name.
+                    </span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* 2. Logo / Avatar Upload via Cloudinary */}
+            <div className="p-4 bg-[#FAF7F5] border border-[#E8DDD7] rounded-2xl space-y-3">
+              <label className="block text-xs font-bold text-[#2D1F23] flex items-center gap-1.5 uppercase tracking-wider">
+                <Image className="w-3.5 h-3.5 text-[#63474D]" />
+                {applicantType === 'Individual Organizer' ? 'Organizer Profile Photo' : 'Organization Brand Logo'}
+                <span className="text-gray-400 font-normal lowercase">(Optional - PNG, JPG, WebP up to 5MB)</span>
+              </label>
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-white border border-[#E8DDD7] overflow-hidden shrink-0 flex items-center justify-center shadow-2xs">
+                  {organizationLogo ? (
+                    <img
+                      src={organizationLogo}
+                      alt="Logo preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  ) : applicantType === 'Individual Organizer' ? (
+                    <User className="w-8 h-8 text-gray-400" />
+                  ) : (
+                    <Building className="w-8 h-8 text-gray-400" />
+                  )}
+                </div>
+
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#63474D] hover:bg-[#52393F] text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors shadow-2xs">
+                      {isUploadingLogo ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5" />
+                      )}
+                      <span>{isUploadingLogo ? 'Uploading...' : organizationLogo ? 'Replace Logo' : 'Upload Logo'}</span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        onChange={handleLogoUpload}
+                        disabled={isUploadingLogo}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {organizationLogo ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrganizationLogo('');
+                          setLogoUploadError(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-200 bg-red-50/50 hover:bg-red-50 text-red-600 rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                        title="Remove logo"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove Logo</span>
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {logoUploadError && (
+                    <p className="text-[11px] text-red-600 font-medium">{logoUploadError}</p>
+                  )}
+                  <p className="text-[10px] text-gray-400">
+                    {organizationLogo
+                      ? 'Current logo is displayed. Click Replace Logo to change it or Remove Logo to clear it.'
+                      : 'Upload a brand logo or profile photo. Appears on event posters and attendee certificates.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Core Information Fields */}
+            {applicantType === 'Organization / Institution' ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                      Organization Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={organization}
+                      onChange={(e) => setOrganization(e.target.value)}
+                      placeholder="e.g. GDG Addis, Techawat Solutions"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                      Organization Type
+                    </label>
+                    <select
+                      value={organizationType}
+                      onChange={(e) => setOrganizationType(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
+                    >
+                      {ORGANIZATION_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-[#63474D]" />
+                      Your Position / Role
+                    </label>
+                    <input
+                      type="text"
+                      value={applicantPosition}
+                      onChange={(e) => setApplicantPosition(e.target.value)}
+                      placeholder="e.g. Lead Organizer, Founder, Community Director"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-[#63474D]" />
+                      Lead Contact Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your full legal name"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-[#63474D]" />
+                      Official Contact Phone
+                    </label>
+                    <input
+                      type="text"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+251 911 000 000"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-[#63474D]" />
+                      Official Website or Portal Link
+                    </label>
+                    <input
+                      type="text"
+                      value={organizationWebsite}
+                      onChange={(e) => setOrganizationWebsite(e.target.value)}
+                      placeholder="https://yourorganization.com"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#63474D]" />
+                    Organization Description / Mission
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Briefly describe your organization's mission and community background..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-[#63474D]" />
+                      Full Legal Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your full name"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-[#63474D]" />
+                      Contact Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+251 911 000 000"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-[#63474D]" />
+                    Portfolio / Social Profile Link
+                  </label>
+                  <input
+                    type="text"
+                    value={organizationWebsite}
+                    onChange={(e) => setOrganizationWebsite(e.target.value)}
+                    placeholder="https://github.com/... or https://linkedin.com/in/..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#63474D]" />
+                    Personal Introduction & Organizer Bio
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Tell attendees about your background organizing meetups, workshops, or tech community events..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Email input (read-only) */}
+            <div className="max-w-xs sm:max-w-sm">
               <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-[#63474D]" />
-                Full Name
+                <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
+                Account Email
               </label>
               <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                type="email"
+                readOnly
+                value={email}
+                className="w-full px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500 cursor-not-allowed"
               />
+              <p className="text-[10px] text-gray-400 mt-1">Contact Sheeba platform support to modify primary login email.</p>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                <Building className="w-3.5 h-3.5 text-[#63474D]" />
-                {orgLabel}
-              </label>
-              <input
-                type="text"
-                value={organization}
-                onChange={(e) => setOrganization(e.target.value)}
-                placeholder={orgPlaceholder}
-                className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-              />
+            {/* Social Accounts */}
+            <div className="pt-4 border-t border-[#E8DDD7]/70 space-y-3">
+              <div>
+                <h3 className="text-xs font-bold text-[#2D1F23]">Community Channels & Social Accounts</h3>
+                <p className="text-[11px] text-[#756366]">
+                  These channels will appear below your organizer badges and public event pages.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <TelegramIcon className="w-3.5 h-3.5 text-[#0088cc]" />
+                    Telegram Channel / Group
+                  </label>
+                  <input
+                    type="text"
+                    value={telegram}
+                    onChange={(e) => setTelegram(e.target.value)}
+                    placeholder="@channel or https://t.me/..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <XIcon className="w-3.5 h-3.5 text-[#2D1F23]" />
+                    X (Twitter)
+                  </label>
+                  <input
+                    type="text"
+                    value={xHandle}
+                    onChange={(e) => setXHandle(e.target.value)}
+                    placeholder="@handle or https://x.com/..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <TikTokIcon className="w-3.5 h-3.5 text-black" />
+                    TikTok
+                  </label>
+                  <input
+                    type="text"
+                    value={tiktok}
+                    onChange={(e) => setTiktok(e.target.value)}
+                    placeholder="@account or https://tiktok.com/@..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <YouTubeIcon className="w-3.5 h-3.5 text-[#ff0000]" />
+                    YouTube Channel
+                  </label>
+                  <input
+                    type="text"
+                    value={youtube}
+                    onChange={(e) => setYoutube(e.target.value)}
+                    placeholder="@channel or https://youtube.com/..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Email input brought halfway to the left */}
-          <div className="max-w-xs sm:max-w-sm">
-            <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-              <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
-              Contact Email
-            </label>
-            <input
-              type="email"
-              readOnly
-              value={email}
-              className="w-full px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500 cursor-not-allowed"
-            />
-            <p className="text-[10px] text-gray-400 mt-1">Contact support to modify primary login email.</p>
-          </div>
-
-          {/* Social Accounts */}
-          <div className="pt-4 border-t border-[#E8DDD7]/70 space-y-3">
-            <div>
-              <h3 className="text-xs font-bold text-[#2D1F23]">Social Accounts</h3>
-              <p className="text-[11px] text-[#756366]">
-                {socialsSubtitle}
-              </p>
+            <div className="pt-2">
+              <Button type="submit" variant="primary" size="md" isLoading={isSavingProfile} icon={<CheckCircle2 className="w-4 h-4" />}>
+                Save Organizer Profile & Onboarding Info
+              </Button>
             </div>
-
+          </form>
+        ) : (
+          <form onSubmit={handleSaveProfile} className="space-y-5 max-w-3xl">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <TelegramIcon className="w-3.5 h-3.5 text-[#0088cc]" />
-                  Telegram
+                  <User className="w-3.5 h-3.5 text-[#63474D]" />
+                  Full Name
                 </label>
                 <input
                   type="text"
-                  value={telegram}
-                  onChange={(e) => setTelegram(e.target.value)}
-                  placeholder="@channel or https://t.me/..."
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <XIcon className="w-3.5 h-3.5 text-[#2D1F23]" />
-                  X (Twitter)
+                  <Building className="w-3.5 h-3.5 text-[#63474D]" />
+                  {orgLabel}
                 </label>
                 <input
                   type="text"
-                  value={xHandle}
-                  onChange={(e) => setXHandle(e.target.value)}
-                  placeholder="@handle or https://x.com/..."
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <TikTokIcon className="w-3.5 h-3.5 text-black" />
-                  TikTok
-                </label>
-                <input
-                  type="text"
-                  value={tiktok}
-                  onChange={(e) => setTiktok(e.target.value)}
-                  placeholder="@account or https://tiktok.com/@..."
-                  className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
-                  <YouTubeIcon className="w-3.5 h-3.5 text-[#ff0000]" />
-                  YouTube
-                </label>
-                <input
-                  type="text"
-                  value={youtube}
-                  onChange={(e) => setYoutube(e.target.value)}
-                  placeholder="@channel or https://youtube.com/..."
+                  value={organization}
+                  onChange={(e) => setOrganization(e.target.value)}
+                  placeholder={orgPlaceholder}
                   className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                 />
               </div>
             </div>
-          </div>
 
-          <div className="pt-2">
-            <Button type="submit" variant="primary" size="sm" isLoading={isSavingProfile}>
-              Save Profile Changes
-            </Button>
-          </div>
-        </form>
+            {/* Email input brought halfway to the left */}
+            <div className="max-w-xs sm:max-w-sm">
+              <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                <img src="/mail-icon.webp" alt="Email" className="w-3.5 h-3.5 object-contain" />
+                Contact Email
+              </label>
+              <input
+                type="email"
+                readOnly
+                value={email}
+                className="w-full px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs text-gray-500 cursor-not-allowed"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">Contact support to modify primary login email.</p>
+            </div>
+
+            {/* Social Accounts */}
+            <div className="pt-4 border-t border-[#E8DDD7]/70 space-y-3">
+              <div>
+                <h3 className="text-xs font-bold text-[#2D1F23]">Social Accounts</h3>
+                <p className="text-[11px] text-[#756366]">
+                  {socialsSubtitle}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <TelegramIcon className="w-3.5 h-3.5 text-[#0088cc]" />
+                    Telegram
+                  </label>
+                  <input
+                    type="text"
+                    value={telegram}
+                    onChange={(e) => setTelegram(e.target.value)}
+                    placeholder="@channel or https://t.me/..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <XIcon className="w-3.5 h-3.5 text-[#2D1F23]" />
+                    X (Twitter)
+                  </label>
+                  <input
+                    type="text"
+                    value={xHandle}
+                    onChange={(e) => setXHandle(e.target.value)}
+                    placeholder="@handle or https://x.com/..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <TikTokIcon className="w-3.5 h-3.5 text-black" />
+                    TikTok
+                  </label>
+                  <input
+                    type="text"
+                    value={tiktok}
+                    onChange={(e) => setTiktok(e.target.value)}
+                    placeholder="@account or https://tiktok.com/@..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1 flex items-center gap-1.5">
+                    <YouTubeIcon className="w-3.5 h-3.5 text-[#ff0000]" />
+                    YouTube
+                  </label>
+                  <input
+                    type="text"
+                    value={youtube}
+                    onChange={(e) => setYoutube(e.target.value)}
+                    placeholder="@channel or https://youtube.com/..."
+                    className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button type="submit" variant="primary" size="sm" isLoading={isSavingProfile}>
+                Save Profile Changes
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Organizer Default Registration Questions */}
