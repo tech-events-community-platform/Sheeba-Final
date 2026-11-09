@@ -6,6 +6,21 @@ import { AuthRequest, BadgeCode } from '../types';
 export class BadgeController {
   static async getAllBadges(req: Request, res: Response, next: NextFunction) {
     try {
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 15;
+      const search = (req.query.search as string) || '';
+      const status = (req.query.status as string) || 'all';
+
+      if (page !== undefined || req.query.limit !== undefined || req.query.status !== undefined || req.query.search !== undefined) {
+        const result = await BadgeService.getBadgeAwardsPaginated({
+          page: page || 1,
+          limit,
+          search,
+          status,
+        });
+        return sendSuccess(res, result, 'Badge awards retrieved with pagination.');
+      }
+
       const badges = await BadgeService.getAllBadgeAwards();
       return sendSuccess(res, badges, 'Badge awards retrieved.');
     } catch (error) {
@@ -99,6 +114,18 @@ export class BadgeController {
 
       await BadgeService.adminRevokeBadge(badgeId, revokedBy, reason);
       return sendSuccess(res, null, 'Badge revoked successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async reinstateBadge(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const badgeId = req.params.id as string;
+      const reinstatedBy = req.user?.userId;
+
+      await BadgeService.adminReinstateBadge(badgeId, reinstatedBy);
+      return sendSuccess(res, null, 'Badge granted and reinstated successfully.');
     } catch (error) {
       next(error);
     }

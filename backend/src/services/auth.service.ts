@@ -5,6 +5,7 @@ import { IUser, IUserSafe, UserRole, ISponsorRegistration } from '../types';
 import { signAuthToken, verifyAuthToken } from '../utils/jwt.util';
 import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
+import { AuditService } from './audit.service';
 import { OAuth2Client } from 'google-auth-library';
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -430,6 +431,20 @@ export class AuthService {
       console.warn('Welcome email dispatch failed:', emailErr);
     }
 
+    await AuditService.logAction({
+      action: 'USER_REGISTERED',
+      category: 'AUTH_SECURITY',
+      entityType: 'user',
+      entityId: rawUser.id,
+      entityTitle: rawUser.full_name,
+      performedBy: rawUser.id,
+      performedByName: rawUser.full_name,
+      performedByEmail: rawUser.email,
+      performedByRole: rawUser.role,
+      details: `New account registered successfully with role: ${rawUser.role}`,
+      metadata: { role: rawUser.role, email: rawUser.email },
+    });
+
     return {
       user,
       token,
@@ -661,6 +676,20 @@ export class AuthService {
 
     const user = this.formatUserResponse(rawUser, stats);
     user.role = (sessionRole as string).toUpperCase() as any;
+
+    await AuditService.logAction({
+      action: 'USER_LOGIN',
+      category: 'AUTH_SECURITY',
+      entityType: 'user',
+      entityId: rawUser.id,
+      entityTitle: rawUser.full_name,
+      performedBy: rawUser.id,
+      performedByName: rawUser.full_name,
+      performedByEmail: rawUser.email,
+      performedByRole: sessionRole,
+      details: `User logged in with session role: ${sessionRole}`,
+    });
+
     return { user, token };
   }
 
@@ -798,6 +827,21 @@ export class AuthService {
 
     const rawUpdated = updated.rows[0];
     const stats = await this.computeUserStats(rawUpdated.id);
+
+    await AuditService.logAction({
+      action: 'ORGANIZER_APPLICATION_SUBMITTED',
+      category: 'ORGANIZER_SPONSOR',
+      entityType: 'user',
+      entityId: rawUpdated.id,
+      entityTitle: finalOrgName,
+      performedBy: rawUpdated.id,
+      performedByName: rawUpdated.full_name,
+      performedByEmail: rawUpdated.email,
+      performedByRole: rawUpdated.role,
+      details: `Organizer application submitted by ${rawUpdated.full_name} (${applicantType})`,
+      metadata: { applicantType, organization: finalOrgName },
+    });
+
     return {
       user: this.formatUserResponse(rawUpdated, stats),
       message: 'Your organizer application has been submitted and is currently being reviewed by Sheeba administration.',
@@ -1525,6 +1569,20 @@ export class AuthService {
       console.warn('Failed to send sponsor application email:', e);
     }
 
+    await AuditService.logAction({
+      action: 'SPONSOR_REGISTERED',
+      category: 'ORGANIZER_SPONSOR',
+      entityType: 'user',
+      entityId: rawUser.id,
+      entityTitle: company_name.trim(),
+      performedBy: rawUser.id,
+      performedByName: full_name.trim(),
+      performedByEmail: cleanEmail,
+      performedByRole: 'sponsor',
+      details: `Corporate sponsor registration submitted: ${company_name.trim()} (${industry_category.trim()})`,
+      metadata: { companyName: company_name.trim(), industryCategory: industry_category.trim() },
+    });
+
     return {
       user,
       message: 'Your application will be reviewed shortly. Wait a few moments until Sheeba Administration approves you...',
@@ -1893,6 +1951,18 @@ export class AuthService {
       role: (userFormatted.role?.toLowerCase() || 'attendee') as any,
       fullName: user.full_name,
       mustChangePassword: false,
+    });
+
+    await AuditService.logAction({
+      action: 'PASSWORD_CHANGED',
+      category: 'AUTH_SECURITY',
+      entityType: 'user',
+      entityId: user.id,
+      entityTitle: user.full_name,
+      performedBy: user.id,
+      performedByName: user.full_name,
+      performedByEmail: user.email,
+      details: 'Account password changed successfully',
     });
 
     return {

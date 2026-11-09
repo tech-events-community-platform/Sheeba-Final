@@ -3,6 +3,7 @@ import { ISponsorshipApplication, ISponsorshipDeal, SponsorshipDealStatus, IAppl
 import { CacheService } from './cache.service';
 import { RecycleBinService } from './recycleBin.service';
 import { EmailService } from './email.service';
+import { AuditService } from './audit.service';
 
 export class SponsorshipService {
   /**
@@ -102,6 +103,17 @@ export class SponsorshipService {
     await CacheService.delPattern('*http:*/api/sponsorship*');
     await CacheService.delPattern('matching:recommendations:*');
 
+    await AuditService.logAction({
+      action: 'SPONSORSHIP_PITCH_CREATED',
+      category: 'ORGANIZER_SPONSOR',
+      entityType: 'sponsorship_pitch',
+      entityId: created.id,
+      entityTitle: created.event_title,
+      performedBy: organizerId,
+      details: `Sponsorship pitch created for "${created.event_title}"`,
+      metadata: { eventTitle: created.event_title, location: created.location },
+    });
+
     return created;
   }
 
@@ -163,7 +175,7 @@ export class SponsorshipService {
         ), 0) AS interested_sponsors_count
       FROM sponsorship_applications sa
       JOIN users u ON sa.organizer_id = u.id
-      WHERE sa.status != 'CLOSED' AND sa.deleted_at IS NULL
+      WHERE sa.status != 'CLOSED' AND sa.deleted_at IS NULL AND COALESCE(sa.is_taken_down, FALSE) = FALSE
     `;
 
     const params: any[] = [];
@@ -262,8 +274,9 @@ export class SponsorshipService {
       status: string;
       packages: any;
       organizer_id: string;
+      is_taken_down?: boolean;
     }>(
-      `SELECT id, event_title, status, packages, organizer_id 
+      `SELECT id, event_title, status, packages, organizer_id, is_taken_down 
        FROM sponsorship_applications 
        WHERE id = $1 AND deleted_at IS NULL`,
       [applicationId]
@@ -276,6 +289,12 @@ export class SponsorshipService {
     }
 
     const pitch = appRes.rows[0];
+    if (pitch.is_taken_down) {
+      const err: any = new Error('This sponsorship pitch is currently suspended for administrative review and cannot accept applications.');
+      err.statusCode = 403;
+      err.code = 'PITCH_MODERATED';
+      throw err;
+    }
     if (pitch.status === 'CLOSED') {
       const err: any = new Error('This sponsorship pitch has been closed by the organizer.');
       err.statusCode = 400;
@@ -408,6 +427,19 @@ export class SponsorshipService {
     await CacheService.delPattern(`sponsorship:app:${applicationId}*`);
     await CacheService.delPattern(`*http:*user:${sponsorId}*sponsorship*`);
     await CacheService.delPattern('*http:*/api/admin/sponsorship*');
+
+    await AuditService.logAction({
+      action: 'SPONSOR_PROPOSAL_SUBMITTED',
+      category: 'ORGANIZER_SPONSOR',
+      entityType: 'sponsorship_deal',
+      entityId: deal.id,
+      entityTitle: pitch.event_title,
+      performedBy: sponsorId,
+      performedByName: sponsor.full_name,
+      performedByEmail: sponsor.email,
+      details: `Proposal submitted for "${pitch.event_title}" (Package: ${deal.package_name}, Amount: ${deal.pledged_amount} ETB)`,
+      metadata: { applicationId, packageName: deal.package_name, pledgedAmount: deal.pledged_amount },
+    });
 
     return deal;
   }

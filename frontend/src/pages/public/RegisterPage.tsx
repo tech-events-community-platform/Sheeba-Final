@@ -500,59 +500,60 @@ export const RegisterPage: React.FC = () => {
                       />
                     </div>
                   </div>
-
-                  {/* Organization Logo Upload */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#2D1F23] mb-1">
-                      Organization Logo <span className="text-[#756366] font-normal">(Optional - PNG, JPG, WebP up to 5MB)</span>
-                    </label>
-                    {organizationLogo ? (
-                      <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
-                        <img
-                          src={organizationLogo}
-                          alt="Organization Logo"
-                          className="w-10 h-10 rounded-full object-cover border border-[#E8DDD7]"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-[#2D1F23] flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                            <span>Logo uploaded</span>
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setOrganizationLogo('')}
-                          className="p-1 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
-                          title="Remove logo"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="flex items-center justify-center gap-2 p-3 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
-                        {isUploadingLogo ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
-                        ) : (
-                          <Upload className="w-4 h-4 text-[#756366]" />
-                        )}
-                        <span className="text-xs font-medium text-[#756366]">
-                          {isUploadingLogo ? 'Uploading logo...' : 'Click to upload logo'}
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/jpg,image/webp"
-                          className="hidden"
-                          disabled={isUploadingLogo}
-                          onChange={handleLogoUpload}
-                        />
-                      </label>
-                    )}
-                    {logoUploadError && (
-                      <p className="text-[11px] text-red-600 mt-1">{logoUploadError}</p>
-                    )}
-                  </div>
                 </div>
               )}
+
+              {/* Organizer Logo / Profile Photo Upload (Optional for all organizers) */}
+              <div>
+                <label className="block text-xs font-semibold text-[#2D1F23] mb-1">
+                  {applicantType === 'Individual Organizer' ? 'Organizer Logo / Profile Photo' : 'Organization Logo'}{' '}
+                  <span className="text-[#756366] font-normal">(Optional - PNG, JPG, WebP up to 5MB)</span>
+                </label>
+                {organizationLogo ? (
+                  <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                    <img
+                      src={organizationLogo}
+                      alt={applicantType === 'Individual Organizer' ? 'Organizer Logo' : 'Organization Logo'}
+                      className="w-10 h-10 rounded-full object-cover border border-[#E8DDD7]"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-[#2D1F23] flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                        <span>Logo uploaded</span>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setOrganizationLogo('')}
+                      className="p-1 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
+                      title="Remove logo"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 p-3 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
+                    {isUploadingLogo ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
+                    ) : (
+                      <Upload className="w-4 h-4 text-[#756366]" />
+                    )}
+                    <span className="text-xs font-medium text-[#756366]">
+                      {isUploadingLogo ? 'Uploading logo to Cloudinary...' : 'Click to upload logo from computer'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      disabled={isUploadingLogo}
+                      onChange={handleLogoUpload}
+                    />
+                  </label>
+                )}
+                {logoUploadError && (
+                  <p className="text-[11px] text-red-600 mt-1">{logoUploadError}</p>
+                )}
+              </div>
             </div>
           )}
 

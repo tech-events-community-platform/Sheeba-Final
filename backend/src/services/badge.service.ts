@@ -1,5 +1,6 @@
 import { query } from '../config/db';
 import { BadgeCode, IBadgeAward, UserRole } from '../types';
+import { AuditService } from './audit.service';
 
 export class BadgeService {
   static formatBadge(row: any): any {
@@ -55,6 +56,84 @@ export class BadgeService {
     );
 
     return result.rows.map((row: any) => this.formatBadge(row));
+  }
+
+  static async getBadgeAwardsPaginated(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+  }): Promise<{
+    badges: any[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const page = Math.max(1, Number(params.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(params.limit) || 15));
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = [];
+    const values: any[] = [];
+    let pIdx = 1;
+
+    if (params.status === 'active') {
+      conditions.push(`b.revoked_at IS NULL`);
+    } else if (params.status === 'revoked') {
+      conditions.push(`b.revoked_at IS NOT NULL`);
+    }
+
+    if (params.search && params.search.trim()) {
+      const term = `%${params.search.trim().toLowerCase()}%`;
+      values.push(term);
+      conditions.push(
+        `(LOWER(u.full_name) LIKE $${pIdx} OR LOWER(u.email) LIKE $${pIdx} OR LOWER(e.title) LIKE $${pIdx} OR LOWER(b.badge_label) LIKE $${pIdx} OR LOWER(COALESCE(org.organization, org.full_name, '')) LIKE $${pIdx})`
+      );
+      pIdx++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const countSql = `
+      SELECT COUNT(*)::INTEGER AS total
+      FROM badge_awards b
+      JOIN events e ON b.event_id = e.id
+      JOIN users u ON b.user_id = u.id
+      JOIN users org ON e.organizer_id = org.id
+      ${whereClause}
+    `;
+    const countRes = await query(countSql, values);
+    const total = countRes.rows[0]?.total || 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    const dataValues = [...values, limit, offset];
+    const dataSql = `
+      SELECT 
+        b.id, b.badge_code, b.badge_label, b.event_id, b.user_id, b.awarded_by, b.awarded_at, b.revoked_at, b.revocation_reason, b.organizer_note,
+        e.title AS event_title, e.event_type, e.event_date, e.location AS event_location, e.description AS event_description, e.start_time, e.end_time,
+        u.full_name AS attendee_name, u.email AS attendee_email,
+        org.full_name AS issuer_name,
+        COALESCE(org.organization, org.full_name, 'Organizer') AS organizer_name,
+        org.organization AS organizer_organization
+      FROM badge_awards b
+      JOIN events e ON b.event_id = e.id
+      JOIN users u ON b.user_id = u.id
+      JOIN users org ON e.organizer_id = org.id
+      ${whereClause}
+      ORDER BY b.awarded_at DESC
+      LIMIT $${pIdx} OFFSET $${pIdx + 1}
+    `;
+
+    const dataRes = await query(dataSql, dataValues);
+    const badges = dataRes.rows.map((row: any) => this.formatBadge(row));
+
+    return {
+      badges,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
   }
 
   static async getAttendeeBadges(userId: string): Promise<any[]> {
@@ -232,6 +311,16 @@ export class BadgeService {
     );
 
     const raw = insertRes.rows[0];
+    await AuditService.logAction({
+      action: 'BADGE_AWARDED',
+      category: 'BADGES',
+      entityType: 'badge_award',
+      entityId: raw.id,
+      entityTitle: `${badgeLabel} Badge`,
+      performedBy: awardedByOrganizerId,
+      details: `${badgeLabel} badge awarded to attendee`,
+      metadata: { eventId, attendeeId, badgeCode: normBadgeCode },
+    });
     return this.getBadgeById(raw.id);
   }
 
@@ -283,9 +372,10 @@ export class BadgeService {
       `UPDATE badge_awards
        SET revoked_at = NOW(),
            revoked_by = $1,
-           revocation_reason = $2
+           revocation_reason = $2,
+           updated_at = NOW()
        WHERE id = $3
-       RETURNING id`,
+       RETURNING id, badge_label, event_id, user_id`,
       [revokedByUserId || null, reason || 'Admin revocation action', badgeAwardId]
     );
 
@@ -294,6 +384,51 @@ export class BadgeService {
       err.statusCode = 404;
       throw err;
     }
+
+    const row = res.rows[0];
+    await AuditService.logAction({
+      action: 'BADGE_REVOKED',
+      category: 'BADGES',
+      entityType: 'badge_award',
+      entityId: badgeAwardId,
+      entityTitle: `${row.badge_label || 'Badge'} Award`,
+      performedBy: revokedByUserId,
+      details: reason || 'Badge credential revoked by administration',
+      metadata: { badgeAwardId, eventId: row.event_id, recipientUserId: row.user_id },
+    });
+
+    return true;
+  }
+
+  static async adminReinstateBadge(badgeAwardId: string, reinstatedByUserId?: string): Promise<boolean> {
+    const res = await query(
+      `UPDATE badge_awards
+       SET revoked_at = NULL,
+           revoked_by = NULL,
+           revocation_reason = NULL,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, badge_label, event_id, user_id`,
+      [badgeAwardId]
+    );
+
+    if (!res.rowCount || res.rowCount === 0) {
+      const err: any = new Error('Badge award record not found.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const row = res.rows[0];
+    await AuditService.logAction({
+      action: 'BADGE_REINSTATED',
+      category: 'BADGES',
+      entityType: 'badge_award',
+      entityId: badgeAwardId,
+      entityTitle: `${row.badge_label || 'Badge'} Award`,
+      performedBy: reinstatedByUserId,
+      details: 'Previously revoked badge credential reinstated to active status by administration',
+      metadata: { badgeAwardId, eventId: row.event_id, recipientUserId: row.user_id },
+    });
 
     return true;
   }

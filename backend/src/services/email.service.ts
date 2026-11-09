@@ -1517,4 +1517,118 @@ export class EmailService {
 
     await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
+
+  /**
+   * Notify organizer when event public discovery has been taken down by administration
+   */
+  static async sendEventPublicityTakedownNotificationEmail(params: {
+    toEmail: string;
+    organizerName: string;
+    eventTitle: string;
+    reason: string;
+  }): Promise<void> {
+    const { toEmail, organizerName, eventTitle, reason } = params;
+    const subject = `Notice: Public Discovery Suspended for "${eventTitle}"`;
+
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #FAF7F5;">
+        <div style="background-color: #ffffff; padding: 32px; border-radius: 16px; border: 1px solid #E8DDD7; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+            <div style="width: 40px; height: 40px; background-color: #FEF2F2; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+              🛡️
+            </div>
+            <div>
+              <h1 style="color: #991B1B; font-size: 20px; font-weight: bold; margin: 0;">Community Discovery Update</h1>
+              <p style="color: #756366; font-size: 13px; margin: 2px 0 0 0;">Sheeba Platform Administration</p>
+            </div>
+          </div>
+
+          <p style="color: #2D1F23; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+            Hello <strong>${organizerName || 'Organizer'}</strong>,
+          </p>
+          <p style="color: #2D1F23; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+            Following a content review, public discovery for your event <strong>"${eventTitle}"</strong> has been suspended from the Sheeba Community Discovery feed.
+          </p>
+
+          <div style="background-color: #FEF2F2; border: 1px solid #F87171; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+            <p style="color: #991B1B; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px 0;">
+              Reason for Administrative Takedown:
+            </p>
+            <p style="color: #7F1D1D; font-size: 13px; line-height: 1.5; margin: 0; white-space: pre-wrap;">
+              ${reason}
+            </p>
+          </div>
+
+          <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+            <p style="color: #334155; font-size: 12px; line-height: 1.5; margin: 0;">
+              <strong>ℹ️ Important Note:</strong> Your event has <em>not</em> been cancelled. Existing attendee registrations, tickets, passes, and your private direct registration link remain fully active.
+            </p>
+          </div>
+
+          <p style="color: #756366; font-size: 12px; line-height: 1.5; margin: 0;">
+            If you believe this was in error or if you have updated your event to comply with Sheeba Platform Guidelines, please contact administration to request reinstatement.
+          </p>
+        </div>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, organizerName);
+  }
+
+  /**
+   * Notify organizer when sponsorship pitch has been taken down by administration
+   */
+  static async sendPitchTakedownNotificationEmail(params: {
+    toEmail: string;
+    organizerName: string;
+    eventTitle: string;
+    reason: string;
+  }): Promise<void> {
+    const { toEmail, organizerName, eventTitle, reason } = params;
+    const subject = `Notice: Sponsorship Pitch Taken Down for "${eventTitle}"`;
+
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #FAF7F5;">
+        <div style="background-color: #ffffff; padding: 32px; border-radius: 16px; border: 1px solid #E8DDD7; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+            <div style="width: 40px; height: 40px; background-color: #FEF2F2; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+              ⚠️
+            </div>
+            <div>
+              <h1 style="color: #991B1B; font-size: 20px; font-weight: bold; margin: 0;">Sponsorship Marketplace Notice</h1>
+              <p style="color: #756366; font-size: 13px; margin: 2px 0 0 0;">Code of Conduct & Moderation Oversight</p>
+            </div>
+          </div>
+
+          <p style="color: #2D1F23; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+            Hello <strong>${organizerName || 'Organizer'}</strong>,
+          </p>
+          <p style="color: #2D1F23; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+            Your sponsorship pitch for <strong>"${eventTitle}"</strong> has been taken down from the Sheeba Sponsorship Marketplace due to a policy or Code of Conduct violation.
+          </p>
+
+          <div style="background-color: #FEF2F2; border: 1px solid #F87171; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+            <p style="color: #991B1B; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px 0;">
+              Policy / Code of Conduct Violation Reason:
+            </p>
+            <p style="color: #7F1D1D; font-size: 13px; line-height: 1.5; margin: 0; white-space: pre-wrap;">
+              ${reason}
+            </p>
+          </div>
+
+          <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+            <p style="color: #334155; font-size: 12px; line-height: 1.5; margin: 0;">
+              <strong>ℹ️ Note on Existing Deals:</strong> Any sponsorship deals, pledges, or agreements already confirmed prior to this takedown remain intact in your records. However, new sponsors cannot discover or apply to this pitch while it is taken down.
+            </p>
+          </div>
+
+          <p style="color: #756366; font-size: 12px; line-height: 1.5; margin: 0;">
+            To appeal this decision or request reinstatement after rectifying the issue, please contact Sheeba Platform Administration.
+          </p>
+        </div>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, organizerName);
+  }
 }

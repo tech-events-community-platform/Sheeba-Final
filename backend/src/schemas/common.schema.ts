@@ -59,3 +59,14 @@ export const recycleBinItemParamSchema = z.object({
   ),
   id: z.string().trim().min(1, 'ID parameter is required.'),
 });
+
+/**
+ * Admin users list query schema supporting backend filtering and pagination
+ */
+export const adminUsersQuerySchema = z.object({
+  role: z.enum(['organizer', 'sponsor', 'attendee']).optional(),
+  status: z.enum(['pending', 'approved', 'rejected', 'all']).optional(),
+  search: z.string().trim().optional(),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(15),
+});

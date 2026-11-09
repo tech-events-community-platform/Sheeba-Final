@@ -1588,10 +1588,22 @@ export const api = {
       return badgeAwardsStore.filter((b) => b.attendeeId === attendeeId && !b.revokedAt);
     },
 
-    getAllBadgeAwards: async (): Promise<BadgeAward[]> => {
+    getAllBadgeAwards: async (params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+    }): Promise<any> => {
       try {
-        const res = await requestApi('/badges');
-        if (res.data && Array.isArray(res.data)) return res.data;
+        const queryParts: string[] = [];
+        if (params?.page) queryParts.push(`page=${params.page}`);
+        if (params?.limit) queryParts.push(`limit=${params.limit}`);
+        if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+        if (params?.status && params.status !== 'all') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+        const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+
+        const res = await requestApi(`/badges${queryStr}`);
+        if (res.data) return res.data;
       } catch {
         // fallback
       }
@@ -1616,6 +1628,20 @@ export const api = {
         const award = badgeAwardsStore.find((b) => b.id === badgeId);
         if (award) {
           award.revokedAt = new Date().toISOString();
+          return true;
+        }
+        return false;
+      }
+    },
+
+    adminReinstateBadge: async (badgeId: string): Promise<boolean> => {
+      try {
+        await requestApi(`/badges/${badgeId}/reinstate`, { method: 'POST' });
+        return true;
+      } catch {
+        const award = badgeAwardsStore.find((b) => b.id === badgeId);
+        if (award) {
+          award.revokedAt = null;
           return true;
         }
         return false;
@@ -2105,8 +2131,21 @@ export const api = {
       return res.data;
     },
 
-    getUsers: async () => {
-      const res = await requestApi('/admin/users');
+    getUsers: async (params?: {
+      role?: 'organizer' | 'sponsor' | 'attendee';
+      status?: 'pending' | 'approved' | 'rejected' | 'all';
+      search?: string;
+      page?: number;
+      limit?: number;
+    }) => {
+      const queryParts: string[] = [];
+      if (params?.role) queryParts.push(`role=${encodeURIComponent(params.role)}`);
+      if (params?.status && params.status !== 'all') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+      if (params?.search && params.search.trim()) queryParts.push(`search=${encodeURIComponent(params.search.trim())}`);
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/admin/users${queryStr}`);
       return res.data;
     },
 
@@ -2199,6 +2238,112 @@ export const api = {
       } catch {
         return [];
       }
+    },
+
+    // Content Moderation (Publicized Events & Organizer Sponsorship Pitches)
+    getPublicizedEventsForModeration: async (params?: { search?: string; status?: string; page?: number; limit?: number }) => {
+      const queryParts: string[] = [];
+      if (params?.status && params.status !== 'ALL') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/admin/moderation/events${queryStr}`);
+      return res.data || { events: [], total: 0, page: 1, totalPages: 1 };
+    },
+
+    takedownEventPublicity: async (eventId: string, reason: string) => {
+      const res = await requestApi(`/admin/moderation/events/${eventId}/takedown`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    restoreEventPublicity: async (eventId: string, reason?: string) => {
+      const res = await requestApi(`/admin/moderation/events/${eventId}/restore`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    getOrganizerPitchesForModeration: async (params?: { search?: string; status?: string; page?: number; limit?: number }) => {
+      const queryParts: string[] = [];
+      if (params?.status && params.status !== 'ALL') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/admin/moderation/pitches${queryStr}`);
+      return res.data || { pitches: [], total: 0, page: 1, totalPages: 1 };
+    },
+
+    takedownOrganizerPitch: async (pitchId: string, reason: string) => {
+      const res = await requestApi(`/admin/moderation/pitches/${pitchId}/takedown`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    restoreOrganizerPitch: async (pitchId: string, reason?: string) => {
+      const res = await requestApi(`/admin/moderation/pitches/${pitchId}/restore`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      });
+      return res.data;
+    },
+
+    getContentModerationHistory: async (params?: { contentType?: string; contentId?: string; limit?: number }) => {
+      const queryParts: string[] = [];
+      if (params?.contentType) queryParts.push(`contentType=${encodeURIComponent(params.contentType)}`);
+      if (params?.contentId) queryParts.push(`contentId=${encodeURIComponent(params.contentId)}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi(`/admin/moderation/history${queryStr}`);
+      return res.data || [];
+    },
+
+    getAuditLogs: async (params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      category?: string;
+      action?: string;
+    }): Promise<{
+      logs: Array<{
+        id: string;
+        action: string;
+        category: string;
+        entityType: string;
+        entityId: string;
+        entityTitle?: string;
+        performedBy?: string;
+        performedByName: string;
+        performedByEmail?: string;
+        performedByRole?: string;
+        details?: string;
+        metadata: Record<string, any>;
+        createdAt: string;
+      }>;
+      pagination: {
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+      };
+      categoryCounts: Record<string, number>;
+    }> => {
+      const queryParts: string[] = [];
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+      if (params?.category && params.category !== 'ALL') queryParts.push(`category=${encodeURIComponent(params.category)}`);
+      if (params?.action && params.action !== 'ALL') queryParts.push(`action=${encodeURIComponent(params.action)}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi<{ success: boolean; data: any }>(`/admin/audit-logs${queryStr}`);
+      return res.data || { logs: [], pagination: { page: 1, limit: 15, total: 0, totalPages: 1 }, categoryCounts: { ALL: 0 } };
     },
   },
 

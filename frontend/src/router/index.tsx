@@ -71,6 +71,8 @@ import { ScannerPortalPage } from '../pages/scanner/ScannerPortalPage';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { AdminEventsPage } from '../pages/admin/AdminEventsPage';
 import { AdminUsersPage } from '../pages/admin/AdminUsersPage';
+import { AdminModerationPage } from '../pages/admin/AdminModerationPage';
+import { AdminSponsorshipApplicationsPage } from '../pages/admin/AdminSponsorshipApplicationsPage';
 
 // Recycle Bin Pages
 import { OrganizerRecycleBinPage } from '../pages/organizer/OrganizerRecycleBinPage';
@@ -78,6 +80,7 @@ import { AttendeeRecycleBinPage } from '../pages/attendee/AttendeeRecycleBinPage
 import { SponsorRecycleBinPage } from '../pages/sponsor/SponsorRecycleBinPage';
 import { ExhibitorRecycleBinPage } from '../pages/exhibitor/ExhibitorRecycleBinPage';
 import { AdminRecycleBinPage } from '../pages/admin/AdminRecycleBinPage';
+import { AdminAuditLogsPage } from '../pages/admin/AdminAuditLogsPage';
 
 export const router = createBrowserRouter([
   // Public Routes (SRS Section 18)
@@ -181,6 +184,9 @@ export const router = createBrowserRouter([
           { path: 'organizers', element: <AdminUsersPage /> },
           { path: 'reports', element: <AdminDashboardPage /> },
           { path: 'recycle-bin', element: <AdminRecycleBinPage /> },
+          { path: 'audit-logs', element: <AdminAuditLogsPage /> },
+          { path: 'moderation', element: <AdminModerationPage /> },
+          { path: 'sponsorship-applications', element: <AdminSponsorshipApplicationsPage /> },
           { path: 'profile', element: <AccountSettingsPage /> },
           { path: 'settings', element: <AccountSettingsPage /> },
           { path: 'change-password', element: <ChangePasswordPage /> },

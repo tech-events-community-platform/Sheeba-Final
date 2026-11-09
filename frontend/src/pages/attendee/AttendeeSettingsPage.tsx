@@ -907,64 +907,66 @@ export const AttendeeSettingsPage: React.FC = () => {
                           className="w-full px-3.5 py-2.5 bg-white border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                         />
                       </div>
-
-                      {/* Organization Logo Upload */}
-                      <div className="sm:col-span-2 pt-1">
-                        <label className="block text-xs font-bold text-[#2D1F23] mb-2">
-                          Organization Logo (Optional)
-                        </label>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-white border border-[#E8DDD7] rounded-2xl">
-                          {/* Circular Logo Preview / Default Placeholder */}
-                          <div className="w-16 h-16 rounded-full border-2 border-[#E8DDD7] overflow-hidden bg-[#FAF7F5] flex items-center justify-center shrink-0 shadow-xs relative">
-                            {orgLogo ? (
-                              <img
-                                src={orgLogo}
-                                alt="Organization Logo"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <Building2 className="w-8 h-8 text-[#63474D]/40" />
-                            )}
-                          </div>
-
-                          <div className="space-y-1.5 flex-1">
-                            <div className="flex items-center gap-3">
-                              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#63474D]/10 hover:bg-[#63474D]/20 text-[#63474D] text-xs font-bold cursor-pointer transition-all">
-                                <Upload className="w-3.5 h-3.5" />
-                                <span>{isUploadingLogo ? 'Uploading...' : orgLogo ? 'Change Logo' : 'Upload Logo'}</span>
-                                <input
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/webp"
-                                  onChange={handleLogoUpload}
-                                  disabled={isUploadingLogo}
-                                  className="hidden"
-                                />
-                              </label>
-
-                              {orgLogo && (
-                                <button
-                                  type="button"
-                                  onClick={() => setOrgLogo('')}
-                                  className="text-xs text-rose-600 hover:text-rose-700 font-semibold"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-
-                            {logoUploadError && (
-                              <p className="text-[11px] text-red-600 font-medium">{logoUploadError}</p>
-                            )}
-
-                            <p className="text-[11px] text-[#756366] leading-relaxed">
-                              PNG, JPG, or WebP up to 5MB. Displayed as the organization's circular profile image. Never replaces your personal account profile picture.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 )}
+
+                {/* Organizer Logo Upload (Available for all organizers) */}
+                <div className="pt-2 border-t border-[#E8DDD7]">
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-2">
+                    {applicantType === 'Individual Organizer' ? 'Organizer Logo / Profile Photo' : 'Organization Logo'} (Optional)
+                  </label>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-white border border-[#E8DDD7] rounded-2xl">
+                    {/* Circular Logo Preview / Default Placeholder */}
+                    <div className="w-16 h-16 rounded-full border-2 border-[#E8DDD7] overflow-hidden bg-[#FAF7F5] flex items-center justify-center shrink-0 shadow-xs relative">
+                      {orgLogo ? (
+                        <img
+                          src={orgLogo}
+                          alt={applicantType === 'Individual Organizer' ? 'Organizer Logo' : 'Organization Logo'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : applicantType === 'Individual Organizer' ? (
+                        <User className="w-8 h-8 text-[#63474D]/40" />
+                      ) : (
+                        <Building2 className="w-8 h-8 text-[#63474D]/40" />
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-3">
+                        <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#63474D]/10 hover:bg-[#63474D]/20 text-[#63474D] text-xs font-bold cursor-pointer transition-all">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{isUploadingLogo ? 'Uploading...' : orgLogo ? 'Change Logo' : 'Upload Logo'}</span>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={handleLogoUpload}
+                            disabled={isUploadingLogo}
+                            className="hidden"
+                          />
+                        </label>
+
+                        {orgLogo && (
+                          <button
+                            type="button"
+                            onClick={() => setOrgLogo('')}
+                            className="text-xs text-rose-600 hover:text-rose-700 font-semibold"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+
+                      {logoUploadError && (
+                        <p className="text-[11px] text-red-600 font-medium">{logoUploadError}</p>
+                      )}
+
+                      <p className="text-[11px] text-[#756366] leading-relaxed">
+                        PNG, JPG, or WebP up to 5MB. Uploaded via Cloudinary. Displayed on public event pages and organizer listings.
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Account Password Verification */}
                 {user?.hasPassword !== false && (

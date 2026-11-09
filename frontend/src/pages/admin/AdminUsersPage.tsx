@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { Pagination } from '../../components/ui/Pagination';
 import {
   Search,
   Users,
@@ -23,6 +24,11 @@ import {
   Eye,
   Send,
   HelpCircle,
+  Target,
+  DollarSign,
+  Tag,
+  Briefcase,
+  Layers,
 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -72,10 +78,28 @@ export interface SponsorRecord {
   industryCategory: string;
   phone?: string;
   website?: string;
+  companyWebsite?: string;
+  companyPhone?: string;
+  bio?: string;
+  avatarUrl?: string;
+  sponsorPreferences?: {
+    sponsorshipObjectives?: string[];
+    targetAudience?: string[];
+    targetSkills?: string[];
+    targetInterests?: string[];
+    preferredEventCategories?: string[];
+    preferredEventTypes?: string[];
+    preferredLocations?: string[];
+    minBudget?: number | null;
+    maxBudget?: number | null;
+    preferredBenefits?: string[];
+    additionalPreferences?: Record<string, any>;
+  };
   status: string;
   approvalStatus: string;
   isActive: boolean;
   registeredAt: string;
+  updatedAt?: string;
 }
 
 export const AdminUsersPage: React.FC = () => {
@@ -84,7 +108,63 @@ export const AdminUsersPage: React.FC = () => {
   const [sponsors, setSponsors] = useState<SponsorRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'ORGANIZERS' | 'ATTENDEES' | 'SPONSORS'>('ORGANIZERS');
+  const [organizerSubTab, setOrganizerSubTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [sponsorSubTab, setSponsorSubTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Independent pagination state per role/status
+  const [pages, setPages] = useState<Record<string, number>>({
+    organizer_pending: 1,
+    organizer_approved: 1,
+    organizer_rejected: 1,
+    sponsor_pending: 1,
+    sponsor_approved: 1,
+    sponsor_rejected: 1,
+    attendee_all: 1,
+  });
+  const [totalRecords, setTotalRecords] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [statusCounts, setStatusCounts] = useState<{
+    pending: number;
+    approved: number;
+    rejected: number;
+    more_info_needed?: number;
+    total: number;
+  }>({ pending: 0, approved: 0, rejected: 0, total: 0 });
+  const [summaryStats, setSummaryStats] = useState<{
+    organizersTotal: number;
+    organizersPending: number;
+    organizersApproved: number;
+    organizersRejected: number;
+    sponsorsTotal: number;
+    sponsorsPending: number;
+    sponsorsApproved: number;
+    sponsorsRejected: number;
+    attendeesTotal: number;
+  }>({
+    organizersTotal: 0,
+    organizersPending: 0,
+    organizersApproved: 0,
+    organizersRejected: 0,
+    sponsorsTotal: 0,
+    sponsorsPending: 0,
+    sponsorsApproved: 0,
+    sponsorsRejected: 0,
+    attendeesTotal: 0,
+  });
+
+  const getCurrentKey = () => {
+    if (activeTab === 'ORGANIZERS') return `organizer_${organizerSubTab}`;
+    if (activeTab === 'SPONSORS') return `sponsor_${sponsorSubTab}`;
+    return 'attendee_all';
+  };
+  const currentPage = pages[getCurrentKey()] || 1;
+
+  const handlePageChange = (newPage: number) => {
+    const key = getCurrentKey();
+    setPages((prev) => ({ ...prev, [key]: newPage }));
+  };
 
   const [statusModalUser, setStatusModalUser] = useState<AttendeeRecord | OrganizerRecord | SponsorRecord | null>(null);
 
@@ -96,18 +176,61 @@ export const AdminUsersPage: React.FC = () => {
   const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('');
   const [requestInfoNotesInput, setRequestInfoNotesInput] = useState<string>('');
 
+  // Sponsor Review Modal state
+  const [reviewSponsor, setReviewSponsor] = useState<SponsorRecord | null>(null);
+  const [reviewSponsorLoading, setReviewSponsorLoading] = useState<boolean>(false);
+  const [sponsorLogoError, setSponsorLogoError] = useState<boolean>(false);
+  const [reviewSponsorActionTab, setReviewSponsorActionTab] = useState<'idle' | 'reject'>('idle');
+
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [actionErrorMsg, setActionErrorMsg] = useState<string | null>(null);
 
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset page to 1 when search query changes
+  useEffect(() => {
+    const key = getCurrentKey();
+    setPages((prev) => ({ ...prev, [key]: 1 }));
+  }, [debouncedSearch]);
+
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const data = await api.admin.getUsers();
+      const role = activeTab === 'ORGANIZERS' ? 'organizer' : activeTab === 'SPONSORS' ? 'sponsor' : 'attendee';
+      const status = activeTab === 'ORGANIZERS' ? organizerSubTab : activeTab === 'SPONSORS' ? sponsorSubTab : 'all';
+      const pageToFetch = pages[getCurrentKey()] || 1;
+
+      const data = await api.admin.getUsers({
+        role,
+        status,
+        search: debouncedSearch,
+        page: pageToFetch,
+        limit: 15,
+      });
+
       if (data) {
-        setAttendees(data.attendees || []);
-        setOrganizers(data.organizers || []);
-        setSponsors(data.sponsors || []);
+        if (role === 'organizer') {
+          setOrganizers(data.records || data.organizers || []);
+        } else if (role === 'sponsor') {
+          setSponsors(data.records || data.sponsors || []);
+        } else if (role === 'attendee') {
+          setAttendees(data.records || data.attendees || []);
+        }
+        setTotalRecords(data.total ?? 0);
+        setTotalPages(data.totalPages ?? 1);
+        if (data.counts) {
+          setStatusCounts(data.counts);
+        }
+        if (data.summary) {
+          setSummaryStats(data.summary);
+        }
       }
     } catch (err: any) {
       console.error('Failed to load users from backend:', err);
@@ -118,7 +241,7 @@ export const AdminUsersPage: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [activeTab, organizerSubTab, sponsorSubTab, debouncedSearch, currentPage]);
 
   const handleOpenOrganizerReview = async (organizer: OrganizerRecord) => {
     setReviewOrganizer(organizer);
@@ -204,6 +327,23 @@ export const AdminUsersPage: React.FC = () => {
     }
   };
 
+  const handleOpenSponsorReview = async (sponsor: SponsorRecord) => {
+    setReviewSponsor(sponsor);
+    setSponsorLogoError(false);
+    setReviewSponsorActionTab('idle');
+    setReviewSponsorLoading(true);
+    try {
+      const details = await api.admin.getSponsorDetails(sponsor.id);
+      if (details) {
+        setReviewSponsor((prev) => (prev ? { ...prev, ...details } : details));
+      }
+    } catch (err) {
+      console.warn('Could not fetch detailed sponsor record, using row data:', err);
+    } finally {
+      setReviewSponsorLoading(false);
+    }
+  };
+
   const handleApproveSponsor = async (sponsorId: string) => {
     setActionLoadingId(sponsorId);
     setActionSuccessMsg(null);
@@ -212,6 +352,10 @@ export const AdminUsersPage: React.FC = () => {
     try {
       await api.admin.approveSponsor(sponsorId);
       setActionSuccessMsg('Sponsor approved and activated successfully! An approval email has been dispatched.');
+      if (reviewSponsor?.id === sponsorId) {
+        setReviewSponsor(null);
+        setReviewSponsorActionTab('idle');
+      }
       await fetchUsers();
     } catch (err: any) {
       setActionErrorMsg(err.message || 'Failed to approve sponsor.');
@@ -228,6 +372,10 @@ export const AdminUsersPage: React.FC = () => {
     try {
       await api.admin.rejectSponsor(sponsorId);
       setActionSuccessMsg('Sponsor application rejected. A notification email has been dispatched.');
+      if (reviewSponsor?.id === sponsorId) {
+        setReviewSponsor(null);
+        setReviewSponsorActionTab('idle');
+      }
       await fetchUsers();
     } catch (err: any) {
       setActionErrorMsg(err.message || 'Failed to reject sponsor.');
@@ -252,31 +400,8 @@ export const AdminUsersPage: React.FC = () => {
     }
   };
 
-  const pendingOrganizersCount = organizers.filter(
-    (o) => o.approvalStatus === 'pending' || o.approvalStatus === 'more_info_needed'
-  ).length;
-  const pendingSponsorsCount = sponsors.filter((s) => s.approvalStatus === 'pending').length;
-
-  const filteredAttendees = attendees.filter(
-    (u) =>
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredOrganizers = organizers.filter(
-    (o) =>
-      o.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.organization.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredSponsors = sponsors.filter(
-    (s) =>
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.industryCategory.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const pendingOrganizersCount = summaryStats.organizersPending;
+  const pendingSponsorsCount = summaryStats.sponsorsPending;
 
   return (
     <div className="space-y-6 pb-16">
@@ -325,10 +450,13 @@ export const AdminUsersPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Main Tabs */}
       <div className="flex border-b border-[#E8DDD7] gap-6">
         <button
-          onClick={() => setActiveTab('ORGANIZERS')}
+          onClick={() => {
+            setActiveTab('ORGANIZERS');
+            setPages((prev) => ({ ...prev, [`organizer_${organizerSubTab}`]: 1 }));
+          }}
           className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
             activeTab === 'ORGANIZERS'
               ? 'border-[#63474D] text-[#63474D]'
@@ -336,7 +464,7 @@ export const AdminUsersPage: React.FC = () => {
           }`}
         >
           <Building2 className="w-4 h-4" />
-          Organizers ({organizers.length})
+          Organizers ({summaryStats.organizersTotal})
           {pendingOrganizersCount > 0 && (
             <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black animate-pulse">
               {pendingOrganizersCount} Pending
@@ -345,7 +473,10 @@ export const AdminUsersPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('SPONSORS')}
+          onClick={() => {
+            setActiveTab('SPONSORS');
+            setPages((prev) => ({ ...prev, [`sponsor_${sponsorSubTab}`]: 1 }));
+          }}
           className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
             activeTab === 'SPONSORS'
               ? 'border-[#63474D] text-[#63474D]'
@@ -353,7 +484,7 @@ export const AdminUsersPage: React.FC = () => {
           }`}
         >
           <Sparkles className="w-4 h-4 text-[#FFA686]" />
-          Corporate Sponsors ({sponsors.length})
+          Corporate Sponsors ({summaryStats.sponsorsTotal})
           {pendingSponsorsCount > 0 && (
             <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black animate-pulse">
               {pendingSponsorsCount} Pending
@@ -362,7 +493,10 @@ export const AdminUsersPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('ATTENDEES')}
+          onClick={() => {
+            setActiveTab('ATTENDEES');
+            setPages((prev) => ({ ...prev, attendee_all: 1 }));
+          }}
           className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
             activeTab === 'ATTENDEES'
               ? 'border-[#63474D] text-[#63474D]'
@@ -370,9 +504,157 @@ export const AdminUsersPage: React.FC = () => {
           }`}
         >
           <Users className="w-4 h-4" />
-          Attendees ({attendees.length})
+          Attendees ({summaryStats.attendeesTotal})
         </button>
       </div>
+
+      {/* Sub-Tabs: Pill Switcher for Organizers */}
+      {activeTab === 'ORGANIZERS' && (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setOrganizerSubTab('pending');
+              setPages((prev) => ({ ...prev, organizer_pending: 1 }));
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              organizerSubTab === 'pending'
+                ? 'bg-[#63474D] text-white shadow-xs'
+                : 'bg-white border border-[#E8DDD7] text-[#756366] hover:bg-[#FAF7F5]'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Pending Review</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                organizerSubTab === 'pending' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {summaryStats.organizersPending}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setOrganizerSubTab('approved');
+              setPages((prev) => ({ ...prev, organizer_approved: 1 }));
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              organizerSubTab === 'approved'
+                ? 'bg-[#63474D] text-white shadow-xs'
+                : 'bg-white border border-[#E8DDD7] text-[#756366] hover:bg-[#FAF7F5]'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Approved Organizers</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                organizerSubTab === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+              }`}
+            >
+              {summaryStats.organizersApproved}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setOrganizerSubTab('rejected');
+              setPages((prev) => ({ ...prev, organizer_rejected: 1 }));
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              organizerSubTab === 'rejected'
+                ? 'bg-[#63474D] text-white shadow-xs'
+                : 'bg-white border border-[#E8DDD7] text-[#756366] hover:bg-[#FAF7F5]'
+            }`}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            <span>Rejected / More Info</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                organizerSubTab === 'rejected' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+              }`}
+            >
+              {summaryStats.organizersRejected}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Sub-Tabs: Pill Switcher for Sponsors */}
+      {activeTab === 'SPONSORS' && (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setSponsorSubTab('pending');
+              setPages((prev) => ({ ...prev, sponsor_pending: 1 }));
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              sponsorSubTab === 'pending'
+                ? 'bg-[#63474D] text-white shadow-xs'
+                : 'bg-white border border-[#E8DDD7] text-[#756366] hover:bg-[#FAF7F5]'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Pending Review</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                sponsorSubTab === 'pending' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {summaryStats.sponsorsPending}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSponsorSubTab('approved');
+              setPages((prev) => ({ ...prev, sponsor_approved: 1 }));
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              sponsorSubTab === 'approved'
+                ? 'bg-[#63474D] text-white shadow-xs'
+                : 'bg-white border border-[#E8DDD7] text-[#756366] hover:bg-[#FAF7F5]'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Approved Sponsors</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                sponsorSubTab === 'approved' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+              }`}
+            >
+              {summaryStats.sponsorsApproved}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setSponsorSubTab('rejected');
+              setPages((prev) => ({ ...prev, sponsor_rejected: 1 }));
+            }}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              sponsorSubTab === 'rejected'
+                ? 'bg-[#63474D] text-white shadow-xs'
+                : 'bg-white border border-[#E8DDD7] text-[#756366] hover:bg-[#FAF7F5]'
+            }`}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            <span>Rejected</span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                sponsorSubTab === 'rejected' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+              }`}
+            >
+              {summaryStats.sponsorsRejected}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="relative max-w-sm">
@@ -405,14 +687,20 @@ export const AdminUsersPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DDD7] text-[#2D1F23]">
-                {filteredSponsors.length === 0 ? (
+                {sponsors.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-xs text-[#756366]">
-                      No corporate sponsors registered yet.
+                      {isLoading
+                        ? 'Loading corporate sponsors...'
+                        : sponsorSubTab === 'pending'
+                        ? 'No pending corporate sponsors awaiting review.'
+                        : sponsorSubTab === 'approved'
+                        ? 'No approved corporate sponsors found.'
+                        : 'No rejected corporate sponsors.'}
                     </td>
                   </tr>
                 ) : (
-                  filteredSponsors.map((s) => (
+                  sponsors.map((s) => (
                     <tr key={s.id} className="hover:bg-[#FAF7F5]/50 transition-colors">
                       <td className="py-3.5 px-4">
                         <div className="font-bold text-[#2D1F23] flex items-center gap-1.5">
@@ -464,30 +752,42 @@ export const AdminUsersPage: React.FC = () => {
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
-                        {s.approvalStatus === 'pending' ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="accent"
-                              isLoading={actionLoadingId === s.id}
-                              onClick={() => handleApproveSponsor(s.id)}
-                              className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                            >
-                              Approve
-                            </Button>
-                            <button
-                              type="button"
-                              onClick={() => handleRejectSponsor(s.id)}
-                              className="text-xs font-semibold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs font-semibold text-gray-500">
-                            {s.approvalStatus === 'approved' ? 'Verified' : 'Archived'}
-                          </span>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenSponsorReview(s)}
+                            className="text-xs px-2.5 py-1 flex items-center gap-1 border-[#E8DDD7] text-[#63474D] hover:bg-[#FAF7F5]"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Review
+                          </Button>
+
+                          {s.approvalStatus === 'pending' ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="accent"
+                                isLoading={actionLoadingId === s.id}
+                                onClick={() => handleApproveSponsor(s.id)}
+                                className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                              >
+                                Approve
+                              </Button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectSponsor(s.id)}
+                                className="text-xs font-semibold text-red-600 hover:text-red-700 hover:underline px-2 py-1"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs font-semibold text-gray-500 pl-1">
+                              {s.approvalStatus === 'approved' ? 'Verified' : 'Archived'}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -510,14 +810,20 @@ export const AdminUsersPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DDD7] text-[#2D1F23]">
-                {filteredOrganizers.length === 0 ? (
+                {organizers.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-xs text-[#756366]">
-                      No organizers registered yet.
+                      {isLoading
+                        ? 'Loading organizers...'
+                        : organizerSubTab === 'pending'
+                        ? 'No pending organizer applications awaiting review.'
+                        : organizerSubTab === 'approved'
+                        ? 'No approved organizers found.'
+                        : 'No rejected or info-requested organizer applications.'}
                     </td>
                   </tr>
                 ) : (
-                  filteredOrganizers.map((o) => {
+                  organizers.map((o) => {
                     const isOrg = o.applicantType === 'Organization / Institution' || (!o.applicantType && o.organization);
                     return (
                       <tr key={o.id} className="hover:bg-[#FAF7F5]/50 transition-colors">
@@ -635,14 +941,14 @@ export const AdminUsersPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DDD7] text-[#2D1F23]">
-                {filteredAttendees.length === 0 ? (
+                {attendees.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-8 text-center text-xs text-[#756366]">
-                      No attendees registered yet.
+                      {isLoading ? 'Loading attendees...' : 'No attendees found.'}
                     </td>
                   </tr>
                 ) : (
-                  filteredAttendees.map((u) => (
+                  attendees.map((u) => (
                     <tr key={u.id} className="hover:bg-[#FAF7F5]/50 transition-colors">
                       <td className="py-3.5 px-4 font-bold">{u.name}</td>
                       <td className="py-3.5 px-4 text-[#756366]">{u.email}</td>
@@ -668,6 +974,16 @@ export const AdminUsersPage: React.FC = () => {
             </table>
           </div>
         )}
+
+        {/* Unified Backend Pagination */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalRecords}
+          itemsPerPage={15}
+          onPageChange={handlePageChange}
+          isLoading={isLoading}
+        />
       </div>
 
       {/* Organizer Application Review Modal */}
@@ -885,23 +1201,45 @@ export const AdminUsersPage: React.FC = () => {
                       >
                         Request Info
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setReviewActionTab('reject')}
-                        className="border-red-300 text-red-700 hover:bg-red-50 text-xs"
-                      >
-                        Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        isLoading={actionLoadingId === reviewOrganizer.id}
-                        onClick={() => handleApproveOrganizer(reviewOrganizer.id)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
-                      >
-                        Approve Application
-                      </Button>
+
+                      {reviewOrganizer.approvalStatus !== 'approved' ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setReviewActionTab('reject')}
+                            className="border-red-300 text-red-700 hover:bg-red-50 text-xs"
+                          >
+                            Reject
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            isLoading={actionLoadingId === reviewOrganizer.id}
+                            onClick={() => handleApproveOrganizer(reviewOrganizer.id)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                          >
+                            Approve Application
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setReviewOrganizer(null);
+                            setStatusModalUser(reviewOrganizer);
+                          }}
+                          className={`text-xs ${
+                            reviewOrganizer.isActive
+                              ? 'border-red-300 text-red-700 hover:bg-red-50'
+                              : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                          }`}
+                        >
+                          {reviewOrganizer.isActive ? 'Deactivate Account' : 'Activate Account'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ) : reviewActionTab === 'reject' ? (
@@ -991,6 +1329,394 @@ export const AdminUsersPage: React.FC = () => {
         )}
       </Modal>
 
+      {/* Corporate Sponsor Application Review Modal */}
+      <Modal
+        isOpen={!!reviewSponsor}
+        onClose={() => {
+          setReviewSponsor(null);
+          setReviewSponsorActionTab('idle');
+        }}
+        title="Corporate Sponsor Application Review"
+        maxWidth="2xl"
+      >
+        {reviewSponsor && (
+          <div className="space-y-5 text-xs text-[#2D1F23]">
+            {/* Header Info */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E8DDD7] gap-2">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={
+                    reviewSponsor.approvalStatus === 'approved'
+                      ? 'success'
+                      : reviewSponsor.approvalStatus === 'pending'
+                      ? 'warning'
+                      : 'error'
+                  }
+                >
+                  {reviewSponsor.approvalStatus === 'pending'
+                    ? 'Pending Review'
+                    : reviewSponsor.approvalStatus === 'approved'
+                    ? 'Approved / Active'
+                    : 'Rejected'}
+                </Badge>
+                <span className="text-[11px] font-semibold text-[#63474D] bg-[#FAF7F5] border border-[#E8DDD7] px-2.5 py-0.5 rounded-full">
+                  {reviewSponsor.industryCategory || 'Technology & Digital'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-[#756366]">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>
+                  Registered:{' '}
+                  {reviewSponsor.registeredAt
+                    ? new Date(reviewSponsor.registeredAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })
+                    : 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {reviewSponsorLoading ? (
+              <div className="py-8 text-center text-[#756366] flex flex-col items-center gap-2">
+                <RefreshCw className="w-5 h-5 animate-spin text-[#63474D]" />
+                <span>Loading sponsor profile & questionnaire answers...</span>
+              </div>
+            ) : (
+              <>
+                {/* Corporate & Representative Identity Card */}
+                <div className="flex items-start gap-4 p-4 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7]">
+                  {/* Logo or Placeholder */}
+                  <div className="shrink-0">
+                    {reviewSponsor.avatarUrl && !sponsorLogoError ? (
+                      <img
+                        src={reviewSponsor.avatarUrl}
+                        alt={`${reviewSponsor.companyName} Logo`}
+                        onError={() => setSponsorLogoError(true)}
+                        className="w-16 h-16 rounded-2xl object-cover border-2 border-[#E8DDD7] shadow-sm bg-white p-1"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-2xl bg-white border-2 border-[#E8DDD7] flex items-center justify-center text-[#63474D] shadow-sm">
+                        <Building2 className="w-8 h-8" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <h4 className="font-bold text-base text-[#2D1F23] truncate">
+                        {reviewSponsor.companyName}
+                      </h4>
+                    </div>
+                    <div className="text-[11px] text-[#756366]">
+                      Representative / Lead Contact:{' '}
+                      <strong className="text-[#2D1F23]">{reviewSponsor.name}</strong>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 text-[11px] text-[#756366]">
+                      <span className="flex items-center gap-1">
+                        <Mail className="w-3 h-3 text-[#63474D]" />
+                        {reviewSponsor.email}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-[#63474D]" />
+                        {reviewSponsor.phone || reviewSponsor.companyPhone || 'No phone provided'}
+                      </span>
+                      {(reviewSponsor.website || reviewSponsor.companyWebsite) && (
+                        <a
+                          href={
+                            (reviewSponsor.website || reviewSponsor.companyWebsite)!.startsWith('http')
+                              ? (reviewSponsor.website || reviewSponsor.companyWebsite)
+                              : `https://${reviewSponsor.website || reviewSponsor.companyWebsite}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#63474D] font-bold hover:underline"
+                        >
+                          <Globe className="w-3 h-3" />
+                          <span>{reviewSponsor.website || reviewSponsor.companyWebsite}</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Company Overview & Background */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#63474D]" />
+                    Company Overview & Background
+                  </label>
+                  <div className="p-3.5 rounded-2xl bg-white border border-[#E8DDD7] text-xs leading-relaxed text-[#2D1F23] whitespace-pre-wrap">
+                    {reviewSponsor.bio || 'No company bio provided during registration.'}
+                  </div>
+                </div>
+
+                {/* Sponsorship Questionnaire & Preferences */}
+                <div className="space-y-3 pt-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#FFA686]" />
+                    Sponsorship Questionnaire & Targeting Preferences
+                  </label>
+
+                  <div className="p-4 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] space-y-4">
+                    {/* Objectives */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1">
+                        <Target className="w-3 h-3 text-[#63474D]" />
+                        Sponsorship Objectives
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {reviewSponsor.sponsorPreferences?.sponsorshipObjectives &&
+                        reviewSponsor.sponsorPreferences.sponsorshipObjectives.length > 0 ? (
+                          reviewSponsor.sponsorPreferences.sponsorshipObjectives.map((obj, i) => (
+                            <span
+                              key={i}
+                              className="px-2.5 py-1 rounded-xl bg-white border border-[#E8DDD7] text-[11px] font-semibold text-[#2D1F23]"
+                            >
+                              {obj}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-[#756366] italic">None specified</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Target Audience */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1">
+                        <Users className="w-3 h-3 text-[#63474D]" />
+                        Target Audience
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {reviewSponsor.sponsorPreferences?.targetAudience &&
+                        reviewSponsor.sponsorPreferences.targetAudience.length > 0 ? (
+                          reviewSponsor.sponsorPreferences.targetAudience.map((aud, i) => (
+                            <span
+                              key={i}
+                              className="px-2.5 py-1 rounded-xl bg-white border border-[#E8DDD7] text-[11px] font-semibold text-[#2D1F23]"
+                            >
+                              {aud}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-[#756366] italic">General audience</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Target Skills & Interests */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1">
+                        <Tag className="w-3 h-3 text-[#63474D]" />
+                        Target Skills & Technologies
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(reviewSponsor.sponsorPreferences?.targetSkills?.length ||
+                          reviewSponsor.sponsorPreferences?.targetInterests?.length) ? (
+                          [
+                            ...(reviewSponsor.sponsorPreferences?.targetSkills || []),
+                            ...(reviewSponsor.sponsorPreferences?.targetInterests || []),
+                          ].map((skill, i) => (
+                            <span
+                              key={i}
+                              className="px-2.5 py-1 rounded-xl bg-white border border-[#E8DDD7] text-[11px] font-semibold text-[#63474D]"
+                            >
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-[#756366] italic">All tech domains</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Preferred Event Categories */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1">
+                        <Layers className="w-3 h-3 text-[#63474D]" />
+                        Preferred Event Formats & Categories
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(reviewSponsor.sponsorPreferences?.preferredEventCategories?.length ||
+                          reviewSponsor.sponsorPreferences?.preferredEventTypes?.length) ? (
+                          [
+                            ...(reviewSponsor.sponsorPreferences?.preferredEventCategories || []),
+                            ...(reviewSponsor.sponsorPreferences?.preferredEventTypes || []),
+                          ].map((cat, i) => (
+                            <span
+                              key={i}
+                              className="px-2.5 py-1 rounded-xl bg-white border border-[#E8DDD7] text-[11px] font-semibold text-[#2D1F23]"
+                            >
+                              {cat}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-[#756366] italic">Any event format</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Budget & Additional Notes */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="p-3 rounded-xl bg-white border border-[#E8DDD7]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1 mb-1">
+                          <DollarSign className="w-3 h-3 text-[#63474D]" />
+                          Target Budget Range
+                        </span>
+                        <span className="font-bold text-xs text-[#2D1F23]">
+                          {reviewSponsor.sponsorPreferences?.maxBudget
+                            ? `Up to ETB ${reviewSponsor.sponsorPreferences.maxBudget.toLocaleString()}`
+                            : reviewSponsor.sponsorPreferences?.minBudget
+                            ? `From ETB ${reviewSponsor.sponsorPreferences.minBudget.toLocaleString()}`
+                            : 'Flexible / Negotiable'}
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-white border border-[#E8DDD7]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1 mb-1">
+                          <Briefcase className="w-3 h-3 text-[#63474D]" />
+                          Preferred Locations
+                        </span>
+                        <span className="font-semibold text-xs text-[#2D1F23]">
+                          {reviewSponsor.sponsorPreferences?.preferredLocations &&
+                          reviewSponsor.sponsorPreferences.preferredLocations.length > 0
+                            ? reviewSponsor.sponsorPreferences.preferredLocations.join(', ')
+                            : 'Addis Ababa / All Ethiopia'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {reviewSponsor.sponsorPreferences?.additionalPreferences && (
+                      <div className="space-y-1 pt-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] block">
+                          Additional Requirements / Custom Notes
+                        </span>
+                        <div className="p-3 rounded-xl bg-white border border-[#E8DDD7] text-xs text-[#2D1F23] whitespace-pre-wrap">
+                          {typeof reviewSponsor.sponsorPreferences.additionalPreferences === 'string'
+                            ? reviewSponsor.sponsorPreferences.additionalPreferences
+                            : (reviewSponsor.sponsorPreferences.additionalPreferences as any).notes ||
+                              JSON.stringify(reviewSponsor.sponsorPreferences.additionalPreferences, null, 2)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Review Action Controls */}
+                {reviewSponsorActionTab === 'idle' ? (
+                  <div className="pt-3 border-t border-[#E8DDD7] flex flex-wrap items-center justify-between gap-3">
+                    <Button variant="outline" size="sm" onClick={() => setReviewSponsor(null)}>
+                      Close
+                    </Button>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {reviewSponsor.approvalStatus === 'pending' ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setReviewSponsorActionTab('reject')}
+                            className="border-red-300 text-red-700 hover:bg-red-50 text-xs"
+                          >
+                            Reject Application
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            isLoading={actionLoadingId === reviewSponsor.id}
+                            onClick={() => handleApproveSponsor(reviewSponsor.id)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                          >
+                            Approve Corporate Sponsor
+                          </Button>
+                        </>
+                      ) : reviewSponsor.approvalStatus === 'approved' ? (
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Verified Corporate Partner
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setReviewSponsor(null);
+                              setStatusModalUser(reviewSponsor);
+                            }}
+                            className={`text-xs ${
+                              reviewSponsor.isActive
+                                ? 'border-red-300 text-red-700 hover:bg-red-50'
+                                : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                            }`}
+                          >
+                            {reviewSponsor.isActive ? 'Deactivate Account' : 'Activate Account'}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-50 px-3 py-1.5 rounded-xl border border-red-200">
+                            <XCircle className="w-3.5 h-3.5 text-red-600" />
+                            Rejected Application
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            isLoading={actionLoadingId === reviewSponsor.id}
+                            onClick={() => handleApproveSponsor(reviewSponsor.id)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                          >
+                            Reconsider & Approve
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-3 border-t border-[#E8DDD7] space-y-3 bg-red-50/50 p-4 rounded-2xl border border-red-200">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-bold text-xs text-red-800 flex items-center gap-1.5">
+                        <XCircle className="w-4 h-4 text-red-600" />
+                        Confirm Rejection of Corporate Sponsor
+                      </h5>
+                      <button
+                        type="button"
+                        onClick={() => setReviewSponsorActionTab('idle')}
+                        className="text-xs text-[#756366] hover:text-[#2D1F23]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <p className="text-xs text-red-700">
+                      Are you sure you want to reject the application for <strong>{reviewSponsor.companyName}</strong>? A rejection notice will be emailed to <strong>{reviewSponsor.email}</strong>.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReviewSponsorActionTab('idle')}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        isLoading={actionLoadingId === reviewSponsor.id}
+                        onClick={() => handleRejectSponsor(reviewSponsor.id)}
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                      >
+                        Confirm Rejection & Notify
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+
       {/* Confirmation Modal */}
       <Modal
         isOpen={!!statusModalUser}
@@ -1016,6 +1742,394 @@ export const AdminUsersPage: React.FC = () => {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Corporate Sponsor Application Review Modal */}
+      <Modal
+        isOpen={!!reviewSponsor}
+        onClose={() => {
+          setReviewSponsor(null);
+          setReviewSponsorActionTab('idle');
+        }}
+        title="Corporate Sponsor Application Review"
+        maxWidth="2xl"
+      >
+        {reviewSponsor && (
+          <div className="space-y-5 text-xs text-[#2D1F23]">
+            {/* Header Info */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#E8DDD7] gap-2">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={
+                    reviewSponsor.approvalStatus === 'approved'
+                      ? 'success'
+                      : reviewSponsor.approvalStatus === 'pending'
+                      ? 'warning'
+                      : 'error'
+                  }
+                >
+                  {reviewSponsor.approvalStatus === 'pending'
+                    ? 'Pending Review'
+                    : reviewSponsor.approvalStatus === 'approved'
+                    ? 'Approved / Active'
+                    : 'Rejected'}
+                </Badge>
+                <span className="text-[11px] font-semibold text-[#63474D] bg-[#FAF7F5] border border-[#E8DDD7] px-2.5 py-0.5 rounded-full">
+                  {reviewSponsor.industryCategory || 'Technology & Digital'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-[#756366]">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>
+                  Registered:{' '}
+                  {reviewSponsor.registeredAt
+                    ? new Date(reviewSponsor.registeredAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })
+                    : 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {reviewSponsorLoading ? (
+              <div className="py-8 text-center text-[#756366] flex flex-col items-center gap-2">
+                <RefreshCw className="w-5 h-5 animate-spin text-[#63474D]" />
+                <span>Loading sponsor profile & questionnaire answers...</span>
+              </div>
+            ) : (
+              <>
+                {/* Corporate & Representative Identity Card */}
+                <div className="flex items-start gap-4 p-4 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7]">
+                  {/* Logo or Placeholder */}
+                  <div className="shrink-0">
+                    {reviewSponsor.avatarUrl && !sponsorLogoError ? (
+                      <img
+                        src={reviewSponsor.avatarUrl}
+                        alt={`${reviewSponsor.companyName} Logo`}
+                        onError={() => setSponsorLogoError(true)}
+                        className="w-16 h-16 rounded-2xl object-cover border-2 border-[#E8DDD7] shadow-sm bg-white p-1"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-2xl bg-white border-2 border-[#E8DDD7] flex items-center justify-center text-[#63474D] shadow-sm">
+                        <Building2 className="w-8 h-8" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <h4 className="font-bold text-base text-[#2D1F23] truncate">
+                        {reviewSponsor.companyName}
+                      </h4>
+                    </div>
+                    <div className="text-[11px] text-[#756366]">
+                      Representative / Lead Contact:{' '}
+                      <strong className="text-[#2D1F23]">{reviewSponsor.name}</strong>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1.5 text-[11px] text-[#756366]">
+                      <span className="flex items-center gap-1">
+                        <Mail className="w-3 h-3 text-[#63474D]" />
+                        {reviewSponsor.email}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-[#63474D]" />
+                        {reviewSponsor.phone || reviewSponsor.companyPhone || 'No phone provided'}
+                      </span>
+                      {(reviewSponsor.website || reviewSponsor.companyWebsite) && (
+                        <a
+                          href={
+                            (reviewSponsor.website || reviewSponsor.companyWebsite)!.startsWith('http')
+                              ? (reviewSponsor.website || reviewSponsor.companyWebsite)
+                              : `https://${reviewSponsor.website || reviewSponsor.companyWebsite}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#63474D] font-bold hover:underline"
+                        >
+                          <Globe className="w-3 h-3" />
+                          <span>{reviewSponsor.website || reviewSponsor.companyWebsite}</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Company Overview & Background */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#63474D]" />
+                    Company Overview & Background
+                  </label>
+                  <div className="p-3.5 rounded-2xl bg-white border border-[#E8DDD7] text-xs leading-relaxed text-[#2D1F23] whitespace-pre-wrap">
+                    {reviewSponsor.bio || 'No company bio provided during registration.'}
+                  </div>
+                </div>
+
+                {/* Sponsorship Questionnaire & Preferences */}
+                <div className="space-y-3 pt-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#FFA686]" />
+                    Sponsorship Questionnaire & Targeting Preferences
+                  </label>
+
+                  <div className="p-4 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] space-y-4">
+                    {/* Objectives */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1">
+                        <Target className="w-3 h-3 text-[#63474D]" />
+                        Sponsorship Objectives
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {reviewSponsor.sponsorPreferences?.sponsorshipObjectives &&
+                        reviewSponsor.sponsorPreferences.sponsorshipObjectives.length > 0 ? (
+                          reviewSponsor.sponsorPreferences.sponsorshipObjectives.map((obj, i) => (
+                            <span
+                              key={i}
+                              className="px-2.5 py-1 rounded-xl bg-white border border-[#E8DDD7] text-[11px] font-semibold text-[#2D1F23]"
+                            >
+                              {obj}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-[#756366] italic">None specified</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Target Audience */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1">
+                        <Users className="w-3 h-3 text-[#63474D]" />
+                        Target Audience
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {reviewSponsor.sponsorPreferences?.targetAudience &&
+                        reviewSponsor.sponsorPreferences.targetAudience.length > 0 ? (
+                          reviewSponsor.sponsorPreferences.targetAudience.map((aud, i) => (
+                            <span
+                              key={i}
+                              className="px-2.5 py-1 rounded-xl bg-white border border-[#E8DDD7] text-[11px] font-semibold text-[#2D1F23]"
+                            >
+                              {aud}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-[#756366] italic">General audience</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Target Skills & Interests */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1">
+                        <Tag className="w-3 h-3 text-[#63474D]" />
+                        Target Skills & Technologies
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(reviewSponsor.sponsorPreferences?.targetSkills?.length ||
+                          reviewSponsor.sponsorPreferences?.targetInterests?.length) ? (
+                          [
+                            ...(reviewSponsor.sponsorPreferences?.targetSkills || []),
+                            ...(reviewSponsor.sponsorPreferences?.targetInterests || []),
+                          ].map((skill, i) => (
+                            <span
+                              key={i}
+                              className="px-2.5 py-1 rounded-xl bg-white border border-[#E8DDD7] text-[11px] font-semibold text-[#63474D]"
+                            >
+                              {skill}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-[#756366] italic">All tech domains</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Preferred Event Categories */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1">
+                        <Layers className="w-3 h-3 text-[#63474D]" />
+                        Preferred Event Formats & Categories
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(reviewSponsor.sponsorPreferences?.preferredEventCategories?.length ||
+                          reviewSponsor.sponsorPreferences?.preferredEventTypes?.length) ? (
+                          [
+                            ...(reviewSponsor.sponsorPreferences?.preferredEventCategories || []),
+                            ...(reviewSponsor.sponsorPreferences?.preferredEventTypes || []),
+                          ].map((cat, i) => (
+                            <span
+                              key={i}
+                              className="px-2.5 py-1 rounded-xl bg-white border border-[#E8DDD7] text-[11px] font-semibold text-[#2D1F23]"
+                            >
+                              {cat}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-[#756366] italic">Any event format</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Budget & Additional Notes */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="p-3 rounded-xl bg-white border border-[#E8DDD7]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1 mb-1">
+                          <DollarSign className="w-3 h-3 text-[#63474D]" />
+                          Target Budget Range
+                        </span>
+                        <span className="font-bold text-xs text-[#2D1F23]">
+                          {reviewSponsor.sponsorPreferences?.maxBudget
+                            ? `Up to ETB ${reviewSponsor.sponsorPreferences.maxBudget.toLocaleString()}`
+                            : reviewSponsor.sponsorPreferences?.minBudget
+                            ? `From ETB ${reviewSponsor.sponsorPreferences.minBudget.toLocaleString()}`
+                            : 'Flexible / Negotiable'}
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-white border border-[#E8DDD7]">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] flex items-center gap-1 mb-1">
+                          <Briefcase className="w-3 h-3 text-[#63474D]" />
+                          Preferred Locations
+                        </span>
+                        <span className="font-semibold text-xs text-[#2D1F23]">
+                          {reviewSponsor.sponsorPreferences?.preferredLocations &&
+                          reviewSponsor.sponsorPreferences.preferredLocations.length > 0
+                            ? reviewSponsor.sponsorPreferences.preferredLocations.join(', ')
+                            : 'Addis Ababa / All Ethiopia'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {reviewSponsor.sponsorPreferences?.additionalPreferences && (
+                      <div className="space-y-1 pt-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#756366] block">
+                          Additional Requirements / Custom Notes
+                        </span>
+                        <div className="p-3 rounded-xl bg-white border border-[#E8DDD7] text-xs text-[#2D1F23] whitespace-pre-wrap">
+                          {typeof reviewSponsor.sponsorPreferences.additionalPreferences === 'string'
+                            ? reviewSponsor.sponsorPreferences.additionalPreferences
+                            : (reviewSponsor.sponsorPreferences.additionalPreferences as any).notes ||
+                              JSON.stringify(reviewSponsor.sponsorPreferences.additionalPreferences, null, 2)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Review Action Controls */}
+                {reviewSponsorActionTab === 'idle' ? (
+                  <div className="pt-3 border-t border-[#E8DDD7] flex flex-wrap items-center justify-between gap-3">
+                    <Button variant="outline" size="sm" onClick={() => setReviewSponsor(null)}>
+                      Close
+                    </Button>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {reviewSponsor.approvalStatus === 'pending' ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setReviewSponsorActionTab('reject')}
+                            className="border-red-300 text-red-700 hover:bg-red-50 text-xs"
+                          >
+                            Reject Application
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            isLoading={actionLoadingId === reviewSponsor.id}
+                            onClick={() => handleApproveSponsor(reviewSponsor.id)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                          >
+                            Approve Corporate Sponsor
+                          </Button>
+                        </>
+                      ) : reviewSponsor.approvalStatus === 'approved' ? (
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Verified Corporate Partner
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setReviewSponsor(null);
+                              setStatusModalUser(reviewSponsor);
+                            }}
+                            className={`text-xs ${
+                              reviewSponsor.isActive
+                                ? 'border-red-300 text-red-700 hover:bg-red-50'
+                                : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                            }`}
+                          >
+                            {reviewSponsor.isActive ? 'Deactivate Account' : 'Activate Account'}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-1 text-xs font-bold text-red-700 bg-red-50 px-3 py-1.5 rounded-xl border border-red-200">
+                            <XCircle className="w-3.5 h-3.5 text-red-600" />
+                            Rejected Application
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            isLoading={actionLoadingId === reviewSponsor.id}
+                            onClick={() => handleApproveSponsor(reviewSponsor.id)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
+                          >
+                            Reconsider & Approve
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-3 border-t border-[#E8DDD7] space-y-3 bg-red-50/50 p-4 rounded-2xl border border-red-200">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-bold text-xs text-red-800 flex items-center gap-1.5">
+                        <XCircle className="w-4 h-4 text-red-600" />
+                        Confirm Rejection of Corporate Sponsor
+                      </h5>
+                      <button
+                        type="button"
+                        onClick={() => setReviewSponsorActionTab('idle')}
+                        className="text-xs text-[#756366] hover:text-[#2D1F23]"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <p className="text-xs text-red-700">
+                      Are you sure you want to reject the application for <strong>{reviewSponsor.companyName}</strong>? A rejection notice will be emailed to <strong>{reviewSponsor.email}</strong>.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setReviewSponsorActionTab('idle')}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        isLoading={actionLoadingId === reviewSponsor.id}
+                        onClick={() => handleRejectSponsor(reviewSponsor.id)}
+                        className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                      >
+                        Confirm Rejection & Notify
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );

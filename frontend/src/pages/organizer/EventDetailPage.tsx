@@ -111,6 +111,10 @@ export const EventDetailPage: React.FC = () => {
 
   const handleCopyLink = () => {
     if (!event) return;
+    if (event.isPublicityModerated) {
+      alert(`Public discovery for this event has been suspended by administration due to: "${event.publicityTakedownReason || 'Policy review'}". Only an administrator can restore community discovery.`);
+      return;
+    }
     const url = `${window.location.origin}/e/${event.shareLinkToken}`;
     navigator.clipboard.writeText(url);
     setCopiedLink(true);
@@ -121,6 +125,14 @@ export const EventDetailPage: React.FC = () => {
 
   const handleTogglePublicize = async () => {
     if (!event) return;
+    if (event.isPublicityModerated) {
+      alert(`Public discovery for this event was suspended by administration due to: "${event.publicityTakedownReason || 'Policy review'}". Only an administrator can restore community discovery.`);
+      return;
+    }
+    if (event.isPublicityModerated) {
+      alert(`Public discovery for this event has been suspended by administration due to: "${event.publicityTakedownReason || 'Policy review'}". Only an administrator can restore community discovery.`);
+      return;
+    }
     setTogglingPublicize(true);
     try {
       const nextStatus = !event.isPublicized;
@@ -159,6 +171,10 @@ export const EventDetailPage: React.FC = () => {
   const handleAddManualAttendee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!event) return;
+    if (event.isPublicityModerated) {
+      alert(`Public discovery for this event has been suspended by administration due to: "${event.publicityTakedownReason || 'Policy review'}". Only an administrator can restore community discovery.`);
+      return;
+    }
     const validation = validateForm(manualAttendeeFormSchema, manualForm);
     if (!validation.success) {
       const firstError = Object.values(validation.errors || {})[0] || 'Please provide both full name and a valid email address.';
@@ -194,6 +210,10 @@ export const EventDetailPage: React.FC = () => {
 
   const handleAdmitAttendee = async (attendee: AttendeeRosterItem) => {
     if (!event) return;
+    if (event.isPublicityModerated) {
+      alert(`Public discovery for this event has been suspended by administration due to: "${event.publicityTakedownReason || 'Policy review'}". Only an administrator can restore community discovery.`);
+      return;
+    }
     const attendeeId = attendee.attendeeId || attendee.id;
     setAdmittingAttendeeId(attendeeId);
     try {
@@ -248,6 +268,10 @@ export const EventDetailPage: React.FC = () => {
   // Delete attendee handler
   const handleConfirmDeleteAttendee = async (attendee: AttendeeRosterItem) => {
     if (!event) return;
+    if (event.isPublicityModerated) {
+      alert(`Public discovery for this event has been suspended by administration due to: "${event.publicityTakedownReason || 'Policy review'}". Only an administrator can restore community discovery.`);
+      return;
+    }
     setIsDeletingAttendee(true);
     try {
       const attendeeId = attendee.registrationId || attendee.id;
@@ -270,6 +294,10 @@ export const EventDetailPage: React.FC = () => {
   // Approval / Rejection Handlers
   const handleApproveAttendee = async (attendee: AttendeeRosterItem) => {
     if (!event) return;
+    if (event.isPublicityModerated) {
+      alert(`Public discovery for this event has been suspended by administration due to: "${event.publicityTakedownReason || 'Policy review'}". Only an administrator can restore community discovery.`);
+      return;
+    }
     const regId = attendee.registrationId || attendee.id;
     setApprovingId(regId);
     try {
@@ -337,6 +365,10 @@ export const EventDetailPage: React.FC = () => {
 
   const handleApproveAllPending = async () => {
     if (!event) return;
+    if (event.isPublicityModerated) {
+      alert(`Public discovery for this event has been suspended by administration due to: "${event.publicityTakedownReason || 'Policy review'}". Only an administrator can restore community discovery.`);
+      return;
+    }
     const pendingIds = roster.filter((r) => r.approvalStatus === 'pending').map((r) => r.registrationId || r.id);
     if (pendingIds.length === 0) return;
     if (!window.confirm(`Approve all ${pendingIds.length} pending applications and issue their entry passes?`)) return;
@@ -375,6 +407,10 @@ export const EventDetailPage: React.FC = () => {
 
   const handleConfirmDeleteEvent = async () => {
     if (!event) return;
+    if (event.isPublicityModerated) {
+      alert(`Public discovery for this event has been suspended by administration due to: "${event.publicityTakedownReason || 'Policy review'}". Only an administrator can restore community discovery.`);
+      return;
+    }
     setIsDeletingEvent(true);
     try {
       await api.events.delete(event.id);
@@ -821,27 +857,33 @@ export const EventDetailPage: React.FC = () => {
               Sheeba Community Discovery
             </span>
             <p className="text-xs text-[#2D1F23] font-medium">
-              {event.isPublicized
-                ? 'Publicized in Sheeba Discovery (Attendees can discover and register from community feed)'
-                : 'Direct Share Link Only (Private: only people with your direct URL can register)'}
+              {event.isPublicityModerated
+                ? `Public Discovery Suspended by Administration: ${event.publicityTakedownReason || 'Policy review'}. Direct share link remains active.`
+                : event.isPublicized
+                  ? 'Publicized in Sheeba Discovery (Attendees can discover and register from community feed)'
+                  : 'Direct Share Link Only (Private: only people with your direct URL can register)'}
             </p>
           </div>
           <button
             type="button"
-            disabled={togglingPublicize}
+            disabled={togglingPublicize || Boolean(event.isPublicityModerated)}
             onClick={handleTogglePublicize}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${event.isPublicized
-              ? 'bg-[#EAF4EF] text-[#2A7B5F] hover:bg-[#d8ece1] border border-[#2A7B5F]/30'
-              : 'bg-gray-100 text-[#63474D] hover:bg-gray-200 border border-gray-200'
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${event.isPublicityModerated
+              ? 'bg-rose-50 text-rose-700 border border-rose-300 cursor-not-allowed opacity-90'
+              : event.isPublicized
+                ? 'bg-[#EAF4EF] text-[#2A7B5F] hover:bg-[#d8ece1] border border-[#2A7B5F]/30 cursor-pointer'
+                : 'bg-gray-100 text-[#63474D] hover:bg-gray-200 border border-gray-200 cursor-pointer'
               }`}
           >
             <Globe className="w-3.5 h-3.5" />
             <span>
               {togglingPublicize
                 ? 'Updating...'
-                : event.isPublicized
-                  ? 'Publicized in Discovery (Click to make Private)'
-                  : 'Publicize in Sheeba'}
+                : event.isPublicityModerated
+                  ? 'Discovery Suspended by Admin'
+                  : event.isPublicized
+                    ? 'Publicized in Discovery (Click to make Private)'
+                    : 'Publicize in Sheeba'}
             </span>
           </button>
         </div>
@@ -876,11 +918,10 @@ export const EventDetailPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveMainTab('attendees')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeMainTab === 'attendees'
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeMainTab === 'attendees'
               ? 'bg-[#63474D] text-white shadow-2xs'
               : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
-          }`}
+            }`}
         >
           <User className="w-4 h-4" />
           <span>Attendees & Passes ({roster.length})</span>
@@ -889,11 +930,10 @@ export const EventDetailPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveMainTab('exhibitors')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeMainTab === 'exhibitors'
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeMainTab === 'exhibitors'
               ? 'bg-[#63474D] text-white shadow-2xs'
               : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
-          }`}
+            }`}
         >
           <Store className="w-4 h-4" />
           <span>Exhibitors & Booths</span>
@@ -902,11 +942,10 @@ export const EventDetailPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveMainTab('scanners')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeMainTab === 'scanners'
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeMainTab === 'scanners'
               ? 'bg-[#63474D] text-white shadow-2xs'
               : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
-          }`}
+            }`}
         >
           <QrCode className="w-4 h-4" />
           <span>Door Staff & Scanners</span>
@@ -916,529 +955,529 @@ export const EventDetailPage: React.FC = () => {
       {activeMainTab === 'attendees' && (
         <div className="space-y-8 animate-fade-in">
           {/* Section: Attended List (Unboxed) */}
-      <div className="space-y-4 pt-8 border-t border-gray-100">
-        {/* Attended List Header: Heading, Search Bar in Middle, Badge Action on Right */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <h2 className="font-serif font-bold text-xl text-[#2D1F23] shrink-0">
-            Attended List ({attendedList.length})
-          </h2>
+          <div className="space-y-4 pt-8 border-t border-gray-100">
+            {/* Attended List Header: Heading, Search Bar in Middle, Badge Action on Right */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <h2 className="font-serif font-bold text-xl text-[#2D1F23] shrink-0">
+                Attended List ({attendedList.length})
+              </h2>
 
-          <div className="w-full sm:max-w-md flex-1">
-            <input
-              type="text"
-              placeholder="Search attended by name or email..."
-              value={attendedSearch}
-              onChange={(e) => setAttendedSearch(e.target.value)}
-              className="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-            />
-          </div>
+              <div className="w-full sm:max-w-md flex-1">
+                <input
+                  type="text"
+                  placeholder="Search attended by name or email..."
+                  value={attendedSearch}
+                  onChange={(e) => setAttendedSearch(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
+              </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <Link to={`/organizer/badges/${event.id}`}>
-              <Button
-                variant="outline"
-                size="sm"
-                icon={<Award className="w-3.5 h-3.5 text-[#63474D]" />}
-              >
-                Bulk Approve Badges
-              </Button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Bulk Action Bar for Attended Badges */}
-        {selectedAttendedIds.length > 0 && (
-          <div className="p-3.5 bg-[#FAF7F5] border border-[#63474D]/25 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fade-in shadow-2xs">
-            <div className="flex items-center gap-2 text-xs font-bold text-[#2D1F23]">
-              <Award className="w-4 h-4 text-[#FFA686]" />
-              <span>{selectedAttendedIds.length} attendee{selectedAttendedIds.length === 1 ? '' : 's'} selected</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link to={`/organizer/badges/${event.id}`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={<Award className="w-3.5 h-3.5 text-[#63474D]" />}
+                  >
+                    Bulk Approve Badges
+                  </Button>
+                </Link>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-[#756366] font-semibold">Award Badge:</span>
-              <select
-                value={bulkBadgeCode}
-                onChange={(e) => setBulkBadgeCode(e.target.value as BadgeCode)}
-                className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-              >
-                <option value="participant">Participant</option>
-                <option value="winner">Winner</option>
-                <option value="speaker">Speaker</option>
-              </select>
+            {/* Bulk Action Bar for Attended Badges */}
+            {selectedAttendedIds.length > 0 && (
+              <div className="p-3.5 bg-[#FAF7F5] border border-[#63474D]/25 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fade-in shadow-2xs">
+                <div className="flex items-center gap-2 text-xs font-bold text-[#2D1F23]">
+                  <Award className="w-4 h-4 text-[#FFA686]" />
+                  <span>{selectedAttendedIds.length} attendee{selectedAttendedIds.length === 1 ? '' : 's'} selected</span>
+                </div>
 
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={isBulkAwarding}
-                onClick={handleBulkAwardBadges}
-                icon={<Award className="w-3.5 h-3.5 text-[#FFA686]" />}
-              >
-                {isBulkAwarding ? 'Awarding...' : `Award to Selected (${selectedAttendedIds.length})`}
-              </Button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-[#756366] font-semibold">Award Badge:</span>
+                  <select
+                    value={bulkBadgeCode}
+                    onChange={(e) => setBulkBadgeCode(e.target.value as BadgeCode)}
+                    className="px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                  >
+                    <option value="participant">Participant</option>
+                    <option value="winner">Winner</option>
+                    <option value="speaker">Speaker</option>
+                  </select>
 
-              <button
-                type="button"
-                onClick={() => setSelectedAttendedIds([])}
-                className="px-2 py-1 text-xs text-gray-500 hover:text-black cursor-pointer font-medium"
-              >
-                Deselect
-              </button>
-            </div>
-          </div>
-        )}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={isBulkAwarding}
+                    onClick={handleBulkAwardBadges}
+                    icon={<Award className="w-3.5 h-3.5 text-[#FFA686]" />}
+                  >
+                    {isBulkAwarding ? 'Awarding...' : `Award to Selected (${selectedAttendedIds.length})`}
+                  </Button>
 
-        {attendedList.length === 0 ? (
-          <div className="py-8 text-center text-xs text-gray-400">
-            {roster.filter((r) => r.status === 'Checked in').length === 0
-              ? 'No attendees checked in at the door yet.'
-              : 'No attended records match your search filter.'}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px]">
-                <tr>
-                  <th className="py-3 px-2 w-8">
-                    <input
-                      type="checkbox"
-                      checked={attendedList.length > 0 && attendedList.every((att) => selectedAttendedIds.includes(att.attendeeId || att.id))}
-                      onChange={handleSelectAllAttended}
-                      className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
-                      title="Select all"
-                    />
-                  </th>
-                  <th className="py-3 px-2">Attendee</th>
-                  <th className="py-3 px-2">Check-in Time</th>
-                  <th className="py-3 px-2">Status</th>
-                  <th className="py-3 px-2">Current Badges</th>
-                  <th className="py-3 px-2 text-right">Award Higher Badge</th>
-                  <th className="py-3 px-2 text-right">Remove</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {attendedList.map((att) => (
-                  <tr key={att.id} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="py-3.5 px-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedAttendedIds.includes(att.attendeeId || att.id)}
-                        onChange={() => handleToggleAttended(att.attendeeId || att.id)}
-                        className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
-                      />
-                    </td>
-                    <td className="py-3.5 px-2">
-                      <p className="font-bold text-[#2D1F23]">{att.name}</p>
-                      <p className="text-[11px] text-gray-500">{att.email}</p>
-                    </td>
-                    <td className="py-3.5 px-2 text-gray-600 font-mono text-[11px]">
-                      {att.checkInTime || 'Checked in'}
-                    </td>
-                    <td className="py-3.5 px-2">
-                      {/* Unboxed status, NOT clickable on attended list */}
-                      <span className="text-[#2A7B5F] font-semibold text-xs">
-                        Checked in
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-2">
-                      <div className="flex flex-wrap gap-1.5 text-xs text-gray-700">
-                        {att.badges && att.badges.length > 0 ? (
-                          att.badges.map((b) => (
-                            <span key={b} className="font-medium text-[#63474D]">
-                              {b}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-gray-400 italic">Attended</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-2 text-right" colSpan={2}>
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setAwardingAttendee(att)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#63474D] hover:bg-[#523a3f] text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
-                        >
-                          <Award className="w-3.5 h-3.5 text-[#FFA686]" />
-                          <span>Award Badge</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteConfirmToast(att)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                          title={`Remove ${att.name} from event`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAttendedIds([])}
+                    className="px-2 py-1 text-xs text-gray-500 hover:text-black cursor-pointer font-medium"
+                  >
+                    Deselect
+                  </button>
+                </div>
+              </div>
+            )}
 
-      {/* Thick separating line between Attended List and Registered List, stopping before left & right edges */}
-      <div className="px-6 sm:px-12 my-10">
-        <div className="h-1 bg-gray-300/90 rounded-full w-full" />
-      </div>
-
-      {/* Section: Registered List (Unboxed) */}
-      <div id="registered-list-section" className="space-y-4">
-        {/* Registered List Header: Heading, Search Bar in Middle, Add User Manually on Right */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h2 className="font-serif font-bold text-xl text-[#2D1F23] shrink-0">
-              Registered List ({registeredList.length})
-            </h2>
-            {event.requiresApproval && (
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
-                Requires Approval
-              </span>
+            {attendedList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-gray-400">
+                {roster.filter((r) => r.status === 'Checked in').length === 0
+                  ? 'No attendees checked in at the door yet.'
+                  : 'No attended records match your search filter.'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px]">
+                    <tr>
+                      <th className="py-3 px-2 w-8">
+                        <input
+                          type="checkbox"
+                          checked={attendedList.length > 0 && attendedList.every((att) => selectedAttendedIds.includes(att.attendeeId || att.id))}
+                          onChange={handleSelectAllAttended}
+                          className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                          title="Select all"
+                        />
+                      </th>
+                      <th className="py-3 px-2">Attendee</th>
+                      <th className="py-3 px-2">Check-in Time</th>
+                      <th className="py-3 px-2">Status</th>
+                      <th className="py-3 px-2">Current Badges</th>
+                      <th className="py-3 px-2 text-right">Award Higher Badge</th>
+                      <th className="py-3 px-2 text-right">Remove</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {attendedList.map((att) => (
+                      <tr key={att.id} className="hover:bg-gray-50/60 transition-colors">
+                        <td className="py-3.5 px-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedAttendedIds.includes(att.attendeeId || att.id)}
+                            onChange={() => handleToggleAttended(att.attendeeId || att.id)}
+                            className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                          />
+                        </td>
+                        <td className="py-3.5 px-2">
+                          <p className="font-bold text-[#2D1F23]">{att.name}</p>
+                          <p className="text-[11px] text-gray-500">{att.email}</p>
+                        </td>
+                        <td className="py-3.5 px-2 text-gray-600 font-mono text-[11px]">
+                          {att.checkInTime || 'Checked in'}
+                        </td>
+                        <td className="py-3.5 px-2">
+                          {/* Unboxed status, NOT clickable on attended list */}
+                          <span className="text-[#2A7B5F] font-semibold text-xs">
+                            Checked in
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-2">
+                          <div className="flex flex-wrap gap-1.5 text-xs text-gray-700">
+                            {att.badges && att.badges.length > 0 ? (
+                              att.badges.map((b) => (
+                                <span key={b} className="font-medium text-[#63474D]">
+                                  {b}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 italic">Attended</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-2 text-right" colSpan={2}>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAwardingAttendee(att)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#63474D] hover:bg-[#523a3f] text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                            >
+                              <Award className="w-3.5 h-3.5 text-[#FFA686]" />
+                              <span>Award Badge</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmToast(att)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                              title={`Remove ${att.name} from event`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
-          <div className="w-full sm:max-w-md flex-1">
-            <input
-              type="text"
-              placeholder="Search registrants by name or email..."
-              value={registeredSearch}
-              onChange={(e) => setRegisteredSearch(e.target.value)}
-              className="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-            />
+          {/* Thick separating line between Attended List and Registered List, stopping before left & right edges */}
+          <div className="px-6 sm:px-12 my-10">
+            <div className="h-1 bg-gray-300/90 rounded-full w-full" />
           </div>
 
-          <Button
-            onClick={() => {
-              setManualUserError(null);
-              setIsAddUserModalOpen(true);
-            }}
-            variant="primary"
-            size="sm"
-            className="shrink-0"
-          >
-            Add User Manually
-          </Button>
-        </div>
+          {/* Section: Registered List (Unboxed) */}
+          <div id="registered-list-section" className="space-y-4">
+            {/* Registered List Header: Heading, Search Bar in Middle, Add User Manually on Right */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <h2 className="font-serif font-bold text-xl text-[#2D1F23] shrink-0">
+                  Registered List ({registeredList.length})
+                </h2>
+                {event.requiresApproval && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200">
+                    Requires Approval
+                  </span>
+                )}
+              </div>
 
-        {/* Approval Filter Tabs (if event requires approval) */}
-        {event.requiresApproval && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-2">
-            {[
-              { id: 'all', label: 'All Registrants', count: registeredList.length },
-              { id: 'pending', label: 'Pending Review', count: pendingCount, highlight: pendingCount > 0 },
-              { id: 'approved', label: 'Approved', count: approvedCount },
-              { id: 'rejected', label: 'Declined', count: rejectedCount },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setApprovalTab(tab.id as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${approvalTab === tab.id
-                  ? 'bg-[#63474D] text-white shadow-2xs'
-                  : tab.highlight
-                    ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
-                    : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
-                  }`}
-              >
-                <span>{tab.label}</span>
-                <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] ${approvalTab === tab.id
-                    ? 'bg-white/20 text-white'
-                    : tab.highlight
-                      ? 'bg-amber-200 text-amber-900'
-                      : 'bg-black/5 text-[#756366]'
-                    }`}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+              <div className="w-full sm:max-w-md flex-1">
+                <input
+                  type="text"
+                  placeholder="Search registrants by name or email..."
+                  value={registeredSearch}
+                  onChange={(e) => setRegisteredSearch(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                />
+              </div>
 
-        {/* Bulk Action Bar for Registrations */}
-        {selectedRegistrationIds.length > 0 && (
-          <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fade-in shadow-2xs">
-            <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
-              <Check className="w-4 h-4 text-emerald-600" />
-              <span>{selectedRegistrationIds.length} application{selectedRegistrationIds.length === 1 ? '' : 's'} selected</span>
-            </div>
-
-            <div className="flex items-center gap-2">
               <Button
+                onClick={() => {
+                  setManualUserError(null);
+                  setIsAddUserModalOpen(true);
+                }}
                 variant="primary"
                 size="sm"
-                disabled={isBulkApproving || isDeletingAttendee}
-                onClick={handleBulkApprove}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white border-none"
-                icon={<Check className="w-3.5 h-3.5" />}
+                className="shrink-0"
               >
-                {isBulkApproving ? 'Approving...' : `Approve Selected (${selectedRegistrationIds.length})`}
+                Add User Manually
               </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isBulkApproving || isDeletingAttendee}
-                onClick={handleBulkDeleteRegistrations}
-                className="border-red-200 text-red-600 hover:bg-red-50 bg-white"
-                icon={<Trash2 className="w-3.5 h-3.5 text-red-600" />}
-              >
-                {isDeletingAttendee ? 'Deleting...' : `Delete Selected (${selectedRegistrationIds.length})`}
-              </Button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedRegistrationIds([])}
-                className="px-2 py-1 text-xs text-gray-500 hover:text-black cursor-pointer font-medium"
-              >
-                Deselect
-              </button>
             </div>
-          </div>
-        )}
 
-        {displayedRegisteredList.length === 0 ? (
-          <div className="py-8 text-center text-xs text-gray-400">
-            {roster.length === 0
-              ? 'No registrations received yet.'
-              : approvalTab === 'pending'
-                ? 'No pending applications to review.'
-                : 'No registrants match your search filter.'}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px]">
-                <tr>
-                  <th className="py-3 px-2 w-8">
-                    <input
-                      type="checkbox"
-                      checked={displayedRegisteredList.length > 0 && displayedRegisteredList.every((att) => selectedRegistrationIds.includes(att.registrationId || att.id))}
-                      onChange={handleSelectAllRegistrations}
-                      className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
-                      title="Select all"
-                    />
-                  </th>
-                  <th className="py-3 px-2">Attendee Name & Email</th>
-                  <th className="py-3 px-2">Registration Date</th>
-                  <th className="py-3 px-2">Status</th>
-                  <th className="py-3 px-2">Registration Answers</th>
-                  <th className="py-3 px-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {displayedRegisteredList.map((att) => {
-                  const isCheckedIn = att.status === 'Checked in' || att.badges?.includes('attended');
-                  const isPending = att.approvalStatus === 'pending';
-                  const isRejected = att.approvalStatus === 'rejected';
+            {/* Approval Filter Tabs (if event requires approval) */}
+            {event.requiresApproval && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 pb-2">
+                {[
+                  { id: 'all', label: 'All Registrants', count: registeredList.length },
+                  { id: 'pending', label: 'Pending Review', count: pendingCount, highlight: pendingCount > 0 },
+                  { id: 'approved', label: 'Approved', count: approvedCount },
+                  { id: 'rejected', label: 'Declined', count: rejectedCount },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setApprovalTab(tab.id as any)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${approvalTab === tab.id
+                      ? 'bg-[#63474D] text-white shadow-2xs'
+                      : tab.highlight
+                        ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                        : 'bg-[#FAF7F5] text-[#756366] hover:text-[#2D1F23]'
+                      }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] ${approvalTab === tab.id
+                        ? 'bg-white/20 text-white'
+                        : tab.highlight
+                          ? 'bg-amber-200 text-amber-900'
+                          : 'bg-black/5 text-[#756366]'
+                        }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
 
-                  return (
-                    <tr key={att.id} className="hover:bg-gray-50/60 transition-colors">
-                      <td className="py-3.5 px-2">
+            {/* Bulk Action Bar for Registrations */}
+            {selectedRegistrationIds.length > 0 && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 animate-fade-in shadow-2xs">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span>{selectedRegistrationIds.length} application{selectedRegistrationIds.length === 1 ? '' : 's'} selected</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={isBulkApproving || isDeletingAttendee}
+                    onClick={handleBulkApprove}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                    icon={<Check className="w-3.5 h-3.5" />}
+                  >
+                    {isBulkApproving ? 'Approving...' : `Approve Selected (${selectedRegistrationIds.length})`}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isBulkApproving || isDeletingAttendee}
+                    onClick={handleBulkDeleteRegistrations}
+                    className="border-red-200 text-red-600 hover:bg-red-50 bg-white"
+                    icon={<Trash2 className="w-3.5 h-3.5 text-red-600" />}
+                  >
+                    {isDeletingAttendee ? 'Deleting...' : `Delete Selected (${selectedRegistrationIds.length})`}
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRegistrationIds([])}
+                    className="px-2 py-1 text-xs text-gray-500 hover:text-black cursor-pointer font-medium"
+                  >
+                    Deselect
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {displayedRegisteredList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-gray-400">
+                {roster.length === 0
+                  ? 'No registrations received yet.'
+                  : approvalTab === 'pending'
+                    ? 'No pending applications to review.'
+                    : 'No registrants match your search filter.'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-gray-200 text-gray-600 font-bold uppercase text-[10px]">
+                    <tr>
+                      <th className="py-3 px-2 w-8">
                         <input
                           type="checkbox"
-                          checked={selectedRegistrationIds.includes(att.registrationId || att.id)}
-                          onChange={() => handleToggleRegistration(att.registrationId || att.id)}
+                          checked={displayedRegisteredList.length > 0 && displayedRegisteredList.every((att) => selectedRegistrationIds.includes(att.registrationId || att.id))}
+                          onChange={handleSelectAllRegistrations}
                           className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                          title="Select all"
                         />
-                      </td>
-                      <td className="py-3.5 px-2">
-                        <p className="font-bold text-[#2D1F23]">{att.name}</p>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-[11px] text-gray-500">{att.email}</p>
-                          {att.notificationStatus === 'failed' && (
-                            <span
-                              className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded"
-                              title={att.notificationError || 'Email delivery failed'}
-                            >
-                              Email failed
-                            </span>
-                          )}
-                          {att.notificationStatus === 'pending' && (
-                            <span
-                              className="inline-flex items-center gap-0.5 text-[9px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded"
-                              title="Email delivery in background queue"
-                            >
-                              Email queued
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-2 text-gray-600 font-mono text-[11px]">
-                        {att.registrationDate}
-                      </td>
-                      <td className="py-3.5 px-2">
-                        {isPending ? (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAnswersAttendee(att)}
-                            className="text-left cursor-pointer hover:underline focus:outline-none transition-colors"
-                            title="Click to view submitted questionnaire responses"
-                          >
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                              <Clock className="w-3 h-3 text-amber-600" />
-                              Pending Review
-                            </span>
-                          </button>
-                        ) : isRejected ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
-                            <X className="w-3 h-3 text-red-600" />
-                            Declined
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAnswersAttendee(att)}
-                            className="text-left cursor-pointer hover:underline focus:outline-none transition-colors"
-                            title="Click to view answers to questions"
-                          >
-                            <span className={`font-semibold ${isCheckedIn ? 'text-[#2A7B5F]' : 'text-[#63474D]'}`}>
-                              {isCheckedIn ? 'Checked in' : 'Approved'}
-                            </span>
-                          </button>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-2 max-w-xs truncate text-gray-600">
-                        {att.answers && Object.keys(att.answers).length > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAnswersAttendee(att)}
-                            className="text-left text-gray-600 hover:text-[#63474D] hover:underline truncate block max-w-xs cursor-pointer"
-                            title="Click to view all answers"
-                          >
-                            {Object.entries(att.answers)
-                              .map(([, a], qIdx) => `Q${qIdx + 1}: ${a}`)
-                              .join('; ')}
-                          </button>
-                        ) : (
-                          <span className="text-gray-400 italic">None</span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-2 text-right">
-                        {isPending ? (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedAnswersAttendee(att)}
-                              className="px-2.5 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium cursor-pointer"
-                              title="Review submitted answers"
-                            >
-                              Answers
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleApproveAttendee(att)}
-                              disabled={approvingId === (att.registrationId || att.id)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-                              title="Approve attendee and issue pass"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>{approvingId === (att.registrationId || att.id) ? 'Approving...' : 'Approve'}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRejectingAttendee(att);
-                                setRejectionReason('');
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold transition-all cursor-pointer"
-                              title="Decline registration"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              <span>Reject</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirmToast(att)}
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                              title={`Delete registration for ${att.name}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : isRejected ? (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleApproveAttendee(att)}
-                              disabled={approvingId === (att.registrationId || att.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 text-gray-700 text-xs font-medium transition-all cursor-pointer"
-                              title="Re-approve application"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Re-approve</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirmToast(att)}
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                              title={`Remove record`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-end gap-2">
-                            {isCheckedIn ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>Admitted</span>
+                      </th>
+                      <th className="py-3 px-2">Attendee Name & Email</th>
+                      <th className="py-3 px-2">Registration Date</th>
+                      <th className="py-3 px-2">Status</th>
+                      <th className="py-3 px-2">Registration Answers</th>
+                      <th className="py-3 px-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {displayedRegisteredList.map((att) => {
+                      const isCheckedIn = att.status === 'Checked in' || att.badges?.includes('attended');
+                      const isPending = att.approvalStatus === 'pending';
+                      const isRejected = att.approvalStatus === 'rejected';
+
+                      return (
+                        <tr key={att.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="py-3.5 px-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedRegistrationIds.includes(att.registrationId || att.id)}
+                              onChange={() => handleToggleRegistration(att.registrationId || att.id)}
+                              className="rounded border-gray-300 text-[#63474D] focus:ring-[#63474D] cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-3.5 px-2">
+                            <p className="font-bold text-[#2D1F23]">{att.name}</p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-[11px] text-gray-500">{att.email}</p>
+                              {att.notificationStatus === 'failed' && (
+                                <span
+                                  className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded"
+                                  title={att.notificationError || 'Email delivery failed'}
+                                >
+                                  Email failed
+                                </span>
+                              )}
+                              {att.notificationStatus === 'pending' && (
+                                <span
+                                  className="inline-flex items-center gap-0.5 text-[9px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded"
+                                  title="Email delivery in background queue"
+                                >
+                                  Email queued
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-2 text-gray-600 font-mono text-[11px]">
+                            {att.registrationDate}
+                          </td>
+                          <td className="py-3.5 px-2">
+                            {isPending ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedAnswersAttendee(att)}
+                                className="text-left cursor-pointer hover:underline focus:outline-none transition-colors"
+                                title="Click to view submitted questionnaire responses"
+                              >
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                                  <Clock className="w-3 h-3 text-amber-600" />
+                                  Pending Review
+                                </span>
+                              </button>
+                            ) : isRejected ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full">
+                                <X className="w-3 h-3 text-red-600" />
+                                Declined
                               </span>
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => handleAdmitAttendee(att)}
-                                disabled={admittingAttendeeId === (att.attendeeId || att.id)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-2xs transition-all cursor-pointer"
-                                title={`Admit ${att.name} to event and mark as attended`}
+                                onClick={() => setSelectedAnswersAttendee(att)}
+                                className="text-left cursor-pointer hover:underline focus:outline-none transition-colors"
+                                title="Click to view answers to questions"
                               >
-                                <UserCheck className="w-3.5 h-3.5" />
-                                <span>{admittingAttendeeId === (att.attendeeId || att.id) ? 'Admitting...' : 'Admit'}</span>
+                                <span className={`font-semibold ${isCheckedIn ? 'text-[#2A7B5F]' : 'text-[#63474D]'}`}>
+                                  {isCheckedIn ? 'Checked in' : 'Approved'}
+                                </span>
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => handleResendEmail(att)}
-                              disabled={resendingEmailId === (att.registrationId || att.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:text-[#63474D] hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
-                              title={`Resend registration email to ${att.email}`}
-                            >
-                              <Mail className="w-3.5 h-3.5 text-[#63474D]" />
-                              <span>{resendingEmailId === (att.registrationId || att.id) ? 'Sending...' : 'Resend Email'}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirmToast(att)}
-                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                              title={`Remove ${att.name} from event`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Remove</span>
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          </td>
+                          <td className="py-3.5 px-2 max-w-xs truncate text-gray-600">
+                            {att.answers && Object.keys(att.answers).length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedAnswersAttendee(att)}
+                                className="text-left text-gray-600 hover:text-[#63474D] hover:underline truncate block max-w-xs cursor-pointer"
+                                title="Click to view all answers"
+                              >
+                                {Object.entries(att.answers)
+                                  .map(([, a], qIdx) => `Q${qIdx + 1}: ${a}`)
+                                  .join('; ')}
+                              </button>
+                            ) : (
+                              <span className="text-gray-400 italic">None</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-2 text-right">
+                            {isPending ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedAnswersAttendee(att)}
+                                  className="px-2.5 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-medium cursor-pointer"
+                                  title="Review submitted answers"
+                                >
+                                  Answers
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveAttendee(att)}
+                                  disabled={approvingId === (att.registrationId || att.id)}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                                  title="Approve attendee and issue pass"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>{approvingId === (att.registrationId || att.id) ? 'Approving...' : 'Approve'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRejectingAttendee(att);
+                                    setRejectionReason('');
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold transition-all cursor-pointer"
+                                  title="Decline registration"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  <span>Reject</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteConfirmToast(att)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                                  title={`Delete registration for ${att.name}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : isRejected ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveAttendee(att)}
+                                  disabled={approvingId === (att.registrationId || att.id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 text-gray-700 text-xs font-medium transition-all cursor-pointer"
+                                  title="Re-approve application"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Re-approve</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteConfirmToast(att)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                                  title={`Remove record`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-end gap-2">
+                                {isCheckedIn ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Admitted</span>
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdmitAttendee(att)}
+                                    disabled={admittingAttendeeId === (att.attendeeId || att.id)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                                    title={`Admit ${att.name} to event and mark as attended`}
+                                  >
+                                    <UserCheck className="w-3.5 h-3.5" />
+                                    <span>{admittingAttendeeId === (att.attendeeId || att.id) ? 'Admitting...' : 'Admit'}</span>
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleResendEmail(att)}
+                                  disabled={resendingEmailId === (att.registrationId || att.id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:text-[#63474D] hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                                  title={`Resend registration email to ${att.email}`}
+                                >
+                                  <Mail className="w-3.5 h-3.5 text-[#63474D]" />
+                                  <span>{resendingEmailId === (att.registrationId || att.id) ? 'Sending...' : 'Resend Email'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteConfirmToast(att)}
+                                  className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
+                                  title={`Remove ${att.name} from event`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Remove</span>
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Attendee Reviews & Feedback Section */}
-      <div className="pt-8 border-t border-gray-100">
-        <ReviewsSection
-          eventId={event.id}
-          eventTitle={event.title}
-          isOrganizerView={true}
-        />
-      </div>
+          {/* Attendee Reviews & Feedback Section */}
+          <div className="pt-8 border-t border-gray-100">
+            <ReviewsSection
+              eventId={event.id}
+              eventTitle={event.title}
+              isOrganizerView={true}
+            />
+          </div>
         </div>
       )}
 

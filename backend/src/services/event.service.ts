@@ -6,6 +6,7 @@ import { CacheService } from './cache.service';
 import { PaymentService } from './payment.service';
 import { RecycleBinService } from './recycleBin.service';
 import { ScannerService } from './scanner.service';
+import { AuditService } from './audit.service';
 import { getFrontendUrl } from '../config/env';
 
 export class EventService {
@@ -74,6 +75,10 @@ export class EventService {
       isPaid,
       ticketPrice,
       isPublicized: Boolean(row.is_publicized),
+      isPublicityModerated: Boolean(row.is_publicity_moderated),
+      publicityTakedownReason: row.publicity_takedown_reason || null,
+      publicityModeratedAt: row.publicity_moderated_at || null,
+      publicityModeratedBy: row.publicity_moderated_by || null,
       currency: row.currency || 'ETB',
       paymentMethods: typeof row.payment_methods === 'string' ? JSON.parse(row.payment_methods) : row.payment_methods || [],
       requiresApproval: Boolean(row.requires_approval),
@@ -201,6 +206,19 @@ export class EventService {
     await CacheService.delPattern('events:list*');
     await CacheService.delPattern('*http:*/api/events*');
     await CacheService.delPattern('matching:recommendations:*');
+
+    await AuditService.logAction({
+      action: 'EVENT_CREATED',
+      category: 'EVENTS',
+      entityType: 'event',
+      entityId: formatted.id,
+      entityTitle: formatted.title,
+      performedBy: organizerId,
+      performedByName: userRow.full_name,
+      performedByEmail: userRow.email,
+      details: `Event "${formatted.title}" created (${formatted.eventType})`,
+      metadata: { eventType: formatted.eventType, location: formatted.location, isPaid: formatted.isPaid },
+    });
 
     return formatted;
   }
@@ -408,6 +426,19 @@ export class EventService {
       });
     }
 
+    // Prevent organizers from overriding an administrative publicity takedown
+    const isPublicizeAttempt = inputData.isPublicized === true || inputData.is_publicized === true;
+    if (isPublicizeAttempt && (existing.rows[0] as any).is_publicity_moderated) {
+      if (userRole?.toLowerCase() !== 'admin') {
+        const err: any = new Error(
+          `Public discovery for this event was taken down by administration due to: "${(existing.rows[0] as any).publicity_takedown_reason || 'Code of Conduct / Policy violation'}". Only an authorized administrator can restore community discovery.`
+        );
+        err.statusCode = 403;
+        err.code = 'PUBLICITY_MODERATED';
+        throw err;
+      }
+    }
+
     for (const [key, value] of Object.entries(inputData)) {
       const dbKey =
         key === 'type'
@@ -486,7 +517,24 @@ export class EventService {
     await CacheService.del(`report:${realId}`);
     await CacheService.del(`report:${eventId}`);
     await CacheService.delPattern('matching:recommendations:*');
-    return this.getEventById(realId);
+
+    const updatedEvt = await this.getEventById(realId);
+    const isPublicizedChange = inputData.isPublicized !== undefined || inputData.is_publicized !== undefined;
+    const isNowPublicized = Boolean(inputData.isPublicized ?? inputData.is_publicized);
+    await AuditService.logAction({
+      action: isPublicizedChange && isNowPublicized ? 'EVENT_PUBLICIZED' : 'EVENT_UPDATED',
+      category: 'EVENTS',
+      entityType: 'event',
+      entityId: realId,
+      entityTitle: updatedEvt?.title || (existing.rows[0] as any)?.title,
+      performedBy: userId,
+      details: isPublicizedChange && isNowPublicized
+        ? `Event "${updatedEvt?.title}" published to community discovery`
+        : `Event details updated for "${updatedEvt?.title}"`,
+      metadata: { fieldsUpdated: Object.keys(inputData) },
+    });
+
+    return updatedEvt;
   }
 
   static async deleteEvent(eventId: string, userId: string, userRole: UserRole): Promise<boolean> {
@@ -912,6 +960,19 @@ export class EventService {
       await CacheService.delPattern(`event:${event.id}:roster*`);
       await CacheService.delPattern(`*http:*/api/events/${event.id}*`);
       await CacheService.del(`report:${event.id}`);
+
+      await AuditService.logAction({
+        action: 'EVENT_REGISTRATION',
+        category: 'REGISTRATIONS',
+        entityType: 'registration',
+        entityId: registrationId,
+        entityTitle: event.title,
+        performedBy: userId,
+        performedByName: attendeeName,
+        performedByEmail: attendeeEmail,
+        details: `Registered for "${event.title}" (Ticket: ${ticketCode})`,
+        metadata: { eventId: event.id, ticketCode, isPaid: event.isPaid },
+      });
 
       const rawTicket = ticketRes.rows[0];
 

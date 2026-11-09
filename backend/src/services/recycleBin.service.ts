@@ -1,5 +1,6 @@
 import { query } from '../config/db';
 import { CacheService } from './cache.service';
+import { AuditService } from './audit.service';
 import { UserRole } from '../types';
 
 export type RecycleBinEntityType =
@@ -64,6 +65,17 @@ export class RecycleBinService {
           JSON.stringify(params.metadata || {}),
         ]
       );
+
+      await AuditService.logAction({
+        action: `RECYCLE_BIN_${params.action.toUpperCase()}`,
+        category: 'RECYCLE_BIN',
+        entityType: params.entityType,
+        entityId: params.entityId,
+        entityTitle: params.entityTitle || undefined,
+        performedBy: params.performedBy || null,
+        details: `Recycle Bin action: ${params.action.replace('_', ' ')} on ${params.entityType} "${params.entityTitle || params.entityId}"`,
+        metadata: params.metadata,
+      });
     } catch (err: any) {
       console.warn('[RecycleBinService] Failed to record audit log:', err?.message || err);
     }

@@ -58,6 +58,9 @@ export interface Event {
   status: EventStatus;
   isPaid: boolean;
   isPublicized?: boolean;
+  isPublicityModerated?: boolean;
+  publicityTakedownReason?: string | null;
+  publicityModeratedAt?: string | null;
   ticketPrice: number; // In ETB
   currency: 'ETB';
   paymentMethods?: PaymentDestination[];

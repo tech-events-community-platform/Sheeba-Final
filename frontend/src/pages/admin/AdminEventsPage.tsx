@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import type { Event } from '../../types/event';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Search, PlusCircle } from 'lucide-react';
+import { Search, PlusCircle, ShieldAlert } from 'lucide-react';
 
 export const AdminEventsPage: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -21,7 +21,12 @@ export const AdminEventsPage: React.FC = () => {
 
 
   const filteredEvents = events.filter((evt) => {
-    const matchesStatus = statusFilter === 'All' || evt.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'All'
+        ? true
+        : statusFilter === 'Public Discovery'
+        ? Boolean(evt.isPublicized)
+        : evt.status === statusFilter;
     const matchesSearch =
       evt.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       evt.organizerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -36,11 +41,18 @@ export const AdminEventsPage: React.FC = () => {
           <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23]">Platform Events Oversight</h1>
           <p className="text-xs text-[#756366]">Manage events across the Sheba platform and assist organizers.</p>
         </div>
-        <Link to="/organizer/events/create">
-          <Button variant="primary" icon={<PlusCircle className="w-4 h-4" />}>
-            Create Platform Event
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to="/admin/moderation">
+            <Button variant="outline" icon={<ShieldAlert className="w-4 h-4 text-rose-600" />}>
+              Content Moderation
+            </Button>
+          </Link>
+          <Link to="/organizer/events/create">
+            <Button variant="primary" icon={<PlusCircle className="w-4 h-4" />}>
+              Create Platform Event
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Search & Filter Bar */}
@@ -56,12 +68,12 @@ export const AdminEventsPage: React.FC = () => {
           />
         </div>
 
-        <div className="flex gap-2">
-          {['All', 'open', 'completed', 'canceled'].map((status) => (
+        <div className="flex flex-wrap gap-2">
+          {['All', 'Public Discovery', 'open', 'completed', 'canceled'].map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold capitalize transition-all ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                 statusFilter === status
                   ? 'bg-[#63474D] text-white shadow-xs'
                   : 'bg-[#FAF7F5] text-[#756366] hover:bg-[#F4EFEB]'
@@ -107,12 +119,20 @@ export const AdminEventsPage: React.FC = () => {
                   <td className="py-3.5 px-4 font-semibold">
                     {evt.isPaid ? `${evt.ticketPrice} ETB` : 'Free'}
                   </td>
-                  <td className="py-3.5 px-4">
+                  <td className="py-3.5 px-4 space-y-1">
                     <Badge variant={evt.status === 'open' ? 'success' : 'gray'}>
                       {evt.status}
                     </Badge>
+                    {evt.isPublicized && (
+                      <span className="block text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 uppercase tracking-wider w-max">
+                        Discovery
+                      </span>
+                    )}
                   </td>
                   <td className="py-3.5 px-4 text-right space-x-2">
+                    <Link to="/admin/moderation" className="text-xs text-rose-700 font-semibold hover:underline">
+                      Moderate
+                    </Link>
                     <Link to={`/e/${evt.shareLinkToken}`} target="_blank" className="text-xs text-[#63474D] font-semibold hover:underline">
                       Public Link
                     </Link>

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../types';
 import { AdminService } from '../services/admin.service';
+import { AuditService } from '../services/audit.service';
 import { sendSuccess, sendError } from '../utils/apiResponse';
 
 export class AdminController {
@@ -15,7 +16,19 @@ export class AdminController {
 
   static async getUsers(req: Request, res: Response, next: NextFunction) {
     try {
-      const usersData = await AdminService.getUsersList();
+      const role = req.query.role as 'organizer' | 'sponsor' | 'attendee' | undefined;
+      const status = req.query.status as string | undefined;
+      const search = req.query.search as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+      const usersData = await AdminService.getUsersList({
+        role,
+        status,
+        search,
+        page,
+        limit,
+      });
       return sendSuccess(res, usersData, 'Platform users retrieved.');
     } catch (error) {
       next(error);
@@ -170,6 +183,180 @@ export class AdminController {
       const { rejection_reason } = req.body;
       const rejected = await AdminService.rejectSponsorshipApplication(id, adminId, rejection_reason);
       return sendSuccess(res, rejected, 'Sponsorship application rejected.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // =========================================================================
+  // CONTENT MODERATION CONTROLLERS
+  // =========================================================================
+
+  static async getPublicizedEventsForModeration(req: Request, res: Response, next: NextFunction) {
+    try {
+      const search = req.query.search as string | undefined;
+      const status = req.query.status as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+      const result = await AdminService.getPublicizedEventsForModeration({
+        search,
+        status,
+        page,
+        limit,
+      });
+
+      return sendSuccess(res, result, 'Publicized events retrieved for moderation.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async takedownEventPublicity(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const eventId = req.params.id as string;
+      const adminId = req.user?.userId;
+      if (!adminId) {
+        return sendError(res, 'Authentication required.', 401);
+      }
+      const { reason } = req.body;
+      if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
+        return sendError(res, 'A clear reason of at least 5 characters is required for event takedown.', 400);
+      }
+
+      const updated = await AdminService.takedownEventPublicity({
+        eventId,
+        adminId,
+        reason,
+      });
+
+      return sendSuccess(res, updated, 'Event taken down from Public Discovery successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async restoreEventPublicity(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const eventId = req.params.id as string;
+      const adminId = req.user?.userId;
+      if (!adminId) {
+        return sendError(res, 'Authentication required.', 401);
+      }
+      const { reason } = req.body;
+
+      const restored = await AdminService.restoreEventPublicity({
+        eventId,
+        adminId,
+        reason,
+      });
+
+      return sendSuccess(res, restored, 'Event restored to Public Discovery successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getOrganizerPitchesForModeration(req: Request, res: Response, next: NextFunction) {
+    try {
+      const search = req.query.search as string | undefined;
+      const status = req.query.status as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+      const result = await AdminService.getOrganizerPitchesForModeration({
+        search,
+        status,
+        page,
+        limit,
+      });
+
+      return sendSuccess(res, result, 'Organizer sponsorship pitches retrieved for moderation.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async takedownOrganizerPitch(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const pitchId = req.params.id as string;
+      const adminId = req.user?.userId;
+      if (!adminId) {
+        return sendError(res, 'Authentication required.', 401);
+      }
+      const { reason } = req.body;
+      if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
+        return sendError(res, 'A clear reason of at least 5 characters is required for pitch takedown.', 400);
+      }
+
+      const updated = await AdminService.takedownOrganizerPitch({
+        pitchId,
+        adminId,
+        reason,
+      });
+
+      return sendSuccess(res, updated, 'Sponsorship pitch taken down successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async restoreOrganizerPitch(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const pitchId = req.params.id as string;
+      const adminId = req.user?.userId;
+      if (!adminId) {
+        return sendError(res, 'Authentication required.', 401);
+      }
+      const { reason } = req.body;
+
+      const restored = await AdminService.restoreOrganizerPitch({
+        pitchId,
+        adminId,
+        reason,
+      });
+
+      return sendSuccess(res, restored, 'Sponsorship pitch reinstated successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getContentModerationHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const contentType = req.query.contentType as string | undefined;
+      const contentId = req.query.contentId as string | undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+
+      const history = await AdminService.getContentModerationHistory({
+        contentType,
+        contentId,
+        limit,
+      });
+
+      return sendSuccess(res, history, 'Content moderation history retrieved.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getAuditLogs(req: Request, res: Response, next: NextFunction) {
+    try {
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 15;
+      const search = (req.query.search as string) || '';
+      const category = (req.query.category as string) || 'ALL';
+      const action = (req.query.action as string) || 'ALL';
+
+      const result = await AuditService.getAuditLogs({
+        page,
+        limit,
+        search,
+        category,
+        action,
+      });
+
+      return sendSuccess(res, result, 'System audit logs retrieved successfully.');
     } catch (error) {
       next(error);
     }
