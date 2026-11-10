@@ -14,17 +14,17 @@ interface PortfolioEvent {
 
 const FEATURED_EVENTS: PortfolioEvent[] = [
   {
-    image: '/mint.png',
-    images: ['/mint.png'],
+    image: '/mint.webp',
+    images: ['/mint.webp'],
     category: 'INSTITUTIONAL EVENTS',
-    title: 'MINT',
+    title: 'MInT',
     description:
-      'Organizing the celebration of MINT’s 50 year milestone, bringing people together to mark five decades of achievement.',
+      'Organizing the celebration of MInT’s 50 year milestone, bringing people together to mark five decades of achievement.',
     imagePosition: 'object-[center_42%]',
   },
   {
-    image: '/hackathon.png',
-    images: ['/hackathon.png'],
+    image: '/hackathon.webp',
+    images: ['/hackathon.webp'],
     category: 'TECHNOLOGY & INNOVATION',
     title: 'IS Hub × Vision Vertex',
     description:
@@ -32,8 +32,8 @@ const FEATURED_EVENTS: PortfolioEvent[] = [
     imagePosition: 'object-center',
   },
   {
-    image: '/entena.png',
-    images: ['/entena.png'],
+    image: '/entena.webp',
+    images: ['/entena.webp'],
     category: 'COMMUNITY & SOCIAL IMPACT',
     title: 'Her Space',
     description:
@@ -51,8 +51,8 @@ export const SelectedEventsSection: React.FC = () => {
   const activeEventImages = activeEvent?.images && activeEvent.images.length > 0
     ? activeEvent.images
     : activeEvent
-    ? [activeEvent.image]
-    : [];
+      ? [activeEvent.image]
+      : [];
 
   const hasMultipleImages = activeEventImages.length > 1;
 
@@ -161,11 +161,10 @@ export const SelectedEventsSection: React.FC = () => {
             key={event.title}
             direction="up"
             delay={index * 120}
-            className={`h-full ${
-              index === 2
-                ? 'md:col-span-2 md:max-w-md md:mx-auto lg:col-span-1 lg:max-w-none w-full'
-                : 'w-full'
-            }`}
+            className={`h-full ${index === 2
+              ? 'md:col-span-2 md:max-w-md md:mx-auto lg:col-span-1 lg:max-w-none w-full'
+              : 'w-full'
+              }`}
           >
             <article className="group flex flex-col h-full bg-white rounded-2xl sm:rounded-3xl border border-[#E8DDD7] overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 ease-out hover:-translate-y-1 motion-reduce:hover:translate-y-0 motion-reduce:transition-none">
               {/* Event Photograph with Accessible Zoom Trigger */}
