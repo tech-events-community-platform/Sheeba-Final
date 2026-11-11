@@ -432,7 +432,7 @@ export interface IContentModerationLog {
   created_at: Date | string;
 }
 
-export type SponsorshipDealStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'INTERESTED' | 'DECLINED';
+
 export type SponsorshipDealStatus =
   | 'INTERESTED'
   | 'DECLINED'
