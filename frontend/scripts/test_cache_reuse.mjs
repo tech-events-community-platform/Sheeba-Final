@@ -176,12 +176,22 @@ async function runTests() {
   console.log('\n📦 6. Testing Account and Role Switching Isolation...');
   clearApiCache();
 
+  const createMockJwt = (sub) => {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(
+      JSON.stringify({ userId: sub, exp: Math.floor(Date.now() / 1000) + 3600 })
+    ).toString('base64url');
+    return `${header}.${payload}.sig`;
+  };
+  const aliceToken = createMockJwt('alice-123');
+  const bobToken = createMockJwt('bob-456');
+
   // User Alice logs in
-  setAuthToken('token-alice-123');
+  setAuthToken(aliceToken);
   await requestApi('/tickets');
 
   stats = getClientApiCacheStats();
-  assert(stats.keys.some((k) => k.includes('token-alice-123')), 'Cache key is strictly scoped to Alice token');
+  assert(stats.keys.some((k) => k.includes(aliceToken)), 'Cache key is strictly scoped to Alice token');
 
   // User Alice logs out
   removeAuthToken();
@@ -189,11 +199,11 @@ async function runTests() {
   assert(stats.size === 0, 'Client cache is fully emptied on logout (no lingering private data)');
 
   // User Bob logs in
-  setAuthToken('token-bob-456');
+  setAuthToken(bobToken);
   await requestApi('/tickets');
   stats = getClientApiCacheStats();
-  assert(stats.keys.some((k) => k.includes('token-bob-456')), 'Bob tickets are cached under Bob token');
-  assert(!stats.keys.some((k) => k.includes('token-alice-123')), 'Alice data is nowhere in cache');
+  assert(stats.keys.some((k) => k.includes(bobToken)), 'Bob tickets are cached under Bob token');
+  assert(!stats.keys.some((k) => k.includes(aliceToken)), 'Alice data is nowhere in cache');
 
   console.log('\n====================================================');
   console.log(`📊 FRONTEND CACHE TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);

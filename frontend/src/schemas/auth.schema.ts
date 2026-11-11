@@ -134,12 +134,14 @@ export const SPONSORSHIP_OBJECTIVES = [
 ] as const;
 
 export const TARGET_AUDIENCES = [
+  'Event Organizers',
   'University students',
   'Software developers',
   'Entrepreneurs and startup founders',
   'Researchers',
   'Technology professionals',
   'Business owners',
+
 ] as const;
 
 export const PREFERRED_EVENT_CATEGORIES = [

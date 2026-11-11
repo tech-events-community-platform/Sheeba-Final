@@ -57,17 +57,93 @@ const resolveApiBaseUrl = (): string => {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
-export const getAuthToken = (): string | null => {
-  return localStorage.getItem('sheba_auth_token');
-};
+export const AUTH_TOKEN_KEY = 'sheba_auth_token';
+export const AUTH_USER_KEY = 'sheba_auth_user';
+export const AUTH_EXPIRED_EVENT = 'sheba:auth-expired';
+export const AUTH_TOKEN_UPDATED_EVENT = 'sheba:auth-token-updated';
 
-export const setAuthToken = (token: string): void => {
-  localStorage.setItem('sheba_auth_token', token);
+export interface DecodedJwtPayload {
+  exp?: number;
+  iat?: number;
+  userId?: string;
+  role?: string;
+  [key: string]: unknown;
+}
+
+export function decodeJwtPayload(token: string): DecodedJwtPayload | null {
+  try {
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length !== 3 || !parts[1]) return null;
+
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padLength = (4 - (base64.length % 4)) % 4;
+    if (padLength > 0) {
+      base64 += '='.repeat(padLength);
+    }
+
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const json = new TextDecoder().decode(bytes);
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === 'object' ? (parsed as DecodedJwtPayload) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getTokenExpirationMs(token: string): number | null {
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload.exp !== 'number' || !Number.isFinite(payload.exp)) {
+    return null;
+  }
+  return payload.exp * 1000;
+}
+
+export function isTokenExpired(token: string, nowMs: number = Date.now()): boolean {
+  const expMs = getTokenExpirationMs(token);
+  if (expMs === null) {
+    return true;
+  }
+  return nowMs >= expMs;
+}
+
+export const clearAuthSession = (): void => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
   clearApiCache();
 };
 
+export const notifyAuthExpired = (reason: 'expired' | 'unauthorized' = 'expired'): void => {
+  clearAuthSession();
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { reason } }));
+  }
+};
+
+export const getAuthToken = (): string | null => {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if (!token) return null;
+  if (isTokenExpired(token)) {
+    clearAuthSession();
+    return null;
+  }
+  return token;
+};
+
+export const setAuthToken = (token: string): void => {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  clearApiCache();
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(AUTH_TOKEN_UPDATED_EVENT, { detail: { token } }));
+  }
+};
+
 export const removeAuthToken = (): void => {
-  localStorage.removeItem('sheba_auth_token');
+  localStorage.removeItem(AUTH_TOKEN_KEY);
   clearApiCache();
 };
 
@@ -212,6 +288,59 @@ let ticketsStore: Ticket[] = [];
 let badgeAwardsStore: BadgeAward[] = [];
 let attendeeRosterStore: Record<string, AttendeeRosterItem[]> = {};
 
+const PUBLIC_AUTH_401_ENDPOINTS = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/google',
+  '/auth/sponsor/login',
+  '/auth/sponsor/google',
+  '/auth/sponsor/register',
+  '/auth/verify-registration-otp',
+  '/auth/resend-registration-otp',
+  '/auth/forgot-password',
+  '/auth/verify-otp',
+  '/auth/resend-forgot-password-otp',
+  '/auth/reset-password',
+  '/auth/sponsor/forgot-password',
+  '/auth/sponsor/verify-otp',
+  '/auth/sponsor/reset-password',
+  '/auth/logout',
+];
+
+function isSessionExpired401(endpoint: string, data: any): boolean {
+  const cleanEndpoint = endpoint.split('?')[0].toLowerCase();
+  if (PUBLIC_AUTH_401_ENDPOINTS.some((p) => cleanEndpoint.startsWith(p))) {
+    return false;
+  }
+
+  // Credential-gated endpoints can return 401 for an incorrect password while the session token is still valid
+  if (cleanEndpoint.startsWith('/auth/switch-role') || cleanEndpoint.startsWith('/auth/add-exhibitor-role')) {
+    const msg = String(data?.message || data?.error || '').toLowerCase();
+    return msg.includes('token') || msg.includes('session') || msg.includes('expired') || msg.includes('log in');
+  }
+
+  return true;
+}
+
+function buildApiError(response: Response, endpoint: string, data: any): any {
+  if (response.status === 401 && isSessionExpired401(endpoint, data)) {
+    notifyAuthExpired('unauthorized');
+  }
+
+  const errorMsg =
+    (data && typeof data === 'object' && (data.message || data.error)) ||
+    `HTTP ${response.status}: ${response.statusText}`;
+
+  const errorObj: any = new Error(errorMsg);
+  errorObj.status = response.status;
+  errorObj.data = data;
+  errorObj.code = data?.code || data?.error;
+  errorObj.requiresExhibitorRoleAdd = data?.requiresExhibitorRoleAdd;
+  errorObj.requiresExhibitorRegistration = data?.requiresExhibitorRegistration;
+  errorObj.isPendingApproval = data?.isPendingApproval || response.status === 403;
+  return errorObj;
+}
+
 export async function requestApi<T = any>(endpoint: string, options: RequestApiOptions = {}): Promise<T> {
   const method = (options.method || 'GET').toUpperCase();
   const token = getAuthToken();
@@ -250,23 +379,7 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
     }
 
     if (!response.ok) {
-      if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
-        removeAuthToken();
-        localStorage.removeItem('sheba_auth_user');
-      }
-
-      const errorMsg =
-        (data && typeof data === 'object' && (data.message || data.error)) ||
-        `HTTP ${response.status}: ${response.statusText}`;
-
-      const errorObj: any = new Error(errorMsg);
-      errorObj.status = response.status;
-      errorObj.data = data;
-      errorObj.code = data?.code || data?.error;
-      errorObj.requiresExhibitorRoleAdd = data?.requiresExhibitorRoleAdd;
-      errorObj.requiresExhibitorRegistration = data?.requiresExhibitorRegistration;
-      errorObj.isPendingApproval = data?.isPendingApproval || response.status === 403;
-      throw errorObj;
+      throw buildApiError(response, endpoint, data);
     }
 
     // Invalidate client-side cache for the affected entity namespace upon successful mutation
@@ -324,20 +437,7 @@ export async function requestApi<T = any>(endpoint: string, options: RequestApiO
     }
 
     if (!response.ok) {
-      if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
-        removeAuthToken();
-        localStorage.removeItem('sheba_auth_user');
-      }
-
-      const errorMsg =
-        (data && typeof data === 'object' && (data.message || data.error)) ||
-        `HTTP ${response.status}: ${response.statusText}`;
-
-      const errorObj: any = new Error(errorMsg);
-      errorObj.status = response.status;
-      errorObj.data = data;
-      errorObj.isPendingApproval = data?.isPendingApproval || response.status === 403;
-      throw errorObj;
+      throw buildApiError(response, endpoint, data);
     }
 
     // Cache valid JSON responses (avoid Blobs or file downloads)
@@ -533,11 +633,10 @@ export const api = {
 
     getMe: async (): Promise<User | null> => {
       try {
-        const res = await requestApi('/users/profile');
+        const res = await requestApi('/users/profile', { skipCache: true });
         return res.data;
       } catch (err: any) {
-        removeAuthToken();
-        localStorage.removeItem('sheba_auth_user');
+        clearAuthSession();
         return null;
       }
     },
@@ -596,6 +695,9 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       });
+      if (res.data?.token) {
+        setAuthToken(res.data.token);
+      }
       return res.data || { success: true, message: res.message || 'Password changed successfully.' };
     },
 

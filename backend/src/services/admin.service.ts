@@ -3,6 +3,7 @@ import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
 import { AuditService } from './audit.service';
 import { signAuthToken } from '../utils/jwt.util';
+import { ENV } from '../config/env';
 
 export class AdminService {
   static async getDashboardMetrics() {
@@ -541,12 +542,15 @@ export class AdminService {
     }
 
     const user = res.rows[0];
-    const actionToken = signAuthToken({
-      userId: user.id,
-      email: user.email,
-      role: 'attendee',
-      fullName: user.full_name,
-    });
+    const actionToken = signAuthToken(
+      {
+        userId: user.id,
+        email: user.email,
+        role: 'attendee',
+        fullName: user.full_name,
+      },
+      { expiresIn: ENV.ACTION_TOKEN_EXPIRES_IN as any }
+    );
 
     try {
       await EmailService.sendOrganizerInfoRequestedEmail(

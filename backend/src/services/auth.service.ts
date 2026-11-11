@@ -857,9 +857,11 @@ export class AuthService {
     data: {
       targetRole: 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR';
       password?: string;
+      originalExp?: number;
     }
   ): Promise<{ user: any; token: string }> {
-    const { targetRole, password } = data;
+    const { targetRole, password, originalExp } = data;
+    const tokenSignOptions = originalExp !== undefined ? { preserveExp: originalExp } : undefined;
     const normalizedTarget = (targetRole || 'ATTENDEE').toUpperCase() as 'ATTENDEE' | 'ORGANIZER' | 'EXHIBITOR';
 
     const userRes = await query<IUser>(
@@ -910,12 +912,15 @@ export class AuthService {
         throw err;
       }
 
-      const token = signAuthToken({
-        userId: rawUser.id,
-        email: rawUser.email,
-        role: rawUser.role?.toLowerCase() === 'admin' ? 'admin' : 'organizer',
-        fullName: rawUser.full_name,
-      });
+      const token = signAuthToken(
+        {
+          userId: rawUser.id,
+          email: rawUser.email,
+          role: rawUser.role?.toLowerCase() === 'admin' ? 'admin' : 'organizer',
+          fullName: rawUser.full_name,
+        },
+        tokenSignOptions
+      );
 
       const stats = await this.computeUserStats(rawUser.id);
       const userFormatted = this.formatUserResponse(rawUser, stats);
@@ -932,12 +937,15 @@ export class AuthService {
         throw err;
       }
 
-      const token = signAuthToken({
-        userId: rawUser.id,
-        email: rawUser.email,
-        role: 'exhibitor',
-        fullName: rawUser.full_name,
-      });
+      const token = signAuthToken(
+        {
+          userId: rawUser.id,
+          email: rawUser.email,
+          role: 'exhibitor',
+          fullName: rawUser.full_name,
+        },
+        tokenSignOptions
+      );
 
       const stats = await this.computeUserStats(rawUser.id);
       const userFormatted = this.formatUserResponse(rawUser, stats);
@@ -945,12 +953,15 @@ export class AuthService {
       return { user: userFormatted, token };
     } else {
       // Switching to ATTENDEE
-      const token = signAuthToken({
-        userId: rawUser.id,
-        email: rawUser.email,
-        role: rawUser.role?.toLowerCase() === 'admin' ? 'admin' : 'attendee',
-        fullName: rawUser.full_name,
-      });
+      const token = signAuthToken(
+        {
+          userId: rawUser.id,
+          email: rawUser.email,
+          role: rawUser.role?.toLowerCase() === 'admin' ? 'admin' : 'attendee',
+          fullName: rawUser.full_name,
+        },
+        tokenSignOptions
+      );
 
       const stats = await this.computeUserStats(rawUser.id);
       const userFormatted = this.formatUserResponse(rawUser, stats);
@@ -1895,7 +1906,8 @@ export class AuthService {
   static async changePassword(
     userId: string,
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
+    originalExp?: number
   ): Promise<{ success: boolean; message: string; token?: string; user?: any }> {
     if (!newPassword || newPassword.length < 6) {
       const err: any = new Error('New password must be at least 6 characters long.');
@@ -1949,13 +1961,16 @@ export class AuthService {
     const stats = await this.computeUserStats(user.id);
     const userFormatted = this.formatUserResponse(updatedRaw, stats);
 
-    const token = signAuthToken({
-      userId: user.id,
-      email: user.email,
-      role: (userFormatted.role?.toLowerCase() || 'attendee') as any,
-      fullName: user.full_name,
-      mustChangePassword: false,
-    });
+    const token = signAuthToken(
+      {
+        userId: user.id,
+        email: user.email,
+        role: (userFormatted.role?.toLowerCase() || 'attendee') as any,
+        fullName: user.full_name,
+        mustChangePassword: false,
+      },
+      originalExp !== undefined ? { preserveExp: originalExp } : undefined
+    );
 
     await AuditService.logAction({
       action: 'PASSWORD_CHANGED',

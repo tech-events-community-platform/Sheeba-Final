@@ -61,7 +61,11 @@ export class AuthController {
     try {
       const userId = req.user!.userId;
       const { targetRole, password } = req.body;
-      const result = await AuthService.switchRole(userId, { targetRole, password });
+      const result = await AuthService.switchRole(userId, {
+        targetRole,
+        password,
+        originalExp: req.user?.exp,
+      });
 
       return sendSuccess(res, result, 'Role switched successfully.');
     } catch (error) {
@@ -92,7 +96,12 @@ export class AuthController {
     try {
       const userId = req.user!.userId;
       const { currentPassword, newPassword } = req.body;
-      const result = await AuthService.changePassword(userId, currentPassword, newPassword);
+      const result = await AuthService.changePassword(
+        userId,
+        currentPassword,
+        newPassword,
+        req.user?.exp
+      );
       sendSuccess(res, result, result.message);
     } catch (error) {
       next(error);

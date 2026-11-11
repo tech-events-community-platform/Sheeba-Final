@@ -330,6 +330,8 @@ export interface IJwtPayload {
   role: UserRole;
   fullName: string;
   mustChangePassword?: boolean;
+  iat?: number;
+  exp?: number;
 }
 
 export interface IQrTicketPayload {

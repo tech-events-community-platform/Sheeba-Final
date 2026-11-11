@@ -1,6 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import type { User, UserRole } from '../types/user';
-import { api, getAuthToken, removeAuthToken } from '../services/api';
+import {
+  api,
+  AUTH_EXPIRED_EVENT,
+  AUTH_TOKEN_KEY,
+  AUTH_TOKEN_UPDATED_EVENT,
+  AUTH_USER_KEY,
+  clearAuthSession,
+  getAuthToken,
+  getTokenExpirationMs,
+} from '../services/api';
 
 export interface RegisterResult {
   user?: User;
@@ -99,36 +108,146 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const expirationTimerRef = useRef<number | null>(null);
+  const userRef = useRef<User | null>(null);
 
-  const refreshUser = async () => {
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  const clearExpirationTimer = useCallback(() => {
+    if (expirationTimerRef.current !== null) {
+      window.clearTimeout(expirationTimerRef.current);
+      expirationTimerRef.current = null;
+    }
+  }, []);
+
+  const expireSessionNow = useCallback(() => {
+    clearExpirationTimer();
+    clearAuthSession();
+    setUser(null);
+    setIsLoading(false);
+  }, [clearExpirationTimer]);
+
+  const scheduleExpirationTimer = useCallback(
+    (token: string | null) => {
+      clearExpirationTimer();
+      if (!token) return;
+
+      const armTimer = (activeJwt: string) => {
+        const expMs = getTokenExpirationMs(activeJwt);
+        if (expMs === null) {
+          expireSessionNow();
+          return;
+        }
+
+        const remainingMs = expMs - Date.now();
+        if (remainingMs <= 0) {
+          expireSessionNow();
+          return;
+        }
+
+        // Clamp to 32-bit signed max timeout delay; check on fire in case of sleep/throttling
+        const delayMs = Math.min(remainingMs, 2_147_483_647);
+        expirationTimerRef.current = window.setTimeout(() => {
+          const currentToken = getAuthToken();
+          if (!currentToken) {
+            expireSessionNow();
+          } else {
+            armTimer(currentToken);
+          }
+        }, delayMs);
+      };
+
+      armTimer(token);
+    },
+    [clearExpirationTimer, expireSessionNow]
+  );
+
+  const refreshUser = useCallback(async () => {
     const token = getAuthToken();
     if (!token) {
+      clearExpirationTimer();
+      clearAuthSession();
       setUser(null);
-      localStorage.removeItem('sheba_auth_user');
       setIsLoading(false);
       return;
     }
 
+    scheduleExpirationTimer(token);
+
     try {
       const currentUser = await api.auth.getMe();
-      if (currentUser) {
+      if (currentUser && getAuthToken()) {
         setUser(currentUser);
-        localStorage.setItem('sheba_auth_user', JSON.stringify(currentUser));
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser));
+        scheduleExpirationTimer(getAuthToken());
       } else {
-        setUser(null);
-        localStorage.removeItem('sheba_auth_user');
+        expireSessionNow();
       }
     } catch (e) {
       console.error('Failed to load session user:', e);
-      setUser(null);
+      expireSessionNow();
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [clearExpirationTimer, expireSessionNow, scheduleExpirationTimer]);
 
   useEffect(() => {
     refreshUser();
-  }, []);
+
+    const handleAuthExpired = () => {
+      expireSessionNow();
+    };
+
+    const handleTokenUpdated = () => {
+      const token = getAuthToken();
+      if (!token) {
+        expireSessionNow();
+      } else {
+        scheduleExpirationTimer(token);
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key !== null && e.key !== AUTH_TOKEN_KEY && e.key !== AUTH_USER_KEY) {
+        return;
+      }
+      const token = getAuthToken();
+      if (!token) {
+        expireSessionNow();
+        return;
+      }
+      if (e.key === AUTH_TOKEN_KEY && e.newValue) {
+        refreshUser();
+      }
+    };
+
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      const hasSession = Boolean(userRef.current || localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_USER_KEY));
+      if (hasSession && !getAuthToken()) {
+        expireSessionNow();
+      }
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    window.addEventListener(AUTH_TOKEN_UPDATED_EVENT, handleTokenUpdated);
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      clearExpirationTimer();
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+      window.removeEventListener(AUTH_TOKEN_UPDATED_EVENT, handleTokenUpdated);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, [clearExpirationTimer, expireSessionNow, refreshUser, scheduleExpirationTimer]);
 
   const login = async (email: string, password: string, role?: string): Promise<User> => {
     setIsLoading(true);
@@ -338,10 +457,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await api.auth.logout();
     } finally {
-      setUser(null);
-      localStorage.removeItem('sheba_auth_user');
-      removeAuthToken();
-      setIsLoading(false);
+      expireSessionNow();
     }
   };
 

@@ -23,7 +23,7 @@ const FAQS = [
     a: 'When attendees arrive at your event, organizers scan their unique encrypted QR ticket using our dedicated mobile-ready scanner. Once verified, the door check-in is cryptographically recorded, immediately unlocking the attendee\'s permanent attendance badge and verifiable certificate.',
   },
   {
-    q: 'How do corporate sponsors partner with tech events on Sheeba?',
+    q: 'How do corporate sponsors partner with  Sheeba?',
     a: 'Sponsors can register for a corporate sponsor account to explore verified tech events, hackathons, and developer conferences across Ethiopia. Sponsors can pledge funding directly to event packages, review verified attendance statistics, and negotiate brand deliverable placements.',
   },
   {
@@ -97,9 +97,8 @@ export const ContactPage: React.FC = () => {
                   >
                     <span>{faq.q}</span>
                     <ChevronDown
-                      className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${
-                        isOpen ? 'rotate-180 text-[#63474D]' : ''
-                      }`}
+                      className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-[#63474D]' : ''
+                        }`}
                     />
                   </button>
 
