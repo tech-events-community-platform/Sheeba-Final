@@ -3,6 +3,7 @@ import { Event, RegistrationQuestion } from '../../types/event';
 import { api } from '../../services/api';
 import { Button } from '../ui/Button';
 import { uploadToCloudinary } from '../../utils/cloudinary';
+import { formatPhoneInput } from '../../utils/phone';
 import {
   User,
   Mail,
@@ -259,9 +260,10 @@ export const ManualAddAttendeeModal: React.FC<ManualAddAttendeeModalProps> = ({
                 </label>
                 <input
                   type="tel"
-                  placeholder="e.g. +251 91 234 5678"
+                  maxLength={10}
+                  placeholder="0912345678"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                   className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                 />
               </div>

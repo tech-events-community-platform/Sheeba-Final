@@ -64,6 +64,20 @@ export const registerSchema = z
           message: 'Phone number is required.',
           path: ['phone'],
         });
+      } else if (!/^0\d{9}$/.test(data.phone.replace(/[\s-]/g, ''))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Phone number must be exactly 10 digits starting with 0 (e.g., 0912345678).',
+          path: ['phone'],
+        });
+      }
+
+      if (data.role !== 'ORGANIZER' && data.phone && data.phone.trim().length > 0 && !/^0\d{9}$/.test(data.phone.replace(/[\s-]/g, ''))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Phone number must be exactly 10 digits starting with 0 (e.g., 0912345678).',
+          path: ['phone'],
+        });
       }
 
       const applicantType = data.applicantType || data.applicant_type || 'Individual Organizer';
@@ -168,7 +182,11 @@ export const sponsorRegisterSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters long.'),
   companyName: z.string().trim().min(1, 'Company name is required.'),
   industryCategory: z.string().trim().min(1, 'Please select an industry category.'),
-  companyPhone: z.string().trim().min(1, 'Company phone number is required.'),
+  companyPhone: z
+    .string()
+    .trim()
+    .min(1, 'Company phone number is required.')
+    .regex(/^0\d{9}$/, 'Company phone must be exactly 10 digits starting with 0 (e.g., 0912345678).'),
   companyWebsite: z
     .string()
     .trim()
@@ -227,7 +245,11 @@ export const ORGANIZATION_TYPES = [
 export const applyOrganizerSchema = z
   .object({
     applicantType: z.enum(['Individual Organizer', 'Organization / Institution']).default('Individual Organizer'),
-    phone: z.string().trim().min(1, 'Phone number is required.'),
+    phone: z
+      .string()
+      .trim()
+      .min(1, 'Phone number is required.')
+      .regex(/^0\d{9}$/, 'Phone number must be exactly 10 digits starting with 0 (e.g., 0912345678).'),
     applyPassword: z.string().optional(),
     // Individual Organizer field
     personalIntroduction: z.string().trim().optional(),

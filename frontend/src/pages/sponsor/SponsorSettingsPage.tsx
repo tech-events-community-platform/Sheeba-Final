@@ -24,6 +24,7 @@ import {
   Loader2,
   Users,
 } from 'lucide-react';
+import { formatPhoneInput } from '../../utils/phone';
 import { uploadToCloudinary } from '../../utils/cloudinary';
 
 const INDUSTRY_CATEGORIES = [
@@ -141,8 +142,7 @@ export const SponsorSettingsPage: React.FC = () => {
   const [companyWebsite, setCompanyWebsite] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
   const [maxBudget, setMaxBudget] = useState<string>('');
-
-  const [objectives, setObjectives] = useState<string[]>([]);
+    const [objectives, setObjectives] = useState<string[]>([]);
   const [targetAudience, setTargetAudience] = useState<string[]>([]);
   const [preferredCategories, setPreferredCategories] = useState<string[]>([]);
   const [skillsAndInterests, setSkillsAndInterests] = useState<string[]>([]);
@@ -401,10 +401,11 @@ export const SponsorSettingsPage: React.FC = () => {
                 Contact Phone
               </label>
               <input
-                type="text"
+                type="tel"
+                maxLength={10}
                 value={companyPhone}
-                onChange={(e) => setCompanyPhone(e.target.value)}
-                placeholder="+251 911 000 000"
+                onChange={(e) => setCompanyPhone(formatPhoneInput(e.target.value))}
+                placeholder="0912345678"
                 className="w-full px-3.5 py-2.5 text-xs bg-stone-50 border border-gray-300 rounded-xl focus:border-[#63474D] focus:outline-none"
               />
             </div>
@@ -414,7 +415,7 @@ export const SponsorSettingsPage: React.FC = () => {
           <div className="space-y-2">
             <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <Image className="w-3.5 h-3.5 text-gray-400" />
-              Company Logo <span className="text-gray-400 font-normal lowercase">(Optional - PNG, JPG, WebP up to 5MB)</span>
+              Company Logo <span className="text-gray-400 font-normal lowercase">(PNG, JPG, WebP up to 5MB)</span>
             </label>
             {companyLogo ? (
               <div className="flex items-center gap-3 p-2.5 bg-stone-50 border border-gray-300 rounded-xl">

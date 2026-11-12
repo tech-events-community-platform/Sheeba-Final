@@ -12,6 +12,7 @@ import type {
 } from '../../types/exhibitor';
 import type { RegistrationQuestion, PaymentDestination } from '../../types/event';
 import { EditExhibitorQuestionsModal } from './EditExhibitorQuestionsModal';
+import { formatPhoneInput } from '../../utils/phone';
 import { Button } from '../ui/Button';
 import {
   Store,
@@ -1696,9 +1697,10 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                   </label>
                   <input
                     type="tel"
-                    placeholder="+251 91 123 4567"
+                    maxLength={10}
+                    placeholder="0912345678"
                     value={manualForm.contactPhone || ''}
-                    onChange={(e) => setManualForm({ ...manualForm, contactPhone: e.target.value })}
+                    onChange={(e) => setManualForm({ ...manualForm, contactPhone: formatPhoneInput(e.target.value) })}
                     className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                   />
                 </div>

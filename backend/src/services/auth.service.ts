@@ -190,7 +190,8 @@ export class AuthService {
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
-    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(full_name)}&background=63474D&color=fff`;
+    const orgLogo = (data.organization_logo || data.organizationLogo || '').trim();
+    const avatarUrl = orgLogo || `https://ui-avatars.com/api/?name=${encodeURIComponent(full_name)}&background=63474D&color=fff`;
 
     // If organizer: save formalization fields, set organizer_approval_status to 'pending',
     // is_organizer = FALSE, role = 'attendee', is_active = TRUE so the user has attendee access
@@ -219,7 +220,6 @@ export class AuthService {
       const position = (data.applicant_position || data.applicantPosition || data.position || '').trim();
       const orgDesc = (data.organization_description || data.organizationDescription || bio || '').trim();
       const orgWebsite = (data.organization_website || data.organizationWebsite || data.website || '').trim();
-      const orgLogo = (data.organization_logo || data.organizationLogo || '').trim();
 
       const finalBio = isIndividual ? personalIntro : (orgDesc || full_name);
       const finalOrgName = isIndividual ? (full_name || 'Individual Organizer') : orgName;

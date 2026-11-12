@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { ORGANIZATION_TYPES } from '../../schemas';
 import { uploadToCloudinary } from '../../utils/cloudinary';
+import { formatPhoneInput } from '../../utils/phone';
 
 export const OrganizerResponsePage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -465,8 +466,10 @@ export const OrganizerResponsePage: React.FC = () => {
               <input
                 id="resp-phone"
                 type="tel"
+                maxLength={10}
+                placeholder="0912345678"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                 className="w-full px-3 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
               />
             </div>

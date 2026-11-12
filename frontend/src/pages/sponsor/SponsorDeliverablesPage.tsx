@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import type { ISponsorshipDeal, ISponsorDeliverable } from '../../types/sponsorship';
+import { formatPhoneInput } from '../../utils/phone';
 
 export const SponsorDeliverablesPage: React.FC = () => {
   const { user } = useAuth();
@@ -488,9 +489,10 @@ export const SponsorDeliverablesPage: React.FC = () => {
                 <input
                   type="tel"
                   required
+                  maxLength={10}
                   value={form.repPhone}
-                  onChange={(e) => setForm({ ...form, repPhone: e.target.value })}
-                  placeholder="+251 9..."
+                  onChange={(e) => setForm({ ...form, repPhone: formatPhoneInput(e.target.value) })}
+                  placeholder="0912345678"
                   className="w-full px-4 py-2.5 rounded-xl border border-stone-300 focus:border-[#63474D] outline-none text-sm bg-white"
                 />
               </div>

@@ -40,6 +40,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { uploadToCloudinary } from '../../utils/cloudinary';
+import { formatPhoneInput } from '../../utils/phone';
 
 const INDUSTRY_OPTIONS = [
   'Fintech & Financial Services',
@@ -509,9 +510,10 @@ export const SponsorAuthPage: React.FC = () => {
                           <input
                             type="tel"
                             required
+                            maxLength={10}
                             value={companyPhone}
-                            onChange={(e) => setCompanyPhone(e.target.value)}
-                            placeholder="+251 9..."
+                            onChange={(e) => setCompanyPhone(formatPhoneInput(e.target.value))}
+                            placeholder="0912345678"
                             className="w-full pl-9 pr-3 py-2 text-xs bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl focus:outline-none focus:border-[#63474D] focus:bg-white text-[#2D1F23]"
                           />
                         </div>
@@ -539,19 +541,19 @@ export const SponsorAuthPage: React.FC = () => {
                       {/* Company Logo Upload (via Cloudinary) */}
                       <div>
                         <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                          Company Logo <span className="text-gray-400 font-normal">(Optional - PNG, JPG, WebP up to 5MB)</span>
+                          Company Logo <span className="text-gray-400 font-normal">(PNG, JPG, WebP up to 5MB)</span>
                         </label>
                         {companyLogo ? (
-                          <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                          <div className="flex items-center gap-3 p-1.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
                             <img
                               src={companyLogo}
                               alt="Company Logo"
-                              className="w-10 h-10 rounded-xl object-contain bg-white border border-[#E8DDD7] p-0.5"
+                              className="w-9 h-9 rounded-xl object-contain bg-white border border-[#E8DDD7] p-0.5"
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-[#2D1F23] flex items-center gap-1">
+                              <p className="text-[11px] font-semibold text-[#2D1F23] flex items-center gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                                <span>Logo uploaded</span>
+                                <span className="truncate">Logo uploaded</span>
                               </p>
                             </div>
                             <button
@@ -560,30 +562,32 @@ export const SponsorAuthPage: React.FC = () => {
                               className="p-1 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
                               title="Remove logo"
                             >
-                              <X className="w-4 h-4" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ) : (
-                          <label className="flex items-center justify-center gap-2 p-2.5 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
-                            {isUploadingLogo ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
-                            ) : (
-                              <Upload className="w-4 h-4 text-[#756366]" />
+                          <div className="space-y-1.5">
+                            <label className="flex items-center justify-center gap-2 p-2 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
+                              {isUploadingLogo ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#63474D]" />
+                              ) : (
+                                <Upload className="w-3.5 h-3.5 text-[#756366]" />
+                              )}
+                              <span className="text-xs font-medium text-[#756366]">
+                                {isUploadingLogo ? 'Uploading logo to Cloudinary...' : 'Upload logo'}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                className="hidden"
+                                disabled={isUploadingLogo}
+                                onChange={handleLogoUpload}
+                              />
+                            </label>
+                            {logoUploadError && (
+                              <p className="text-[11px] text-red-600">{logoUploadError}</p>
                             )}
-                            <span className="text-xs font-medium text-[#756366]">
-                              {isUploadingLogo ? 'Uploading logo...' : 'Click to upload company logo'}
-                            </span>
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/jpg,image/webp"
-                              className="hidden"
-                              disabled={isUploadingLogo}
-                              onChange={handleLogoUpload}
-                            />
-                          </label>
-                        )}
-                        {logoUploadError && (
-                          <p className="text-[11px] text-red-600 mt-1">{logoUploadError}</p>
+                          </div>
                         )}
                       </div>
                     </div>

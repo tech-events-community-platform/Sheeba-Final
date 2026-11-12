@@ -52,10 +52,10 @@ export default function Hero() {
 
           {/* Sponsor & Exhibitor Portal Entries - Transparent / Glassmorphic */}
           <FadeIn delay={400}>
-            <div className="pt-2 flex flex-col 2xl:flex-row 2xl:items-center gap-3 2xl:gap-6 text-xs sm:text-sm text-gray-900">
+            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-start gap-5 sm:gap-10 text-xs sm:text-sm text-gray-900">
               {/* Sponsor Prompt */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-normal">Looking to sponsor premier gatherings & back upcoming initiatives?</span>
+              <div className="flex flex-col items-start gap-2">
+                <span className="font-normal text-gray-900">Looking to sponsor premier gatherings?</span>
                 <Link
                   to="/sponsor/auth"
                   className="inline-flex items-center gap-1.5 font-bold text-[#63474D] hover:text-[#2D1F23] bg-white/20 hover:bg-white/35 backdrop-blur-md border border-white/40 hover:border-[#63474D]/40 px-4 py-2 rounded-full shadow-sm transition-all duration-200"
@@ -66,9 +66,8 @@ export default function Hero() {
               </div>
 
               {/* Exhibitor Prompt */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-[#2D1F23]">Are you an exhibitor?</span>
-                <span className="font-normal">Showcase your brand and explore event booth opportunities.</span>
+              <div className="flex flex-col items-start gap-2">
+                <span className="font-normal text-gray-900">Showcase your brand and explore event booth opportunities.</span>
                 <Link
                   to="/exhibitor/auth"
                   className="inline-flex items-center gap-1.5 font-bold text-[#63474D] hover:text-[#2D1F23] bg-white/20 hover:bg-white/35 backdrop-blur-md border border-white/40 hover:border-[#63474D]/40 px-4 py-2 rounded-full shadow-sm transition-all duration-200"

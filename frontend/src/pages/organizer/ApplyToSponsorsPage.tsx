@@ -28,7 +28,9 @@ import {
   Search,
   Clock,
   XCircle,
+  RefreshCw,
 } from 'lucide-react';
+import { formatPhoneInput } from '../../utils/phone';
 import {
   LinkedInIcon,
   XIcon,
@@ -741,6 +743,18 @@ export const ApplyToSponsorsPage: React.FC = () => {
             >
               <Building2 className="w-4 h-4" />
               <span>My Sponsors ({sponsorsList.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                loadMyApplications();
+                loadMySponsors();
+              }}
+              title="Refresh pitches and sponsors"
+              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer flex items-center justify-center shrink-0"
+            >
+              <RefreshCw className={`w-4 h-4 ${(fetchLoading || sponsorsLoading) ? 'animate-spin' : ''}`} />
             </button>
 
             <Link
@@ -1903,9 +1917,10 @@ export const ApplyToSponsorsPage: React.FC = () => {
                 <input
                   type="tel"
                   required
-                  placeholder="+251 911 234 567"
+                  maxLength={10}
+                  placeholder="0912345678"
                   value={formData.contact_phone}
-                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, contact_phone: formatPhoneInput(e.target.value) })}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#63474D] focus:ring-2 focus:ring-[#63474D]/20 outline-none text-sm transition-all"
                 />
               </div>
