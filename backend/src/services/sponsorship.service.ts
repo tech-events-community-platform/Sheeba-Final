@@ -649,34 +649,34 @@ export class SponsorshipService {
         sponsor_notes: row.sponsor_notes,
         created_at: row.created_at,
         updated_at: row.updated_at,
-      application: {
-        id: row.application_id,
-        event_title: row.event_title,
-        event_type: row.event_type,
-        category: row.category,
-        expected_date: row.expected_date,
-        location: row.location,
-        expected_attendees: row.expected_attendees ? Number(row.expected_attendees) : 0,
-        target_audience: row.target_audience,
-        funding_goal: row.funding_goal ? Number(row.funding_goal) : 0,
-        currency: row.currency,
-        description: row.application_description,
-        packages: row.packages,
-        contact_name: row.contact_name,
-        contact_phone: row.contact_phone,
-        contact_email: row.contact_email,
-        contact_telegram: row.contact_telegram,
-        pitch_deck_url: row.pitch_deck_url,
-        socials: row.socials,
-        affiliations: row.affiliations,
-        status: row.application_status,
-        organizer_organization: row.organizer_organization,
-        organizer_name: row.organizer_name,
-        organizer_avatar: row.organizer_avatar,
-      },
-    };
-  });
-}
+        application: {
+          id: row.application_id,
+          event_title: row.event_title,
+          event_type: row.event_type,
+          category: row.category,
+          expected_date: row.expected_date,
+          location: row.location,
+          expected_attendees: row.expected_attendees ? Number(row.expected_attendees) : 0,
+          target_audience: row.target_audience,
+          funding_goal: row.funding_goal ? Number(row.funding_goal) : 0,
+          currency: row.currency,
+          description: row.application_description,
+          packages: row.packages,
+          contact_name: row.contact_name,
+          contact_phone: row.contact_phone,
+          contact_email: row.contact_email,
+          contact_telegram: row.contact_telegram,
+          pitch_deck_url: row.pitch_deck_url,
+          socials: row.socials,
+          affiliations: row.affiliations,
+          status: row.application_status,
+          organizer_organization: row.organizer_organization,
+          organizer_name: row.organizer_name,
+          organizer_avatar: row.organizer_avatar,
+        },
+      };
+    });
+  }
 
   /**
    * Update deal notes directly
