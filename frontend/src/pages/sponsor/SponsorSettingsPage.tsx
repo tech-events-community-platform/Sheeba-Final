@@ -27,6 +27,19 @@ import {
 import { formatPhoneInput } from '../../utils/phone';
 import { uploadToCloudinary } from '../../utils/cloudinary';
 
+const INDUSTRY_CATEGORIES = [
+  'Technology',
+  'Finance & Banking',
+  'Telecom',
+  'Healthcare',
+  'Education',
+  'Consumer Goods',
+  'Media & Entertainment',
+  'Energy & Infrastructure',
+  'Agriculture',
+  'Entrepreneurship',
+];
+
 const OBJECTIVES_OPTIONS = [
   'Brand awareness',
   'Talent recruitment',
@@ -129,37 +142,7 @@ export const SponsorSettingsPage: React.FC = () => {
   const [companyWebsite, setCompanyWebsite] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
   const [maxBudget, setMaxBudget] = useState<string>('');
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
-
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      setLogoUploadError('Please select a valid image file (PNG, JPG, or WebP).');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setLogoUploadError('Logo file size must not exceed 5MB.');
-      return;
-    }
-
-    setIsUploadingLogo(true);
-    setLogoUploadError(null);
-    try {
-      const url = await uploadToCloudinary(file, { folder: 'sheeba_sponsor_logos' });
-      setCompanyLogo(url);
-    } catch (err: any) {
-      setLogoUploadError(err.message || 'Failed to upload company logo.');
-    } finally {
-      setIsUploadingLogo(false);
-    }
-  };
-
-  const [objectives, setObjectives] = useState<string[]>([]);
+    const [objectives, setObjectives] = useState<string[]>([]);
   const [targetAudience, setTargetAudience] = useState<string[]>([]);
   const [preferredCategories, setPreferredCategories] = useState<string[]>([]);
   const [skillsAndInterests, setSkillsAndInterests] = useState<string[]>([]);
