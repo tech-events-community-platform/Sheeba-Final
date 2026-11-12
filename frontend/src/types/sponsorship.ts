@@ -57,15 +57,35 @@ export interface ISponsorshipApplication {
   socials?: Record<string, string>;
   affiliations?: IApplicationAffiliations;
   status: SponsorshipApplicationStatus;
+  is_taken_down?: boolean;
+  takedown_reason?: string | null;
+  taken_down_at?: string | null;
+  taken_down_by?: string | null;
   created_at: string;
   updated_at: string;
   organizer_name?: string;
   organizer_organization?: string;
   organizer_avatar?: string;
+  organizer_email?: string;
+  organizer_phone?: string;
   interested_sponsors_count?: number;
   approved_sponsors_count?: number;
   user_deal_status?: string | null;
   user_deal?: any;
+}
+
+export interface IContentModerationLog {
+  id: string;
+  content_type: 'publicized_event' | 'sponsorship_pitch';
+  content_id: string;
+  action: 'takedown' | 'restore';
+  reason: string;
+  performed_by: string;
+  performer_name?: string;
+  performer_email?: string;
+  content_title?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
 }
 
 export type SponsorshipDealStatus =

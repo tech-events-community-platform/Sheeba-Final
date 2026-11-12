@@ -6,12 +6,13 @@ import {
   Calendar,
   Users,
   Award,
-  CreditCard,
   User,
   ChevronLeft,
   ChevronRight,
   Trash2,
   HandCoins,
+  ShieldAlert,
+  Activity,
 } from 'lucide-react';
 
 export const AdminSidebar: React.FC = () => {
@@ -34,9 +35,10 @@ export const AdminSidebar: React.FC = () => {
     { label: 'Event Oversight', path: '/admin/events', icon: Calendar },
     { label: 'Users & Organizers', path: '/admin/users', icon: Users },
     { label: 'Sponsorship Applications', path: '/admin/sponsorship-applications', icon: HandCoins },
-    { label: 'Recycle Bin & Audit', path: '/admin/recycle-bin', icon: Trash2 },
+    { label: 'Content Moderation', path: '/admin/moderation', icon: ShieldAlert },
+    { label: 'System Audit Logs', path: '/admin/audit-logs', icon: Activity },
+    { label: 'Recycle Bin', path: '/admin/recycle-bin', icon: Trash2 },
     { label: 'Badge Revocation Queue', path: '/admin#badges', icon: Award },
-    { label: 'Payment Issues Log', path: '/admin#payments', icon: CreditCard },
     { label: 'Admin Profile', path: '/admin/profile', icon: User },
   ];
 
@@ -52,9 +54,8 @@ export const AdminSidebar: React.FC = () => {
 
   return (
     <aside
-      className={`${
-        isCollapsed ? 'w-16' : 'w-64'
-      } bg-[#63474D] text-white flex flex-col hidden md:flex sticky top-0 h-screen border-r border-[#AA767C]/40 shrink-0 self-start overflow-y-auto transition-all duration-300 z-20`}
+      className={`${isCollapsed ? 'w-16' : 'w-64'
+        } bg-[#63474D] text-white flex flex-col hidden md:flex sticky top-0 h-screen border-r border-[#AA767C]/40 shrink-0 self-start overflow-y-auto transition-all duration-300 z-20`}
     >
       <div className={`${isCollapsed ? 'p-2 pt-3' : 'p-4 pt-3.5'} space-y-4`}>
         {/* Console Header & Minimizer */}
@@ -101,13 +102,11 @@ export const AdminSidebar: React.FC = () => {
                 key={item.path}
                 to={item.path}
                 title={isCollapsed ? item.label : undefined}
-                className={`flex items-center ${
-                  isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-2.5'
-                } rounded-xl text-sm font-medium transition-all ${
-                  active
+                className={`flex items-center ${isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3.5 py-2.5'
+                  } rounded-xl text-sm font-medium transition-all ${active
                     ? `bg-[#AA767C] text-white font-semibold ${isCollapsed ? '' : 'border-l-4'} border-[#FFA686] shadow-xs`
                     : 'text-[#E8DDD7] hover:bg-[#523a3f] hover:text-white'
-                }`}
+                  }`}
               >
                 <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-[#FFA686]' : 'text-[#D6A184]'}`} />
                 {!isCollapsed && <span className="truncate">{item.label}</span>}

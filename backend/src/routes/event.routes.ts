@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { EventController } from '../controllers/event.controller';
+import { ScannerController } from '../controllers/scanner.controller';
 import { authenticate, optionalAuthenticate } from '../middlewares/auth.middleware';
 import { authorizeRoles } from '../middlewares/role.middleware';
 import { validateBody, validateQuery, validateParams } from '../middlewares/validate.middleware';
@@ -137,6 +138,47 @@ router.post(
   validateParams(idParamSchema),
   validateBody(bulkApproveRegistrationsSchema),
   EventController.bulkApproveRegistrations
+);
+
+// Organizer Scanner Staff Management (Specification v2.1)
+router.get(
+  '/:id/scanners',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  ScannerController.getEventScanners
+);
+
+router.post(
+  '/:id/scanners',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  ScannerController.assignScanners
+);
+
+router.patch(
+  '/:id/scanners/toggle',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  ScannerController.toggleScanners
+);
+
+router.delete(
+  '/:id/scanners/:scannerId',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  ScannerController.removeScanner
+);
+
+router.post(
+  '/:id/scanners/:scannerId/resend',
+  authenticate,
+  authorizeRoles('organizer', 'admin'),
+  validateParams(idParamSchema),
+  ScannerController.resendScannerInvite
 );
 
 export default router;

@@ -5,6 +5,8 @@ import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
 import { PaymentService } from './payment.service';
 import { RecycleBinService } from './recycleBin.service';
+import { ScannerService } from './scanner.service';
+import { AuditService } from './audit.service';
 import { getFrontendUrl } from '../config/env';
 
 export class EventService {
@@ -73,9 +75,14 @@ export class EventService {
       isPaid,
       ticketPrice,
       isPublicized: Boolean(row.is_publicized),
+      isPublicityModerated: Boolean(row.is_publicity_moderated),
+      publicityTakedownReason: row.publicity_takedown_reason || null,
+      publicityModeratedAt: row.publicity_moderated_at || null,
+      publicityModeratedBy: row.publicity_moderated_by || null,
       currency: row.currency || 'ETB',
       paymentMethods: typeof row.payment_methods === 'string' ? JSON.parse(row.payment_methods) : row.payment_methods || [],
       requiresApproval: Boolean(row.requires_approval),
+      requiresScanners: Boolean(row.requires_scanners),
       shareLinkToken: row.share_link_token || row.id,
       customQuestions: typeof row.custom_questions === 'string' ? JSON.parse(row.custom_questions) : row.custom_questions || [],
       bannerUrl: posterUrl,
@@ -122,10 +129,19 @@ export class EventService {
       isPublicized = false,
       paymentMethods = [],
       requiresApproval = false,
+      requiresScanners = false,
+      requires_scanners,
+      scannerEmails = [],
+      scanner_emails,
       customQuestions = [],
       bannerUrl,
       posterImageUrl,
     } = data as any;
+
+    const effectiveRequiresScanners = Boolean(requiresScanners ?? requires_scanners ?? false);
+    const effectiveScannerEmails = (Array.isArray(scannerEmails) && scannerEmails.length > 0)
+      ? scannerEmails
+      : (Array.isArray(scanner_emails) ? scanner_emails : []);
 
     const poster = posterImageUrl || bannerUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
     const timeStr = `${startTime} - ${endTime} EAT`;
@@ -136,8 +152,9 @@ export class EventService {
         organizer_id, title, description, event_type, category, event_date,
         start_time, end_time, time_str, location, venue_name, capacity,
         status, is_paid, is_publicized, ticket_price, currency, share_link_token,
-        custom_questions, banner_url, poster_image_url, requires_approval, payment_methods
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, $15, 'ETB', $16, $17, $18, $19, $20, $21)
+        custom_questions, banner_url, poster_image_url, requires_approval, payment_methods,
+        requires_scanners
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open', $13, $14, $15, 'ETB', $16, $17, $18, $19, $20, $21, $22)
       RETURNING *`,
       [
         organizerId,
@@ -161,10 +178,20 @@ export class EventService {
         poster,
         Boolean(requiresApproval),
         JSON.stringify(paymentMethods || []),
+        effectiveRequiresScanners,
       ]
     );
 
     const insertedEvent = result.rows[0];
+
+    // Assign scanners if enabled and provided
+    if (effectiveRequiresScanners && effectiveScannerEmails.length > 0) {
+      await ScannerService.assignScanners({
+        eventId: insertedEvent.id,
+        organizerId,
+        emails: effectiveScannerEmails,
+      });
+    }
     const userRes = await query('SELECT full_name, organization, email FROM users WHERE id = $1', [organizerId]);
     const userRow = userRes.rows[0] || {};
 
@@ -179,6 +206,19 @@ export class EventService {
     await CacheService.delPattern('events:list*');
     await CacheService.delPattern('*http:*/api/events*');
     await CacheService.delPattern('matching:recommendations:*');
+
+    await AuditService.logAction({
+      action: 'EVENT_CREATED',
+      category: 'EVENTS',
+      entityType: 'event',
+      entityId: formatted.id,
+      entityTitle: formatted.title,
+      performedBy: organizerId,
+      performedByName: userRow.full_name,
+      performedByEmail: userRow.email,
+      details: `Event "${formatted.title}" created (${formatted.eventType})`,
+      metadata: { eventType: formatted.eventType, location: formatted.location, isPaid: formatted.isPaid },
+    });
 
     return formatted;
   }
@@ -366,6 +406,7 @@ export class EventService {
       'custom_questions',
       'requires_approval',
       'payment_methods',
+      'requires_scanners',
     ];
 
     const inputData: any = { ...data };
@@ -373,6 +414,29 @@ export class EventService {
       const sTime = inputData.startTime || (existing.rows[0] as any).start_time || '09:00 AM';
       const eTime = inputData.endTime || (existing.rows[0] as any).end_time || '05:00 PM';
       inputData.time_str = `${sTime} - ${eTime} EAT`;
+    }
+
+    // If scanners explicitly disabled via updateEvent, deactivate existing assignments immediately (Specification v2.1)
+    if (inputData.requiresScanners === false || inputData.requires_scanners === false) {
+      await ScannerService.toggleScanners({
+        eventId: realId,
+        organizerId: userId,
+        enabled: false,
+        userRole,
+      });
+    }
+
+    // Prevent organizers from overriding an administrative publicity takedown
+    const isPublicizeAttempt = inputData.isPublicized === true || inputData.is_publicized === true;
+    if (isPublicizeAttempt && (existing.rows[0] as any).is_publicity_moderated) {
+      if (userRole?.toLowerCase() !== 'admin') {
+        const err: any = new Error(
+          `Public discovery for this event was taken down by administration due to: "${(existing.rows[0] as any).publicity_takedown_reason || 'Code of Conduct / Policy violation'}". Only an authorized administrator can restore community discovery.`
+        );
+        err.statusCode = 403;
+        err.code = 'PUBLICITY_MODERATED';
+        throw err;
+      }
     }
 
     for (const [key, value] of Object.entries(inputData)) {
@@ -405,11 +469,13 @@ export class EventService {
                                   ? 'is_publicized'
                                   : key === 'requiresApproval'
                                     ? 'requires_approval'
-                                    : key;
+                                    : key === 'requiresScanners' || key === 'requires_scanners'
+                                      ? 'requires_scanners'
+                                      : key;
       if (allowedFields.includes(dbKey)) {
         fields.push(`${dbKey} = $${counter++}`);
         values.push(
-          dbKey === 'requires_approval'
+          dbKey === 'requires_approval' || dbKey === 'requires_scanners'
             ? Boolean(value)
             : dbKey === 'custom_questions' || dbKey === 'payment_methods'
               ? typeof value === 'string'
@@ -451,7 +517,24 @@ export class EventService {
     await CacheService.del(`report:${realId}`);
     await CacheService.del(`report:${eventId}`);
     await CacheService.delPattern('matching:recommendations:*');
-    return this.getEventById(realId);
+
+    const updatedEvt = await this.getEventById(realId);
+    const isPublicizedChange = inputData.isPublicized !== undefined || inputData.is_publicized !== undefined;
+    const isNowPublicized = Boolean(inputData.isPublicized ?? inputData.is_publicized);
+    await AuditService.logAction({
+      action: isPublicizedChange && isNowPublicized ? 'EVENT_PUBLICIZED' : 'EVENT_UPDATED',
+      category: 'EVENTS',
+      entityType: 'event',
+      entityId: realId,
+      entityTitle: updatedEvt?.title || (existing.rows[0] as any)?.title,
+      performedBy: userId,
+      details: isPublicizedChange && isNowPublicized
+        ? `Event "${updatedEvt?.title}" published to community discovery`
+        : `Event details updated for "${updatedEvt?.title}"`,
+      metadata: { fieldsUpdated: Object.keys(inputData) },
+    });
+
+    return updatedEvt;
   }
 
   static async deleteEvent(eventId: string, userId: string, userRole: UserRole): Promise<boolean> {
@@ -877,6 +960,19 @@ export class EventService {
       await CacheService.delPattern(`event:${event.id}:roster*`);
       await CacheService.delPattern(`*http:*/api/events/${event.id}*`);
       await CacheService.del(`report:${event.id}`);
+
+      await AuditService.logAction({
+        action: 'EVENT_REGISTRATION',
+        category: 'REGISTRATIONS',
+        entityType: 'registration',
+        entityId: registrationId,
+        entityTitle: event.title,
+        performedBy: userId,
+        performedByName: attendeeName,
+        performedByEmail: attendeeEmail,
+        details: `Registered for "${event.title}" (Ticket: ${ticketCode})`,
+        metadata: { eventId: event.id, ticketCode, isPaid: event.isPaid },
+      });
 
       const rawTicket = ticketRes.rows[0];
 

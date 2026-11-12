@@ -5,6 +5,7 @@ import { IUser, IUserSafe, UserRole, ISponsorRegistration } from '../types';
 import { signAuthToken, verifyAuthToken } from '../utils/jwt.util';
 import { EmailService } from './email.service';
 import { CacheService } from './cache.service';
+import { AuditService } from './audit.service';
 import { OAuth2Client } from 'google-auth-library';
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -32,12 +33,15 @@ export class AuthService {
       ...(isExhibitor || hasExhibitorApplications ? ['EXHIBITOR'] : []),
     ];
 
+    const rawAvatar = user.avatar_url && !user.avatar_url.includes('ui-avatars.com') ? user.avatar_url : undefined;
+    const finalOrgLogo = user.organization_logo || (isOrganizer ? rawAvatar : undefined);
+
     return {
       id: user.id,
       name: user.full_name,
       email: user.email,
       role: (user.role || 'attendee').toUpperCase(),
-      avatarUrl: user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.company_name || user.full_name)}&background=63474D&color=fff`,
+      avatarUrl: user.avatar_url || finalOrgLogo || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.company_name || user.full_name)}&background=63474D&color=fff`,
       memberSince: user.member_since || 'August 2026',
       visibility: user.visibility || 'public',
       organization: user.organization || user.company_name || undefined,
@@ -53,14 +57,16 @@ export class AuthService {
       organizerApprovalStatus,
       isExhibitor,
       hasExhibitorApplications,
+      hasActiveScannerEvents: Boolean(user.has_active_scanner_events),
       mustChangePassword: Boolean(user.must_change_password),
       applicantType: user.applicant_type || undefined,
       organizationType: user.organization_type || undefined,
       applicantPosition: user.applicant_position || undefined,
       organizationDescription: user.organization_description || undefined,
       organizationWebsite: user.organization_website || undefined,
-      organizationLogo: user.organization_logo || undefined,
+      organizationLogo: finalOrgLogo,
       personalIntroduction: user.bio || user.organizer_bio || undefined,
+      organizerSocials: user.organizer_socials ? (typeof user.organizer_socials === 'string' ? JSON.parse(user.organizer_socials) : user.organizer_socials) : (user.socials || undefined),
       organizerRejectionReason: user.organizer_rejection_reason || undefined,
       organizerInfoRequestedNotes: user.organizer_info_requested_notes || undefined,
       organizerAppliedAt: user.organizer_applied_at || undefined,
@@ -429,6 +435,20 @@ export class AuthService {
       console.warn('Welcome email dispatch failed:', emailErr);
     }
 
+    await AuditService.logAction({
+      action: 'USER_REGISTERED',
+      category: 'AUTH_SECURITY',
+      entityType: 'user',
+      entityId: rawUser.id,
+      entityTitle: rawUser.full_name,
+      performedBy: rawUser.id,
+      performedByName: rawUser.full_name,
+      performedByEmail: rawUser.email,
+      performedByRole: rawUser.role,
+      details: `New account registered successfully with role: ${rawUser.role}`,
+      metadata: { role: rawUser.role, email: rawUser.email },
+    });
+
     return {
       user,
       token,
@@ -492,6 +512,7 @@ export class AuthService {
     const result = await query<IUser>(
       `SELECT id, email, password_hash, google_id, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
+              (SELECT EXISTS(SELECT 1 FROM event_scanners es JOIN events e ON e.id = es.event_id WHERE es.scanner_user_id = users.id AND es.is_active = TRUE AND e.requires_scanners = TRUE AND e.deleted_at IS NULL)) AS has_active_scanner_events,
               created_at, updated_at
        FROM users WHERE LOWER(email) = LOWER($1)`,
       [email]
@@ -659,13 +680,28 @@ export class AuthService {
 
     const user = this.formatUserResponse(rawUser, stats);
     user.role = (sessionRole as string).toUpperCase() as any;
+
+    await AuditService.logAction({
+      action: 'USER_LOGIN',
+      category: 'AUTH_SECURITY',
+      entityType: 'user',
+      entityId: rawUser.id,
+      entityTitle: rawUser.full_name,
+      performedBy: rawUser.id,
+      performedByName: rawUser.full_name,
+      performedByEmail: rawUser.email,
+      performedByRole: sessionRole,
+      details: `User logged in with session role: ${sessionRole}`,
+    });
+
     return { user, token };
   }
 
   static async getCurrentUser(userId: string): Promise<any> {
     const result = await query<IUser>(
-      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at, (password_hash IS NOT NULL) AS has_password,
+      `SELECT id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, organizer_bio, organizer_socials, must_change_password, deleted_at, is_exhibitor, applicant_type, organization_type, applicant_position, organization_description, organization_website, organization_logo, organizer_rejection_reason, organizer_info_requested_notes, organizer_applied_at, sponsor_preferences, (password_hash IS NOT NULL) AS has_password,
               (SELECT EXISTS(SELECT 1 FROM event_vendors WHERE user_id = users.id)) AS has_exhibitor_applications,
+              (SELECT EXISTS(SELECT 1 FROM event_scanners es JOIN events e ON e.id = es.event_id WHERE es.scanner_user_id = users.id AND es.is_active = TRUE AND e.requires_scanners = TRUE AND e.deleted_at IS NULL)) AS has_active_scanner_events,
               created_at, updated_at
        FROM users WHERE id = $1`,
       [userId]
@@ -795,6 +831,21 @@ export class AuthService {
 
     const rawUpdated = updated.rows[0];
     const stats = await this.computeUserStats(rawUpdated.id);
+
+    await AuditService.logAction({
+      action: 'ORGANIZER_APPLICATION_SUBMITTED',
+      category: 'ORGANIZER_SPONSOR',
+      entityType: 'user',
+      entityId: rawUpdated.id,
+      entityTitle: finalOrgName,
+      performedBy: rawUpdated.id,
+      performedByName: rawUpdated.full_name,
+      performedByEmail: rawUpdated.email,
+      performedByRole: rawUpdated.role,
+      details: `Organizer application submitted by ${rawUpdated.full_name} (${applicantType})`,
+      metadata: { applicantType, organization: finalOrgName },
+    });
+
     return {
       user: this.formatUserResponse(rawUpdated, stats),
       message: 'Your organizer application has been submitted and is currently being reviewed by Sheeba administration.',
@@ -1522,6 +1573,20 @@ export class AuthService {
       console.warn('Failed to send sponsor application email:', e);
     }
 
+    await AuditService.logAction({
+      action: 'SPONSOR_REGISTERED',
+      category: 'ORGANIZER_SPONSOR',
+      entityType: 'user',
+      entityId: rawUser.id,
+      entityTitle: company_name.trim(),
+      performedBy: rawUser.id,
+      performedByName: full_name.trim(),
+      performedByEmail: cleanEmail,
+      performedByRole: 'sponsor',
+      details: `Corporate sponsor registration submitted: ${company_name.trim()} (${industry_category.trim()})`,
+      metadata: { companyName: company_name.trim(), industryCategory: industry_category.trim() },
+    });
+
     return {
       user,
       message: 'Your application will be reviewed shortly. Wait a few moments until Sheeba Administration approves you...',
@@ -1890,6 +1955,18 @@ export class AuthService {
       role: (userFormatted.role?.toLowerCase() || 'attendee') as any,
       fullName: user.full_name,
       mustChangePassword: false,
+    });
+
+    await AuditService.logAction({
+      action: 'PASSWORD_CHANGED',
+      category: 'AUTH_SECURITY',
+      entityType: 'user',
+      entityId: user.id,
+      entityTitle: user.full_name,
+      performedBy: user.id,
+      performedByName: user.full_name,
+      performedByEmail: user.email,
+      details: 'Account password changed successfully',
     });
 
     return {

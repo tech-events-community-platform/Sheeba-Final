@@ -392,51 +392,6 @@ export const OrganizerResponsePage: React.FC = () => {
                     />
                   </div>
                 </div>
-
-                {/* Logo Upload */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#2D1F23] mb-1">
-                    Organization Logo (Optional)
-                  </label>
-                  {orgLogo ? (
-                    <div className="flex items-center gap-3 p-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
-                      <img
-                        src={orgLogo}
-                        alt="Organization Logo"
-                        className="w-10 h-10 rounded-full object-cover border border-[#E8DDD7]"
-                      />
-                      <span className="text-xs text-[#2D1F23] font-medium flex-1">Logo uploaded</span>
-                      <button
-                        type="button"
-                        onClick={() => setOrgLogo('')}
-                        className="p-1 text-[#756366] hover:text-red-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex items-center justify-center gap-2 p-3 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
-                      {isUploadingLogo ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
-                      ) : (
-                        <Upload className="w-4 h-4 text-[#756366]" />
-                      )}
-                      <span className="text-xs font-medium text-[#756366]">
-                        {isUploadingLogo ? 'Uploading logo...' : 'Click to upload new logo'}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg,image/webp"
-                        className="hidden"
-                        disabled={isUploadingLogo}
-                        onChange={handleLogoUpload}
-                      />
-                    </label>
-                  )}
-                  {logoUploadError && (
-                    <p className="text-[11px] text-red-600 mt-1">{logoUploadError}</p>
-                  )}
-                </div>
               </div>
             ) : (
               /* Individual Organizer */
@@ -457,6 +412,51 @@ export const OrganizerResponsePage: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Logo Upload (Optional for all organizers) */}
+            <div>
+              <label className="block text-xs font-semibold text-[#2D1F23] mb-1">
+                {applicantType === 'Individual Organizer' ? 'Organizer Logo / Profile Photo' : 'Organization Logo'} (Optional)
+              </label>
+              {orgLogo ? (
+                <div className="flex items-center gap-3 p-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                  <img
+                    src={orgLogo}
+                    alt={applicantType === 'Individual Organizer' ? 'Organizer Logo' : 'Organization Logo'}
+                    className="w-10 h-10 rounded-full object-cover border border-[#E8DDD7]"
+                  />
+                  <span className="text-xs text-[#2D1F23] font-medium flex-1">Logo uploaded</span>
+                  <button
+                    type="button"
+                    onClick={() => setOrgLogo('')}
+                    className="p-1 text-[#756366] hover:text-red-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-2 p-3 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
+                  {isUploadingLogo ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
+                  ) : (
+                    <Upload className="w-4 h-4 text-[#756366]" />
+                  )}
+                  <span className="text-xs font-medium text-[#756366]">
+                    {isUploadingLogo ? 'Uploading logo to Cloudinary...' : 'Click to upload logo from computer'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    className="hidden"
+                    disabled={isUploadingLogo}
+                    onChange={handleLogoUpload}
+                  />
+                </label>
+              )}
+              {logoUploadError && (
+                <p className="text-[11px] text-red-600 mt-1">{logoUploadError}</p>
+              )}
+            </div>
 
             {/* Phone */}
             <div>

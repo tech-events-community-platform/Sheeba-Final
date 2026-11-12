@@ -11,6 +11,7 @@ import {
 import { UserRole } from '../types';
 import { BadgeService } from './badge.service';
 import { EventService } from './event.service';
+import { ScannerService } from './scanner.service';
 import { CacheService } from './cache.service';
 import { EmailService } from './email.service';
 import { PaymentService } from './payment.service';
@@ -59,10 +60,8 @@ export class CheckinService {
     if (!event) return null;
     const realEventId = event.id;
 
-    if (organizerId && event.organizerId !== organizerId && userRole !== 'admin') {
-      const err: any = new Error('Unauthorized. You are not the organizer of this event.');
-      err.statusCode = 403;
-      throw err;
+    if (organizerId) {
+      await ScannerService.assertScannerOrOrganizerAccess(organizerId, realEventId, userRole);
     }
 
     const cleanQuery = queryText.trim();
@@ -164,11 +163,10 @@ export class CheckinService {
   static async searchAttendees(eventId: string, queryText: string, organizerId?: string, userRole?: string) {
     const event = await EventService.getEventById(eventId);
     if (!event) return [];
+    const realEventId = event.id;
 
-    if (organizerId && event.organizerId !== organizerId && userRole !== 'admin') {
-      const err: any = new Error('Unauthorized. You are not the organizer of this event.');
-      err.statusCode = 403;
-      throw err;
+    if (organizerId) {
+      await ScannerService.assertScannerOrOrganizerAccess(organizerId, realEventId, userRole);
     }
 
     const clean = queryText.trim();
@@ -411,11 +409,7 @@ export class CheckinService {
     }
     const realEventId = event.id;
 
-    if (event.organizerId !== organizerId && userRole && userRole !== 'admin') {
-      const err: any = new Error('Unauthorized. You are not the organizer of this event.');
-      err.statusCode = 403;
-      throw err;
-    }
+    await ScannerService.assertScannerOrOrganizerAccess(organizerId, realEventId, userRole);
 
     const cleanInput = extractCleanTokenOrCode(tokenOrCode);
 
@@ -596,11 +590,7 @@ export class CheckinService {
     }
     const realEventId = event.id;
 
-    if (event.organizerId !== approvedByOrganizerId && userRole && userRole !== 'admin') {
-      const err: any = new Error('Unauthorized. You are not the organizer of this event.');
-      err.statusCode = 403;
-      throw err;
-    }
+    await ScannerService.assertScannerOrOrganizerAccess(approvedByOrganizerId, realEventId, userRole);
 
     const client = await getClient();
     try {
@@ -775,11 +765,7 @@ export class CheckinService {
     }
     const realEventId = event.id;
 
-    if (event.organizerId !== undoneByOrganizerId && userRole && userRole !== 'admin') {
-      const err: any = new Error('Unauthorized.');
-      err.statusCode = 403;
-      throw err;
-    }
+    await ScannerService.assertScannerOrOrganizerAccess(undoneByOrganizerId, realEventId, userRole);
 
     const client = await getClient();
     try {

@@ -2142,12 +2142,14 @@ export const ApplyToSponsorsPage: React.FC = () => {
                         </span>
                         <span
                           className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            app.status === 'FUNDED'
+                            app.is_taken_down
+                              ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                              : app.status === 'FUNDED'
                               ? 'bg-emerald-100 text-emerald-800'
                               : 'bg-blue-100 text-blue-800'
                           }`}
                         >
-                          {app.status}
+                          {app.is_taken_down ? 'TAKEN DOWN (CODE OF CONDUCT)' : app.status}
                         </span>
                       </div>
                       <h3 className="text-xl sm:text-2xl font-bold text-gray-900">{app.event_title}</h3>
@@ -2202,6 +2204,27 @@ export const ApplyToSponsorsPage: React.FC = () => {
                   <p className="text-xs sm:text-sm text-gray-600 leading-relaxed max-w-4xl">
                     "{app.description}"
                   </p>
+
+                  {app.is_taken_down && (
+                    <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-1.5 max-w-4xl">
+                      <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>Administrative Moderation Notice: Pitch Taken Down</span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-rose-700">
+                        This sponsorship pitch was taken down from the Sheeba Sponsorship Marketplace by platform administration.
+                      </p>
+                      {app.takedown_reason && (
+                        <div className="p-3 rounded-xl bg-white border border-rose-200 text-xs font-medium text-rose-950">
+                          <strong className="text-rose-900 font-bold block mb-0.5">Code of Conduct / Takedown Reason:</strong>
+                          <span className="whitespace-pre-wrap">{app.takedown_reason}</span>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-rose-600">
+                        Existing sponsor agreements and pledges are preserved. Only an authorized administrator can reinstate this pitch.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Configured Packages: subtle light tier colors */}
                   <div className="space-y-1.5 pt-1">

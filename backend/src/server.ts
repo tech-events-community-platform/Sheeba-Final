@@ -3,6 +3,7 @@ import { ENV } from './config/env';
 import pool from './config/db';
 import { runMigrations } from './db/migrate';
 import { NotificationQueueService } from './services/notificationQueue.service';
+import { AuditService } from './services/audit.service';
 
 const startServer = async () => {
   try {
@@ -21,6 +22,7 @@ const startServer = async () => {
 
         // Run migrations
         await runMigrations();
+        await AuditService.initAuditTable();
       } catch (dbError) {
         console.error('⚠️ Database connection / migration warning:', dbError);
         console.log('Server will continue running. Update DATABASE_URL in .env to connect to your live Neon database.');

@@ -16,20 +16,6 @@ const TRUSTED_SLIDES: SlideItem[] = [
     description:
       "Ethiopia's Ministry of Innovation and Technology (MInT) chose Sheeba for official event infrastructure and live QR door check-ins at STRIDE 2.0.",
   },
-  {
-    id: 'tech-ai-summit',
-    posterUrl: '/trusted-demo-1.webp',
-    title: 'National Tech & AI Summit (Hosted by Ethiopian Innovation Hub)',
-    description:
-      'Admitted over 3,500 attendees and developers with seamless sub-second door check-ins and verified participation badges.',
-  },
-  {
-    id: 'fintech-forum',
-    posterUrl: '/trusted-demo-2.webp',
-    title: 'Addis Business & FinTech Forum (Hosted by FinTech Leaders)',
-    description:
-      'Enterprise exhibition showcases and turnout analytics trusted by leading financial and corporate institutions.',
-  },
 ];
 
 interface StrideMilestoneCardProps {
@@ -45,7 +31,7 @@ export const StrideMilestoneCard: React.FC<StrideMilestoneCardProps> = ({
   const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
-    if (isPaused) return;
+    if (isPaused || TRUSTED_SLIDES.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % TRUSTED_SLIDES.length);
     }, 4500);
@@ -139,41 +125,46 @@ export const StrideMilestoneCard: React.FC<StrideMilestoneCardProps> = ({
         </div>
 
         {/* Small Left Arrow */}
-        <button
-          type="button"
-          onClick={handlePrev}
-          aria-label="Previous slide"
-          className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/45 hover:bg-black/75 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/20 shadow-md hover:scale-105"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
+        {TRUSTED_SLIDES.length > 1 && (
+          <button
+            type="button"
+            onClick={handlePrev}
+            aria-label="Previous slide"
+            className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/45 hover:bg-black/75 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/20 shadow-md hover:scale-105"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Small Right Arrow */}
-        <button
-          type="button"
-          onClick={handleNext}
-          aria-label="Next slide"
-          className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/45 hover:bg-black/75 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/20 shadow-md hover:scale-105"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
+        {TRUSTED_SLIDES.length > 1 && (
+          <button
+            type="button"
+            onClick={handleNext}
+            aria-label="Next slide"
+            className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-black/45 hover:bg-black/75 backdrop-blur-md text-white flex items-center justify-center transition-all cursor-pointer border border-white/20 shadow-md hover:scale-105"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Dot Indicators */}
-        <div className="absolute bottom-3 left-6 sm:left-8 z-20 flex items-center gap-1.5">
-          {TRUSTED_SLIDES.map((slide, idx) => (
-            <button
-              key={slide.id}
-              type="button"
-              onClick={() => setCurrentIndex(idx)}
-              aria-label={`Go to slide ${idx + 1}`}
-              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                currentIndex === idx
+        {TRUSTED_SLIDES.length > 1 && (
+          <div className="absolute bottom-3 left-6 sm:left-8 z-20 flex items-center gap-1.5">
+            {TRUSTED_SLIDES.map((slide, idx) => (
+              <button
+                key={slide.id}
+                type="button"
+                onClick={() => setCurrentIndex(idx)}
+                aria-label={`Go to slide ${idx + 1}`}
+                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${currentIndex === idx
                   ? 'w-7 bg-white'
                   : 'w-2 bg-white/40 hover:bg-white/70'
-              }`}
-            />
-          ))}
-        </div>
+                  }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

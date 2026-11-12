@@ -1394,4 +1394,241 @@ export class EmailService {
 
     await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
   }
+
+  /**
+   * Scanner Assignment Email for Existing Sheeba Users (Specification v2.1)
+   */
+  static async sendScannerAssignmentExistingUserEmail(params: {
+    toEmail: string;
+    fullName: string;
+    eventTitle: string;
+    organizerName: string;
+    eventDate: string;
+    location: string;
+  }): Promise<void> {
+    const { toEmail, fullName, eventTitle, organizerName, eventDate, location } = params;
+    const frontendUrl = getFrontendUrl();
+    const scannerUrl = `${frontendUrl}/scanner`;
+
+    const subject = `You've been assigned as a Ticket Scanner for ${eventTitle}`;
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Gate & Ticket Verification</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Scanner Assignment Invitation</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Hello ${fullName || 'there'},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            <strong>${organizerName || 'The organizer'}</strong> has assigned you to manage gate check-ins and QR code scanning for:
+          </p>
+          <div style="background-color: #FAF7F5; border-left: 4px solid #63474D; padding: 14px 16px; margin: 16px 0; border-radius: 0 8px 8px 0;">
+            <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: bold; color: #2D1F23;">${eventTitle}</p>
+            <p style="margin: 0 0 4px 0; font-size: 13px; color: #756366;">📅 Date: ${eventDate || 'See event details'}</p>
+            <p style="margin: 0; font-size: 13px; color: #756366;">📍 Location: ${location || 'Venue'}</p>
+          </div>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            You can log in to Sheeba using your <strong>existing account credentials</strong> to access the Scanner Portal.
+          </p>
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${scannerUrl}" style="background-color: #63474D; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+              Open Scanner Portal
+            </a>
+          </div>
+        </div>
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 24px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Scanner Assignment Email for New Users with Temporary Password (Specification v2.1)
+   */
+  static async sendScannerAssignmentNewUserEmail(params: {
+    toEmail: string;
+    fullName: string;
+    eventTitle: string;
+    organizerName: string;
+    eventDate: string;
+    location: string;
+    initialPassword: string;
+  }): Promise<void> {
+    const { toEmail, fullName, eventTitle, organizerName, eventDate, location, initialPassword } = params;
+    const frontendUrl = getFrontendUrl();
+    const loginUrl = `${frontendUrl}/login`;
+
+    const subject = `Your Sheeba Scanner Account for ${eventTitle}`;
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; color: #2D1F23; background-color: #FAF7F5; border-radius: 20px; border: 1px solid #E8DDD7;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #63474D; font-size: 26px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sheeba</h1>
+          <p style="font-size: 13px; color: #756366; margin: 4px 0 0 0;">Event Gate & Ticket Verification</p>
+        </div>
+
+        <div style="background-color: #FFFFFF; border: 1px solid #E8DDD7; border-radius: 16px; padding: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <h2 style="color: #2D1F23; font-size: 20px; margin-top: 0; margin-bottom: 12px;">Your Scanner Staff Account</h2>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            Hello ${fullName || 'Scanner Staff'},
+          </p>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            <strong>${organizerName || 'The organizer'}</strong> has assigned you to manage gate check-ins and QR code scanning for:
+          </p>
+          <div style="background-color: #FAF7F5; border-left: 4px solid #63474D; padding: 14px 16px; margin: 16px 0; border-radius: 0 8px 8px 0;">
+            <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: bold; color: #2D1F23;">${eventTitle}</p>
+            <p style="margin: 0 0 4px 0; font-size: 13px; color: #756366;">📅 Date: ${eventDate || 'See event details'}</p>
+            <p style="margin: 0; font-size: 13px; color: #756366;">📍 Location: ${location || 'Venue'}</p>
+          </div>
+          <p style="color: #555; line-height: 1.6; margin: 0 0 16px 0; font-size: 14px;">
+            A Sheeba account has been created for you. Log in using the credentials below to start scanning:
+          </p>
+          <div style="background-color: #FAF7F5; border: 1px solid #E8DDD7; border-radius: 12px; padding: 18px; margin: 20px 0;">
+            <p style="margin: 0 0 10px 0; font-size: 14px; color: #2D1F23;">
+              <strong>Email:</strong> <span style="font-family: monospace; color: #63474D;">${toEmail}</span>
+            </p>
+            <p style="margin: 0; font-size: 14px; color: #2D1F23;">
+              <strong>Temporary Password:</strong>
+              <code style="font-family: 'SF Mono', Consolas, Monaco, monospace; font-size: 15px; font-weight: bold; background-color: #FFFFFF; padding: 4px 10px; border-radius: 6px; border: 1px solid #E8DDD7; color: #63474D; display: inline-block; margin-left: 6px;">${initialPassword}</code>
+            </p>
+          </div>
+          <div style="margin: 24px 0; text-align: center;">
+            <a href="${loginUrl}" style="background-color: #63474D; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+              Log In to Sheeba
+            </a>
+          </div>
+          <p style="font-size: 12px; color: #756366; line-height: 1.5; margin: 16px 0 0 0; text-align: center;">
+            💡 Tip: You can easily copy your temporary password above and sign in at the gate using your mobile phone camera.
+          </p>
+        </div>
+        <p style="font-size: 11px; color: #99878B; text-align: center; margin-top: 24px; line-height: 1.4;">
+          Sheeba Platform • Ethiopian Tech Community Credentials<br />
+          Addis Ababa, Ethiopia
+        </p>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, fullName);
+  }
+
+  /**
+   * Notify organizer when event public discovery has been taken down by administration
+   */
+  static async sendEventPublicityTakedownNotificationEmail(params: {
+    toEmail: string;
+    organizerName: string;
+    eventTitle: string;
+    reason: string;
+  }): Promise<void> {
+    const { toEmail, organizerName, eventTitle, reason } = params;
+    const subject = `Notice: Public Discovery Suspended for "${eventTitle}"`;
+
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #FAF7F5;">
+        <div style="background-color: #ffffff; padding: 32px; border-radius: 16px; border: 1px solid #E8DDD7; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+            <div style="width: 40px; height: 40px; background-color: #FEF2F2; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+              🛡️
+            </div>
+            <div>
+              <h1 style="color: #991B1B; font-size: 20px; font-weight: bold; margin: 0;">Community Discovery Update</h1>
+              <p style="color: #756366; font-size: 13px; margin: 2px 0 0 0;">Sheeba Platform Administration</p>
+            </div>
+          </div>
+
+          <p style="color: #2D1F23; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+            Hello <strong>${organizerName || 'Organizer'}</strong>,
+          </p>
+          <p style="color: #2D1F23; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+            Following a content review, public discovery for your event <strong>"${eventTitle}"</strong> has been suspended from the Sheeba Community Discovery feed.
+          </p>
+
+          <div style="background-color: #FEF2F2; border: 1px solid #F87171; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+            <p style="color: #991B1B; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px 0;">
+              Reason for Administrative Takedown:
+            </p>
+            <p style="color: #7F1D1D; font-size: 13px; line-height: 1.5; margin: 0; white-space: pre-wrap;">
+              ${reason}
+            </p>
+          </div>
+
+          <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+            <p style="color: #334155; font-size: 12px; line-height: 1.5; margin: 0;">
+              <strong>ℹ️ Important Note:</strong> Your event has <em>not</em> been cancelled. Existing attendee registrations, tickets, passes, and your private direct registration link remain fully active.
+            </p>
+          </div>
+
+          <p style="color: #756366; font-size: 12px; line-height: 1.5; margin: 0;">
+            If you believe this was in error or if you have updated your event to comply with Sheeba Platform Guidelines, please contact administration to request reinstatement.
+          </p>
+        </div>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, organizerName);
+  }
+
+  /**
+   * Notify organizer when sponsorship pitch has been taken down by administration
+   */
+  static async sendPitchTakedownNotificationEmail(params: {
+    toEmail: string;
+    organizerName: string;
+    eventTitle: string;
+    reason: string;
+  }): Promise<void> {
+    const { toEmail, organizerName, eventTitle, reason } = params;
+    const subject = `Notice: Sponsorship Pitch Taken Down for "${eventTitle}"`;
+
+    const htmlBody = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #FAF7F5;">
+        <div style="background-color: #ffffff; padding: 32px; border-radius: 16px; border: 1px solid #E8DDD7; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+            <div style="width: 40px; height: 40px; background-color: #FEF2F2; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+              ⚠️
+            </div>
+            <div>
+              <h1 style="color: #991B1B; font-size: 20px; font-weight: bold; margin: 0;">Sponsorship Marketplace Notice</h1>
+              <p style="color: #756366; font-size: 13px; margin: 2px 0 0 0;">Code of Conduct & Moderation Oversight</p>
+            </div>
+          </div>
+
+          <p style="color: #2D1F23; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+            Hello <strong>${organizerName || 'Organizer'}</strong>,
+          </p>
+          <p style="color: #2D1F23; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+            Your sponsorship pitch for <strong>"${eventTitle}"</strong> has been taken down from the Sheeba Sponsorship Marketplace due to a policy or Code of Conduct violation.
+          </p>
+
+          <div style="background-color: #FEF2F2; border: 1px solid #F87171; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
+            <p style="color: #991B1B; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 8px 0;">
+              Policy / Code of Conduct Violation Reason:
+            </p>
+            <p style="color: #7F1D1D; font-size: 13px; line-height: 1.5; margin: 0; white-space: pre-wrap;">
+              ${reason}
+            </p>
+          </div>
+
+          <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+            <p style="color: #334155; font-size: 12px; line-height: 1.5; margin: 0;">
+              <strong>ℹ️ Note on Existing Deals:</strong> Any sponsorship deals, pledges, or agreements already confirmed prior to this takedown remain intact in your records. However, new sponsors cannot discover or apply to this pitch while it is taken down.
+            </p>
+          </div>
+
+          <p style="color: #756366; font-size: 12px; line-height: 1.5; margin: 0;">
+            To appeal this decision or request reinstatement after rectifying the issue, please contact Sheeba Platform Administration.
+          </p>
+        </div>
+      </div>
+    `;
+
+    await this.dispatchEmail(toEmail, subject, htmlBody, organizerName);
+  }
 }

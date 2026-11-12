@@ -22,6 +22,7 @@ import {
   FileText,
   Upload,
   Loader2,
+  Users,
 } from 'lucide-react';
 import { formatPhoneInput } from '../../utils/phone';
 import { uploadToCloudinary } from '../../utils/cloudinary';
@@ -91,10 +92,40 @@ export const SponsorSettingsPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Form states
+  const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [industryCategory, setIndustryCategory] = useState('');
   const [companyDescription, setCompanyDescription] = useState('');
   const [companyLogo, setCompanyLogo] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setLogoUploadError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setLogoUploadError(null);
+    try {
+      const url = await uploadToCloudinary(file, { folder: 'sheeba_sponsor_logos' });
+      setCompanyLogo(url);
+    } catch (err: any) {
+      setLogoUploadError(err.message || 'Failed to upload company logo.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
   const [companyWebsite, setCompanyWebsite] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
   const [maxBudget, setMaxBudget] = useState<string>('');
@@ -145,10 +176,14 @@ export const SponsorSettingsPage: React.FC = () => {
       setErrorMessage(null);
       const data = await api.sponsorship.getPreferences();
 
+      setFullName((data as any).fullName || user?.name || '');
       setCompanyName(data.companyName || user?.companyName || user?.organization || '');
       setIndustryCategory(data.industryCategory || user?.industryCategory || 'Technology');
       setCompanyDescription(data.bio || user?.bio || '');
-      setCompanyLogo(data.avatarUrl || user?.avatarUrl || '');
+      const cleanAvatar = (data.avatarUrl && !data.avatarUrl.includes('ui-avatars.com')) 
+        ? data.avatarUrl 
+        : ((user?.avatarUrl && !user.avatarUrl.includes('ui-avatars.com')) ? user.avatarUrl : '');
+      setCompanyLogo(cleanAvatar || '');
       setCompanyWebsite(data.companyWebsite || user?.companyWebsite || '');
       setCompanyPhone(data.companyPhone || user?.companyPhone || user?.phone || '');
 
@@ -227,7 +262,9 @@ export const SponsorSettingsPage: React.FC = () => {
 
     try {
       const payload = {
+        fullName: fullName.trim() || undefined,
         companyName: companyName.trim() || undefined,
+        industryCategory: industryCategory.trim() || undefined,
         companyDescription: companyDescription.trim(),
         companyLogo: companyLogo.trim() || null,
         companyWebsite: companyWebsite.trim() || null,
@@ -331,16 +368,34 @@ export const SponsorSettingsPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                Industry Category
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-gray-400" />
+                Contact Representative Name
               </label>
               <input
                 type="text"
-                readOnly
-                value={industryCategory}
-                className="w-full px-3.5 py-2.5 text-xs bg-stone-100 border border-stone-200 rounded-xl text-gray-600 font-medium cursor-not-allowed"
-                title="Assigned during verification"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Full name of representative"
+                className="w-full px-3.5 py-2.5 text-xs bg-stone-50 border border-gray-300 rounded-xl focus:border-[#63474D] focus:outline-none font-medium"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                Industry Category
+              </label>
+              <select
+                value={industryCategory}
+                onChange={(e) => setIndustryCategory(e.target.value)}
+                className="w-full px-3.5 py-2.5 text-xs bg-stone-50 border border-gray-300 rounded-xl focus:border-[#63474D] focus:outline-none font-medium cursor-pointer"
+              >
+                {INDUSTRY_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -373,61 +428,60 @@ export const SponsorSettingsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Logo Upload & Live Preview */}
+          {/* Company Logo Upload & Live Preview */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <Image className="w-3.5 h-3.5 text-gray-400" />
-              Company Logo (PNG, JPG, WebP up to 5MB)
+              Company Logo <span className="text-gray-400 font-normal lowercase">(PNG, JPG, WebP up to 5MB)</span>
             </label>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="flex-1 w-full space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    value={companyLogo}
-                    onChange={(e) => setCompanyLogo(e.target.value)}
-                    placeholder="https://example.com/logo.png"
-                    className="flex-1 px-3.5 py-2.5 text-xs bg-stone-50 border border-gray-300 rounded-xl focus:border-[#63474D] focus:outline-none"
-                  />
-                  <label className="px-3 py-2.5 bg-stone-100 hover:bg-stone-200 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 cursor-pointer flex items-center gap-1.5 shrink-0 transition-colors">
-                    {isUploadingLogo ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#63474D]" />
-                    ) : (
-                      <Upload className="w-3.5 h-3.5 text-gray-600" />
-                    )}
-                    <span>{isUploadingLogo ? 'Uploading...' : 'Upload'}</span>
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/webp"
-                      className="hidden"
-                      disabled={isUploadingLogo}
-                      onChange={handleLogoUpload}
-                    />
-                  </label>
+            {companyLogo ? (
+              <div className="flex items-center gap-3 p-2.5 bg-stone-50 border border-gray-300 rounded-xl">
+                <img
+                  src={companyLogo}
+                  alt="Company Logo Preview"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                  className="w-12 h-12 object-contain rounded-xl border border-gray-200 bg-white p-1 shadow-2xs"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#2D1F23] flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                    <span>Logo attached</span>
+                  </p>
+                  <p className="text-[11px] text-[#756366] truncate">{companyLogo}</p>
                 </div>
-                {logoUploadError && (
-                  <p className="text-[11px] text-red-600">{logoUploadError}</p>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setCompanyLogo('')}
+                  className="p-1.5 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
+                  title="Remove logo"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-[11px] text-gray-400">Preview:</span>
-                {companyLogo ? (
-                  <img
-                    src={companyLogo}
-                    alt="Logo Preview"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
-                    className="w-10 h-10 object-contain rounded-xl border border-gray-200 bg-white p-1 shadow-2xs"
-                  />
+            ) : (
+              <label className="flex items-center justify-center gap-2 p-3 bg-stone-50 hover:bg-stone-100 border border-dashed border-gray-300 rounded-xl cursor-pointer transition-all">
+                {isUploadingLogo ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
                 ) : (
-                  <div className="w-10 h-10 rounded-xl bg-stone-100 border border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xs">
-                    None
-                  </div>
+                  <Upload className="w-4 h-4 text-gray-500" />
                 )}
-              </div>
-            </div>
+                <span className="text-xs font-medium text-gray-600">
+                  {isUploadingLogo ? 'Uploading logo to Cloudinary...' : 'Click to upload company logo from computer'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  disabled={isUploadingLogo}
+                  onChange={handleLogoUpload}
+                />
+              </label>
+            )}
+            {logoUploadError && (
+              <p className="text-[11px] text-red-600 mt-1">{logoUploadError}</p>
+            )}
           </div>
 
           {/* Description */}

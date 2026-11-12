@@ -5,9 +5,11 @@ import type { Event } from '../../types/event';
 import type { ISponsorshipApplication } from '../../types/sponsorship';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+
 import {
   Search,
   PlusCircle,
+  ShieldAlert,
   HandCoins,
   Calendar,
   Building2,
@@ -17,6 +19,7 @@ import {
   RefreshCw,
   CheckCircle2,
 } from 'lucide-react';
+
 
 export const AdminEventsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'events' | 'pitches'>('events');
@@ -79,7 +82,12 @@ export const AdminEventsPage: React.FC = () => {
   };
 
   const filteredEvents = events.filter((evt) => {
-    const matchesStatus = statusFilter === 'All' || evt.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'All'
+        ? true
+        : statusFilter === 'Public Discovery'
+        ? Boolean(evt.isPublicized)
+        : evt.status === statusFilter;
     const matchesSearch =
       evt.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       evt.organizerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -114,6 +122,11 @@ export const AdminEventsPage: React.FC = () => {
           <p className="text-xs text-[#756366]">Manage live events and moderate sponsorship marketplace proposals across Sheeba.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link to="/admin/moderation">
+            <Button variant="outline" icon={<ShieldAlert className="w-4 h-4 text-rose-600" />}>
+              Content Moderation
+            </Button>
+          </Link>
           {activeTab === 'pitches' ? (
             <button
               type="button"
@@ -189,6 +202,7 @@ export const AdminEventsPage: React.FC = () => {
       {/* TAB 1: Platform Events */}
       {activeTab === 'events' && (
         <div className="space-y-4">
+
           {/* Search & Filter Bar */}
           <div className="bg-white p-4 rounded-3xl border border-[#E8DDD7] shadow-xs flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -202,12 +216,13 @@ export const AdminEventsPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex gap-2">
-              {['All', 'open', 'completed', 'canceled'].map((status) => (
+            <div className="flex flex-wrap gap-2">
+              {['All', 'Public Discovery', 'open', 'completed', 'canceled'].map((status) => (
                 <button
                   key={status}
+                  type="button"
                   onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold capitalize transition-all ${
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                     statusFilter === status
                       ? 'bg-[#63474D] text-white shadow-xs'
                       : 'bg-[#FAF7F5] text-[#756366] hover:bg-[#F4EFEB]'
@@ -219,7 +234,7 @@ export const AdminEventsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Table */}
+          {/* Original Events Table */}
           <div className="bg-white rounded-3xl border border-[#E8DDD7] overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -235,61 +250,84 @@ export const AdminEventsPage: React.FC = () => {
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
+
                 <tbody className="divide-y divide-[#E8DDD7] text-[#2D1F23]">
-                  {eventsLoading ? (
-                    <tr>
-                      <td colSpan={8} className="py-12 text-center text-gray-400">
-                        <div className="w-6 h-6 border-2 border-[#63474D] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                        Loading platform events...
+                  {filteredEvents.map((evt) => (
+                    <tr key={evt.id} className="hover:bg-[#FAF7F5]/50">
+                      <td className="py-3.5 px-4 font-bold max-w-xs truncate">
+                        {evt.title}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-[#AA767C] font-semibold">
+                        {evt.organizerName}
+                      </td>
+
+                      <td className="py-3.5 px-4 uppercase font-mono text-[10px]">
+                        <Badge variant="primary">{evt.type}</Badge>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <p>{evt.date}</p>
+                        <p className="text-[10px] text-[#756366]">
+                          {evt.location.split(',')[0]}
+                        </p>
+                      </td>
+
+                      <td className="py-3.5 px-4 font-bold">
+                        {evt.checkedInCount} / {evt.registeredCount}
+                      </td>
+
+                      <td className="py-3.5 px-4 font-semibold">
+                        {evt.isPaid ? `${evt.ticketPrice} ETB` : 'Free'}
+                      </td>
+
+                      <td className="py-3.5 px-4 space-y-1">
+                        <Badge variant={evt.status === 'open' ? 'success' : 'gray'}>
+                          {evt.status}
+                        </Badge>
+
+                        {evt.isPublicized && (
+                          <span className="block text-[9px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 uppercase tracking-wider w-max">
+                            Discovery
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right space-x-2">
+                        <Link
+                          to="/admin/moderation"
+                          className="text-xs text-rose-700 font-semibold hover:underline"
+                        >
+                          Moderate
+                        </Link>
+
+                        <Link
+                          to={`/e/${evt.shareLinkToken}`}
+                          target="_blank"
+                          className="text-xs text-[#63474D] font-semibold hover:underline"
+                        >
+                          Public Link
+                        </Link>
                       </td>
                     </tr>
-                  ) : filteredEvents.length === 0 ? (
+                  ))}
+
+                  {filteredEvents.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-gray-500">
-                        No platform events match your search.
+                      <td colSpan={8} className="py-10 text-center text-[#756366]">
+                        No events found.
                       </td>
                     </tr>
-                  ) : (
-                    filteredEvents.map((evt) => (
-                      <tr key={evt.id} className="hover:bg-[#FAF7F5]/50">
-                        <td className="py-3.5 px-4 font-bold max-w-xs truncate">{evt.title}</td>
-                        <td className="py-3.5 px-4 text-[#AA767C] font-semibold">{evt.organizerName}</td>
-                        <td className="py-3.5 px-4 uppercase font-mono text-[10px]">
-                          <Badge variant="primary">{evt.type}</Badge>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <p>{evt.date}</p>
-                          <p className="text-[10px] text-[#756366]">{evt.location.split(',')[0]}</p>
-                        </td>
-                        <td className="py-3.5 px-4 font-bold">
-                          {evt.checkedInCount} / {evt.registeredCount}
-                        </td>
-                        <td className="py-3.5 px-4 font-semibold">
-                          {evt.isPaid ? `${evt.ticketPrice} ETB` : 'Free'}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <Badge variant={evt.status === 'open' ? 'success' : 'gray'}>
-                            {evt.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3.5 px-4 text-right space-x-2">
-                          <Link
-                            to={`/e/${evt.shareLinkToken}`}
-                            target="_blank"
-                            className="text-xs text-[#63474D] font-semibold hover:underline"
-                          >
-                            Public Link
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
                   )}
                 </tbody>
               </table>
             </div>
           </div>
+
         </div>
       )}
+
+
 
       {/* TAB 2: Sponsorship Marketplace Pitches */}
       {activeTab === 'pitches' && (

@@ -43,10 +43,10 @@ router.post(
   CheckinController.getTicketVerification
 );
 
+// Scanner & Organizer Door Verification Endpoints (Guarded dynamically by ScannerService)
 router.post(
   '/verify',
   authenticate,
-  authorizeRoles('organizer', 'admin'),
   validateBody(verifyScannerTicketSchema),
   CheckinController.verify
 );
@@ -54,7 +54,6 @@ router.post(
 router.post(
   '/search',
   authenticate,
-  authorizeRoles('organizer', 'admin'),
   validateBody(searchAttendeeSchema),
   CheckinController.search
 );
@@ -62,7 +61,6 @@ router.post(
 router.post(
   '/lookup',
   authenticate,
-  authorizeRoles('organizer', 'admin'),
   validateBody(lookupAttendeeSchema),
   CheckinController.lookup
 );
@@ -70,7 +68,6 @@ router.post(
 router.post(
   '/mark-attended',
   authenticate,
-  authorizeRoles('organizer', 'admin'),
   validateBody(markAttendedSchema),
   CheckinController.markAttended
 );
@@ -78,7 +75,6 @@ router.post(
 router.post(
   '/undo',
   authenticate,
-  authorizeRoles('organizer', 'admin'),
   validateBody(undoCheckInSchema),
   CheckinController.undo
 );
@@ -86,7 +82,6 @@ router.post(
 router.post(
   '/approve',
   authenticate,
-  authorizeRoles('organizer', 'admin'),
   validateBody(markAttendedSchema),
   CheckinController.approve
 );

@@ -58,10 +58,15 @@ export interface Event {
   status: EventStatus;
   isPaid: boolean;
   isPublicized?: boolean;
+  isPublicityModerated?: boolean;
+  publicityTakedownReason?: string | null;
+  publicityModeratedAt?: string | null;
   ticketPrice: number; // In ETB
   currency: 'ETB';
   paymentMethods?: PaymentDestination[];
   requiresApproval?: boolean;
+  requiresScanners?: boolean;
+  scannerEmails?: string[];
   shareLinkToken: string;
   customQuestions: RegistrationQuestion[];
   includeDefaultQuestions?: boolean;
@@ -73,3 +78,31 @@ export interface Event {
   expiresAt?: string;
   createdAt?: string;
 }
+
+export interface ScannerStaffItem {
+  id: string;
+  scannerUserId: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  isActive: boolean;
+  assignedAt: string;
+  scannedCount: number;
+}
+
+export interface AssignedScannerEvent {
+  id: string;
+  title: string;
+  type: string;
+  date: string;
+  timeStr?: string;
+  location: string;
+  venueName?: string;
+  organizerName: string;
+  organizerId: string;
+  isEventToday: boolean;
+  isEventPassed: boolean;
+  myScannedCount: number;
+  totalAttendeesCount: number;
+}
+
