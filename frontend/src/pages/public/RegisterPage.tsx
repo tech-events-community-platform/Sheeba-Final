@@ -235,11 +235,10 @@ export const RegisterPage: React.FC = () => {
               setSelectedRole('ATTENDEE');
               setErrorMsg(null);
             }}
-            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              selectedRole === 'ATTENDEE'
+            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${selectedRole === 'ATTENDEE'
                 ? 'bg-[#63474D] text-white shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
-            }`}
+              }`}
           >
             <Users className="w-3.5 h-3.5" />
             <span>Attendee</span>
@@ -250,11 +249,10 @@ export const RegisterPage: React.FC = () => {
               setSelectedRole('ORGANIZER');
               setErrorMsg(null);
             }}
-            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              selectedRole === 'ORGANIZER'
+            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${selectedRole === 'ORGANIZER'
                 ? 'bg-[#63474D] text-white shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
-            }`}
+              }`}
           >
             <Briefcase className="w-3.5 h-3.5" />
             <span>Organizer</span>
@@ -362,22 +360,20 @@ export const RegisterPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setApplicantType('Individual Organizer')}
-                    className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${
-                      applicantType === 'Individual Organizer'
+                    className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${applicantType === 'Individual Organizer'
                         ? 'bg-[#63474D]/10 border-[#63474D] text-[#63474D] font-bold shadow-xs'
                         : 'bg-[#FAF7F5] border-[#E8DDD7] text-[#756366] hover:text-[#2D1F23]'
-                    }`}
+                      }`}
                   >
                     Individual Organizer
                   </button>
                   <button
                     type="button"
                     onClick={() => setApplicantType('Organization / Institution')}
-                    className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${
-                      applicantType === 'Organization / Institution'
+                    className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${applicantType === 'Organization / Institution'
                         ? 'bg-[#63474D]/10 border-[#63474D] text-[#63474D] font-bold shadow-xs'
                         : 'bg-[#FAF7F5] border-[#E8DDD7] text-[#756366] hover:text-[#2D1F23]'
-                    }`}
+                      }`}
                   >
                     Organization / Institution
                   </button>

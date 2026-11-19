@@ -291,11 +291,10 @@ export const SponsorAuthPage: React.FC = () => {
               setErrorMsg(null);
               setIsPendingReview(false);
             }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              authMode === 'login'
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${authMode === 'login'
                 ? 'bg-white text-[#2D1F23] shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
-            }`}
+              }`}
           >
             Sponsor Sign In
           </button>
@@ -306,11 +305,10 @@ export const SponsorAuthPage: React.FC = () => {
               setErrorMsg(null);
               setIsPendingReview(false);
             }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
-              authMode === 'signup'
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${authMode === 'signup'
                 ? 'bg-white text-[#2D1F23] shadow-xs'
                 : 'text-[#756366] hover:text-[#2D1F23]'
-            }`}
+              }`}
           >
             Apply to Sponsor
           </button>
@@ -632,11 +630,10 @@ export const SponsorAuthPage: React.FC = () => {
                               key={obj}
                               type="button"
                               onClick={() => toggleSelection(sponsorshipObjectives, setSponsorshipObjectives, obj)}
-                              className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                active
+                              className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${active
                                   ? 'bg-[#63474D] text-white border-[#63474D] shadow-2xs font-bold'
                                   : 'bg-[#FAF7F5] text-gray-700 border-[#E8DDD7] hover:border-gray-400'
-                              }`}
+                                }`}
                             >
                               {active && <CheckCircle2 className="w-3 h-3 text-[#FFA686]" />}
                               <span>{obj}</span>
@@ -663,11 +660,10 @@ export const SponsorAuthPage: React.FC = () => {
                               key={aud}
                               type="button"
                               onClick={() => toggleSelection(targetAudience, setTargetAudience, aud)}
-                              className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                active
+                              className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${active
                                   ? 'bg-[#63474D] text-white border-[#63474D] shadow-2xs font-bold'
                                   : 'bg-[#FAF7F5] text-gray-700 border-[#E8DDD7] hover:border-gray-400'
-                              }`}
+                                }`}
                             >
                               {active && <CheckCircle2 className="w-3 h-3 text-[#FFA686]" />}
                               <span>{aud}</span>
@@ -694,11 +690,10 @@ export const SponsorAuthPage: React.FC = () => {
                               key={cat}
                               type="button"
                               onClick={() => toggleSelection(preferredEventCategories, setPreferredEventCategories, cat)}
-                              className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                active
+                              className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${active
                                   ? 'bg-[#63474D] text-white border-[#63474D] shadow-2xs font-bold'
                                   : 'bg-[#FAF7F5] text-gray-700 border-[#E8DDD7] hover:border-gray-400'
-                              }`}
+                                }`}
                             >
                               {active && <CheckCircle2 className="w-3 h-3 text-[#FFA686]" />}
                               <span>{cat}</span>
@@ -725,11 +720,10 @@ export const SponsorAuthPage: React.FC = () => {
                               key={skill}
                               type="button"
                               onClick={() => toggleSelection(skillsAndInterests, setSkillsAndInterests, skill)}
-                              className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
-                                active
+                              className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${active
                                   ? 'bg-[#63474D] text-white border-[#63474D] shadow-2xs font-bold'
                                   : 'bg-[#FAF7F5] text-gray-700 border-[#E8DDD7] hover:border-gray-400'
-                              }`}
+                                }`}
                             >
                               {active && <CheckCircle2 className="w-3 h-3 text-[#FFA686]" />}
                               <span>{skill}</span>
@@ -809,11 +803,10 @@ export const SponsorAuthPage: React.FC = () => {
                                     key={loc}
                                     type="button"
                                     onClick={() => toggleSelection(preferredLocations, setPreferredLocations, loc)}
-                                    className={`px-2 py-0.5 text-xs rounded-lg border transition-all cursor-pointer ${
-                                      active
+                                    className={`px-2 py-0.5 text-xs rounded-lg border transition-all cursor-pointer ${active
                                         ? 'bg-[#63474D] text-white border-[#63474D] font-bold'
                                         : 'bg-white text-gray-700 border-[#E8DDD7] hover:border-gray-400'
-                                    }`}
+                                      }`}
                                   >
                                     {loc}
                                   </button>
