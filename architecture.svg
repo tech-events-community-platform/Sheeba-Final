@@ -1,0 +1,356 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 920" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCFAF9"/>
+      <stop offset="100%" stop-color="#F3ECE8"/>
+    </linearGradient>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#63474D"/>
+      <stop offset="100%" stop-color="#8C656C"/>
+    </linearGradient>
+    <linearGradient id="clientGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FAF5F2"/>
+    </linearGradient>
+    <linearGradient id="gatewayGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2D1F23"/>
+      <stop offset="100%" stop-color="#4A343A"/>
+    </linearGradient>
+    <linearGradient id="accentPill" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFA686"/>
+      <stop offset="100%" stop-color="#FF8A65"/>
+    </linearGradient>
+
+    <!-- Filters & Shadows -->
+    <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#2D1F23" flood-opacity="0.08"/>
+    </filter>
+    <filter id="pillShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.12"/>
+    </filter>
+
+    <!-- Arrow Marker -->
+    <marker id="arrowDown" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#63474D"/>
+    </marker>
+    <marker id="arrowRight" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#63474D"/>
+    </marker>
+    <marker id="arrowBidirectional" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M1,1 L7,4 L1,7 Z" fill="#2A7B5F"/>
+    </marker>
+  </defs>
+
+  <style>
+    .font-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; font-weight: 800; }
+    .font-sub { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; font-weight: 600; }
+    .font-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; font-weight: 500; font-size: 11.5px; }
+    .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; }
+  </style>
+
+  <!-- Canvas Background -->
+  <rect x="0" y="0" width="1100" height="920" rx="20" fill="url(#bgGrad)"/>
+  <rect x="15" y="15" width="1070" height="890" rx="16" fill="none" stroke="#E8DDD7" stroke-width="2"/>
+
+  <!-- ==================== HEADER ==================== -->
+  <g transform="translate(40, 35)">
+    <rect x="0" y="0" width="1020" height="60" rx="14" fill="url(#headerGrad)" filter="url(#cardShadow)"/>
+    <text x="25" y="38" fill="#FFFFFF" class="font-title" font-size="22" letter-spacing="0.5">SHEEBA PLATFORM SYSTEM ARCHITECTURE</text>
+    <rect x="760" y="16" width="235" height="28" rx="14" fill="rgba(255,255,255,0.2)"/>
+    <circle cx="778" cy="30" r="5" fill="#4ADE80"/>
+    <text x="792" y="35" fill="#FFFFFF" class="font-body" font-size="11.5" font-weight="700">Production Monorepo Stack</text>
+  </g>
+
+  <!-- ==================== LAYER 1: CLIENT PRESENTATION LAYER ==================== -->
+  <g transform="translate(40, 115)">
+    <rect x="0" y="0" width="1020" height="150" rx="16" fill="#FFFFFF" stroke="#E8DDD7" stroke-width="1.5" filter="url(#cardShadow)"/>
+    
+    <!-- Section Badge -->
+    <rect x="20" y="14" width="310" height="24" rx="12" fill="#FAF5F2" stroke="#E8DDD7" stroke-width="1"/>
+    <text x="32" y="30" fill="#63474D" class="font-sub" font-size="11.5">1. PRESENTATION LAYER (React 19 • Vite 8 • Tailwind v4)</text>
+
+    <!-- 6 Persona Cards -->
+    <!-- Persona 1: Attendee -->
+    <g transform="translate(20, 50)">
+      <rect x="0" y="0" width="150" height="80" rx="12" fill="#FAF7F5" stroke="#E2D4CD" stroke-width="1.2" filter="url(#pillShadow)"/>
+      <rect x="12" y="12" width="26" height="26" rx="8" fill="#63474D"/>
+      <text x="20" y="29" fill="#FFF" class="font-sub" font-size="12">👤</text>
+      <text x="46" y="25" fill="#2D1F23" class="font-sub" font-size="12">Attendee</text>
+      <text x="46" y="38" fill="#8C656C" class="font-body" font-size="10.5">Web Portal</text>
+      <text x="12" y="62" fill="#555" class="font-body" font-size="10">Passes • Dynamic QR</text>
+      <text x="12" y="73" fill="#555" class="font-body" font-size="10">Badges • Discovery</text>
+    </g>
+
+    <!-- Persona 2: Organizer -->
+    <g transform="translate(186, 50)">
+      <rect x="0" y="0" width="150" height="80" rx="12" fill="#FAF7F5" stroke="#E2D4CD" stroke-width="1.2" filter="url(#pillShadow)"/>
+      <rect x="12" y="12" width="26" height="26" rx="8" fill="#8C656C"/>
+      <text x="19" y="29" fill="#FFF" class="font-sub" font-size="12">📅</text>
+      <text x="46" y="25" fill="#2D1F23" class="font-sub" font-size="12">Organizer</text>
+      <text x="46" y="38" fill="#8C656C" class="font-body" font-size="10.5">Workspace</text>
+      <text x="12" y="62" fill="#555" class="font-body" font-size="10">Event Ops • Pitches</text>
+      <text x="12" y="73" fill="#555" class="font-body" font-size="10">Ticketing • Analytics</text>
+    </g>
+
+    <!-- Persona 3: Sponsor -->
+    <g transform="translate(352, 50)">
+      <rect x="0" y="0" width="150" height="80" rx="12" fill="#FAF7F5" stroke="#E2D4CD" stroke-width="1.2" filter="url(#pillShadow)"/>
+      <rect x="12" y="12" width="26" height="26" rx="8" fill="#B35D43"/>
+      <text x="19" y="29" fill="#FFF" class="font-sub" font-size="12">🤝</text>
+      <text x="46" y="25" fill="#2D1F23" class="font-sub" font-size="12">Sponsor</text>
+      <text x="46" y="38" fill="#8C656C" class="font-body" font-size="10.5">Marketplace</text>
+      <text x="12" y="62" fill="#555" class="font-body" font-size="10">Deals • Pitches Review</text>
+      <text x="12" y="73" fill="#555" class="font-body" font-size="10">Impact Reports (PDF/CSV)</text>
+    </g>
+
+    <!-- Persona 4: Exhibitor -->
+    <g transform="translate(518, 50)">
+      <rect x="0" y="0" width="150" height="80" rx="12" fill="#FAF7F5" stroke="#E2D4CD" stroke-width="1.2" filter="url(#pillShadow)"/>
+      <rect x="12" y="12" width="26" height="26" rx="8" fill="#2A7B5F"/>
+      <text x="19" y="29" fill="#FFF" class="font-sub" font-size="12">🎪</text>
+      <text x="46" y="25" fill="#2D1F23" class="font-sub" font-size="12">Exhibitor</text>
+      <text x="46" y="38" fill="#8C656C" class="font-body" font-size="10.5">Booth Portal</text>
+      <text x="12" y="62" fill="#555" class="font-body" font-size="10">Booths • Space Calls</text>
+      <text x="12" y="73" fill="#555" class="font-body" font-size="10">Visitor Lead Capture</text>
+    </g>
+
+    <!-- Persona 5: Door Scanner -->
+    <g transform="translate(684, 50)">
+      <rect x="0" y="0" width="150" height="80" rx="12" fill="#FAF7F5" stroke="#E2D4CD" stroke-width="1.2" filter="url(#pillShadow)"/>
+      <rect x="12" y="12" width="26" height="26" rx="8" fill="#0284C7"/>
+      <text x="19" y="29" fill="#FFF" class="font-sub" font-size="12">📱</text>
+      <text x="46" y="25" fill="#2D1F23" class="font-sub" font-size="12">Staff Scanner</text>
+      <text x="46" y="38" fill="#8C656C" class="font-body" font-size="10.5">Camera App</text>
+      <text x="12" y="62" fill="#555" class="font-body" font-size="10">Sub-0.5s Door Check-in</text>
+      <text x="12" y="73" fill="#555" class="font-body" font-size="10">Masked Privacy Mode</text>
+    </g>
+
+    <!-- Persona 6: Admin -->
+    <g transform="translate(850, 50)">
+      <rect x="0" y="0" width="150" height="80" rx="12" fill="#FAF7F5" stroke="#E2D4CD" stroke-width="1.2" filter="url(#pillShadow)"/>
+      <rect x="12" y="12" width="26" height="26" rx="8" fill="#DC2626"/>
+      <text x="19" y="29" fill="#FFF" class="font-sub" font-size="12">🛡️</text>
+      <text x="46" y="25" fill="#2D1F23" class="font-sub" font-size="12">Platform Admin</text>
+      <text x="46" y="38" fill="#8C656C" class="font-body" font-size="10.5">Governance</text>
+      <text x="12" y="62" fill="#555" class="font-body" font-size="10">Approvals • Moderation</text>
+      <text x="12" y="73" fill="#555" class="font-body" font-size="10">Takedowns • Audit Logs</text>
+    </g>
+  </g>
+
+  <!-- Connectors from Layer 1 to Layer 2 -->
+  <line x1="550" y1="265" x2="550" y2="295" stroke="#63474D" stroke-width="3" stroke-dasharray="4,4" marker-end="url(#arrowDown)"/>
+  <text x="562" y="284" fill="#8C656C" class="font-mono">HTTPS / JSON REST API</text>
+
+  <!-- ==================== LAYER 2: GATEWAY & DEFENSE ==================== -->
+  <g transform="translate(40, 295)">
+    <rect x="0" y="0" width="1020" height="90" rx="16" fill="url(#gatewayGrad)" filter="url(#cardShadow)"/>
+    
+    <text x="25" y="28" fill="#FFA686" class="font-sub" font-size="12" letter-spacing="1">2. API GATEWAY, DEFENSE &amp; MIDDLEWARE PIPELINE (Express.js v5.2)</text>
+
+    <!-- Pipeline Stages -->
+    <g transform="translate(25, 40)">
+      <!-- Stage 1 -->
+      <rect x="0" y="0" width="175" height="36" rx="8" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.2)"/>
+      <text x="12" y="22" fill="#FFF" class="font-body" font-weight="700">🔒 Helmet &amp; Strict CORS</text>
+
+      <!-- Arrow -->
+      <path d="M185,18 L195,18" stroke="#FFA686" stroke-width="2"/>
+
+      <!-- Stage 2 -->
+      <rect x="205" y="0" width="175" height="36" rx="8" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.2)"/>
+      <text x="12" y="22" transform="translate(205,0)" fill="#FFF" class="font-body" font-weight="700">⏱️ Express Rate Limiter</text>
+
+      <!-- Arrow -->
+      <path d="M390,18 L400,18" stroke="#FFA686" stroke-width="2"/>
+
+      <!-- Stage 3 -->
+      <rect x="410" y="0" width="175" height="36" rx="8" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.2)"/>
+      <text x="12" y="22" transform="translate(410,0)" fill="#FFF" class="font-body" font-weight="700">🔑 JWT Auth Verification</text>
+
+      <!-- Arrow -->
+      <path d="M595,18 L605,18" stroke="#FFA686" stroke-width="2"/>
+
+      <!-- Stage 4 -->
+      <rect x="615" y="0" width="175" height="36" rx="8" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.2)"/>
+      <text x="12" y="22" transform="translate(615,0)" fill="#FFF" class="font-body" font-weight="700">🛡️ Role Guards (RBAC)</text>
+
+      <!-- Arrow -->
+      <path d="M800,18 L810,18" stroke="#FFA686" stroke-width="2"/>
+
+      <!-- Stage 5 -->
+      <rect x="820" y="0" width="150" height="36" rx="8" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.2)"/>
+      <text x="12" y="22" transform="translate(820,0)" fill="#FFF" class="font-body" font-weight="700">📐 Zod Validation</text>
+    </g>
+  </g>
+
+  <!-- Connectors from Layer 2 to Layer 3 -->
+  <line x1="550" y1="385" x2="550" y2="415" stroke="#63474D" stroke-width="3" stroke-dasharray="4,4" marker-end="url(#arrowDown)"/>
+  <text x="562" y="404" fill="#8C656C" class="font-mono">Clean Controllers Execution</text>
+
+  <!-- ==================== LAYER 3: BUSINESS DOMAIN SERVICES ==================== -->
+  <g transform="translate(40, 415)">
+    <rect x="0" y="0" width="1020" height="215" rx="16" fill="#FFFFFF" stroke="#E8DDD7" stroke-width="1.5" filter="url(#cardShadow)"/>
+    
+    <!-- Section Badge -->
+    <rect x="20" y="14" width="310" height="24" rx="12" fill="#FAF5F2" stroke="#E8DDD7" stroke-width="1"/>
+    <text x="32" y="30" fill="#63474D" class="font-sub" font-size="11.5">3. BUSINESS DOMAIN SERVICES (Modular Services Pattern)</text>
+
+    <!-- Services Grid (9 services) -->
+    <!-- Service 1: AuthService -->
+    <g transform="translate(20, 50)">
+      <rect x="0" y="0" width="225" height="46" rx="10" fill="#FAF7F5" stroke="#E2D4CD"/>
+      <text x="12" y="20" fill="#2D1F23" class="font-sub" font-size="12">AuthService</text>
+      <text x="12" y="36" fill="#756366" class="font-body" font-size="10">JWT • bcrypt • 6 Roles • 10-Digit Phone</text>
+    </g>
+
+    <!-- Service 2: EventService -->
+    <g transform="translate(265, 50)">
+      <rect x="0" y="0" width="225" height="46" rx="10" fill="#FAF7F5" stroke="#E2D4CD"/>
+      <text x="12" y="20" fill="#2D1F23" class="font-sub" font-size="12">EventService</text>
+      <text x="12" y="36" fill="#756366" class="font-body" font-size="10">Events Lifecycle • Tiers • Capacity</text>
+    </g>
+
+    <!-- Service 3: CheckInService -->
+    <g transform="translate(510, 50)">
+      <rect x="0" y="0" width="240" height="46" rx="10" fill="#FAF7F5" stroke="#E2D4CD"/>
+      <text x="12" y="20" fill="#2D1F23" class="font-sub" font-size="12">CheckInService</text>
+      <text x="12" y="36" fill="#756366" class="font-body" font-size="10">Door Scanning • Duplicate Void • Fast Verify</text>
+    </g>
+
+    <!-- Service 4: SponsorshipService -->
+    <g transform="translate(770, 50)">
+      <rect x="0" y="0" width="230" height="46" rx="10" fill="#FAF7F5" stroke="#E2D4CD"/>
+      <text x="12" y="20" fill="#2D1F23" class="font-sub" font-size="12">SponsorshipService</text>
+      <text x="12" y="36" fill="#756366" class="font-body" font-size="10">Pitches • Self-Deal Guards • Deals Pipeline</text>
+    </g>
+
+    <!-- Service 5: ExhibitorService -->
+    <g transform="translate(20, 106)">
+      <rect x="0" y="0" width="225" height="46" rx="10" fill="#FAF7F5" stroke="#E2D4CD"/>
+      <text x="12" y="20" fill="#2D1F23" class="font-sub" font-size="12">ExhibitorService</text>
+      <text x="12" y="36" fill="#756366" class="font-body" font-size="10">Booths • Space Allocation • Floor Map</text>
+    </g>
+
+    <!-- Service 6: BadgeService -->
+    <g transform="translate(265, 106)">
+      <rect x="0" y="0" width="225" height="46" rx="10" fill="#FAF7F5" stroke="#E2D4CD"/>
+      <text x="12" y="20" fill="#2D1F23" class="font-sub" font-size="12">BadgeService</text>
+      <text x="12" y="36" fill="#756366" class="font-body" font-size="10">Tamper-Proof Attendance Credentials</text>
+    </g>
+
+    <!-- Service 7: ScannerService -->
+    <g transform="translate(510, 106)">
+      <rect x="0" y="0" width="240" height="46" rx="10" fill="#FAF7F5" stroke="#E2D4CD"/>
+      <text x="12" y="20" fill="#2D1F23" class="font-sub" font-size="12">ScannerService</text>
+      <text x="12" y="36" fill="#756366" class="font-body" font-size="10">Staff Delegation • Masked Attendee Privacy</text>
+    </g>
+
+    <!-- Service 8: ReportService -->
+    <g transform="translate(770, 106)">
+      <rect x="0" y="0" width="230" height="46" rx="10" fill="#FAF7F5" stroke="#E2D4CD"/>
+      <text x="12" y="20" fill="#2D1F23" class="font-sub" font-size="12">ReportService</text>
+      <text x="12" y="36" fill="#756366" class="font-body" font-size="10">Dossiers • Verified Intelligence • CSV/PDF</text>
+    </g>
+
+    <!-- Service 9: CacheService & AuditService Banner -->
+    <g transform="translate(20, 162)">
+      <rect x="0" y="0" width="980" height="40" rx="8" fill="#F4EFEB" stroke="#DFCFC7"/>
+      <text x="20" y="24" fill="#63474D" class="font-sub" font-size="11.5">⚡ CacheService &amp; AuditService:</text>
+      <text x="225" y="24" fill="#555" class="font-body" font-size="11">Automated Read-Through Caching • Smart Pattern Invalidation • Immutable Admin Activity Audit Trail</text>
+    </g>
+  </g>
+
+  <!-- Connectors from Layer 3 to Layers 4, 5, 6 -->
+  <line x1="280" y1="630" x2="280" y2="675" stroke="#63474D" stroke-width="2.5" marker-end="url(#arrowDown)"/>
+  <line x1="550" y1="630" x2="550" y2="675" stroke="#63474D" stroke-width="2.5" marker-end="url(#arrowDown)"/>
+  <line x1="820" y1="630" x2="820" y2="675" stroke="#63474D" stroke-width="2.5" marker-end="url(#arrowDown)"/>
+
+  <!-- ==================== LAYER 4, 5, 6: DATA, CACHING & CLOUD ==================== -->
+  
+  <!-- Sub-block 4: Redis Caching -->
+  <g transform="translate(40, 675)">
+    <rect x="0" y="0" width="310" height="205" rx="16" fill="#FFFFFF" stroke="#E8DDD7" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="16" y="14" width="200" height="24" rx="12" fill="#FEF2F2" stroke="#FCA5A5" stroke-width="1"/>
+    <text x="28" y="30" fill="#DC2626" class="font-sub" font-size="11.5">⚡ 4. REDIS / UPSTASH CACHE</text>
+
+    <text x="18" y="62" fill="#2D1F23" class="font-sub" font-size="13">High-Speed Key-Value Cache</text>
+    <text x="18" y="80" fill="#756366" class="font-body">Connection: <tspan class="font-mono">ioredis v6.0</tspan></text>
+    
+    <g transform="translate(18, 95)">
+      <rect x="0" y="0" width="274" height="26" rx="6" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="10" y="17" fill="#444" class="font-mono">events:public:*</text>
+      <text x="175" y="17" fill="#888" class="font-body">Read-through</text>
+    </g>
+    <g transform="translate(18, 127)">
+      <rect x="0" y="0" width="274" height="26" rx="6" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="10" y="17" fill="#444" class="font-mono">sponsorship:app:*</text>
+      <text x="175" y="17" fill="#888" class="font-body">Auto-purged</text>
+    </g>
+    <g transform="translate(18, 159)">
+      <rect x="0" y="0" width="274" height="26" rx="6" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="10" y="17" fill="#444" class="font-mono">admin:metrics:*</text>
+      <text x="175" y="17" fill="#888" class="font-body">Instant del</text>
+    </g>
+  </g>
+
+  <!-- Sub-block 5: Neon PostgreSQL Database -->
+  <g transform="translate(375, 675)">
+    <rect x="0" y="0" width="350" height="205" rx="16" fill="#FFFFFF" stroke="#E8DDD7" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="16" y="14" width="240" height="24" rx="12" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="1"/>
+    <text x="28" y="30" fill="#059669" class="font-sub" font-size="11.5">🗄️ 5. NEON SERVERLESS POSTGRESQL</text>
+
+    <text x="18" y="62" fill="#2D1F23" class="font-sub" font-size="13">PostgreSQL 16 Relational Engine</text>
+    <text x="18" y="80" fill="#756366" class="font-body">Driver: <tspan class="font-mono">@neondatabase/serverless + pg</tspan></text>
+    
+    <g transform="translate(18, 95)">
+      <rect x="0" y="0" width="150" height="42" rx="6" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="10" y="18" fill="#2D1F23" class="font-sub" font-size="11">users &amp; profiles</text>
+      <text x="10" y="32" fill="#888" class="font-body" font-size="9.5">6 Roles, Logos, Phone</text>
+
+      <rect x="160" y="0" width="154" height="42" rx="6" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="170" y="18" fill="#2D1F23" class="font-sub" font-size="11">events &amp; tickets</text>
+      <text x="170" y="32" fill="#888" class="font-body" font-size="9.5">Tiers, Capacity, Passes</text>
+    </g>
+
+    <g transform="translate(18, 143)">
+      <rect x="0" y="0" width="150" height="42" rx="6" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="10" y="18" fill="#2D1F23" class="font-sub" font-size="11">sponsorship_deals</text>
+      <text x="10" y="32" fill="#888" class="font-body" font-size="9.5">Pledges, Sharing Gates</text>
+
+      <rect x="160" y="0" width="154" height="42" rx="6" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="170" y="18" fill="#2D1F23" class="font-sub" font-size="11">check_ins &amp; audit</text>
+      <text x="170" y="32" fill="#888" class="font-body" font-size="9.5">Scan Proofs, Soft-Deletes</text>
+    </g>
+  </g>
+
+  <!-- Sub-block 6: External Cloud Services -->
+  <g transform="translate(750, 675)">
+    <rect x="0" y="0" width="310" height="205" rx="16" fill="#FFFFFF" stroke="#E8DDD7" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect x="16" y="14" width="220" height="24" rx="12" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1"/>
+    <text x="28" y="30" fill="#2563EB" class="font-sub" font-size="11.5">☁️ 6. CLOUD &amp; EXTERNAL SERVICES</text>
+
+    <!-- Cloudinary -->
+    <g transform="translate(16, 52)">
+      <rect x="0" y="0" width="278" height="42" rx="8" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="12" y="18" fill="#2D1F23" class="font-sub" font-size="11">Cloudinary CDN</text>
+      <text x="12" y="32" fill="#666" class="font-body" font-size="10">sheeba_event_posters • organization_logos</text>
+    </g>
+
+    <!-- Google Identity -->
+    <g transform="translate(16, 100)">
+      <rect x="0" y="0" width="278" height="42" rx="8" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="12" y="18" fill="#2D1F23" class="font-sub" font-size="11">Google OAuth 2.0</text>
+      <text x="12" y="32" fill="#666" class="font-body" font-size="10">Frictionless 1-Click Attendee Login</text>
+    </g>
+
+    <!-- Nodemailer / SMTP -->
+    <g transform="translate(16, 148)">
+      <rect x="0" y="0" width="278" height="42" rx="8" fill="#FAF7F5" stroke="#E8DDD7"/>
+      <text x="12" y="18" fill="#2D1F23" class="font-sub" font-size="11">Nodemailer SMTP Queue</text>
+      <text x="12" y="32" fill="#666" class="font-body" font-size="10">Automated Approvals • Deals Notifications</text>
+    </g>
+  </g>
+
+</svg>
+
