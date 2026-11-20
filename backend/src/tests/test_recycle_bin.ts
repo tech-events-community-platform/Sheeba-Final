@@ -136,7 +136,7 @@ async function runRecycleBinTests() {
 
     // Before deletion: event1 is visible in active list
     const activeEventsBefore = await EventService.getEvents({ organizerId: org1Id });
-    assert(activeEventsBefore.some((e) => e.id === event1Id), 'Event 1 is initially visible in organizer active events list');
+    assert(activeEventsBefore.some((e: any) => e.id === event1Id), 'Event 1 is initially visible in organizer active events list');
 
     // Org1 deletes their event
     const deleteResult = await EventService.deleteEvent(event1Id, org1Id, 'organizer');
@@ -144,7 +144,7 @@ async function runRecycleBinTests() {
 
     // After deletion: event disappears from normal listings
     const activeEventsAfter = await EventService.getEvents({ organizerId: org1Id });
-    assert(!activeEventsAfter.some((e) => e.id === event1Id), 'Soft-deleted event disappears from organizer active list');
+    assert(!activeEventsAfter.some((e: any) => e.id === event1Id), 'Soft-deleted event disappears from organizer active list');
 
     const publicEvent = await EventService.getEventById(event1Id);
     assert(publicEvent === null, 'Soft-deleted event returns null (404) for normal event views');
@@ -202,7 +202,7 @@ async function runRecycleBinTests() {
 
     // Check event is back in active listings
     const activeEventsRestored = await EventService.getEvents({ organizerId: org1Id });
-    assert(activeEventsRestored.some((e) => e.id === event1Id), 'Restored event reappears in organizer active list');
+    assert(activeEventsRestored.some((e: any) => e.id === event1Id), 'Restored event reappears in organizer active list');
 
     // Verify registrations are preserved
     const roster = await EventService.getEventRoster(event1Id, org1Id, 'organizer');

@@ -68,11 +68,17 @@ export class EventController {
         filterPublicized = true;
       }
 
+      let effectiveOrganizerId = organizerId as string | undefined;
+      // Organization-level data isolation: Organizers can only access their own events
+      if (req.user && req.user.role?.toLowerCase() === 'organizer' && !isPublicizedQuery) {
+        effectiveOrganizerId = req.user.userId;
+      }
+
       const events = await EventService.getEvents({
         search: search as string,
         type: type as string,
         status: status as string,
-        organizerId: organizerId as string,
+        organizerId: effectiveOrganizerId,
         isPublicized: filterPublicized,
       });
 

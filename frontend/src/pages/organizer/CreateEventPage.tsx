@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -15,6 +15,8 @@ import {
   Image as ImageIcon,
   Globe,
   Sparkles,
+  AlertTriangle,
+  Mail,
 } from 'lucide-react';
 import { getOrganizerDefaultQuestions } from '../../utils/defaultQuestions';
 import {
@@ -35,6 +37,33 @@ interface QuestionDraft {
 
 export const CreateEventPage: React.FC = () => {
   const { user } = useAuth();
+  const [subscription, setSubscription] = useState<any | null>(null);
+  const [loadingSubscription, setLoadingSubscription] = useState<boolean>(true);
+  const [isLimitReached, setIsLimitReached] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchSub = async () => {
+      try {
+        setLoadingSubscription(true);
+        const sub = await api.events.getMySubscription();
+        if (sub) {
+          setSubscription(sub);
+          const maxEvents = Number(sub.max_events ?? sub.maxEvents ?? 1);
+          const used = Number(sub.events_used ?? sub.eventsUsed ?? 0);
+          if (used >= maxEvents || (sub.remaining_events !== undefined && sub.remaining_events <= 0)) {
+            setIsLimitReached(true);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load organizer subscription:', err);
+      } finally {
+        setLoadingSubscription(false);
+      }
+    };
+    if (user?.id) {
+      fetchSub();
+    }
+  }, [user?.id]);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -502,6 +531,59 @@ export const CreateEventPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-start">
         {/* Left Column: Event Form */}
         <form onSubmit={handleSubmit} className="lg:col-span-7 xl:col-span-7 space-y-8 max-w-xl">
+          {/* Subscription Event Creation Limit Banner */}
+          {isLimitReached && (
+            <div className="p-4 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-3 animate-fade-in text-[#5A3825]">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1.5 text-xs leading-relaxed">
+                  <p className="font-bold text-amber-900 text-sm">Event Creation Limit Reached</p>
+                  <p className="text-[#3E2519] font-medium">
+                    You have reached your event creation limit. Please contact Sheeba to upgrade your plan or purchase additional event credits.
+                  </p>
+                  <p className="text-[#756366]">
+                    If you believe this is a mistake, please contact the administrators.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-1 flex flex-wrap items-center gap-2">
+                <Link
+                  to="/contact?category=Plan%20Upgrade&subject=Upgrade%20Event%20Creation%20Limit"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#63474D] text-white rounded-xl text-xs font-semibold hover:bg-[#523a3f] transition-colors shadow-xs"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  Contact Sheeba Administrators
+                </Link>
+                <Link
+                  to="/organizer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E8DDD7] text-[#63474D] rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Back to Dashboard
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Active Subscription Credit Status Pill */}
+          {!isLimitReached && subscription && (
+            <div className="p-3 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl flex items-center justify-between text-xs text-[#63474D]">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#FFA686]" />
+                <span>
+                  Plan: <strong className="text-[#2D1F23]">{subscription.plan_name || subscription.planName}</strong>
+                </span>
+                <span className="text-[#AA767C]">•</span>
+                <span>
+                  <strong>{subscription.events_used ?? subscription.eventsUsed ?? 0}</strong> of{' '}
+                  <strong>{subscription.max_events ?? subscription.maxEvents ?? 1}</strong> events created
+                </span>
+              </div>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-800">
+                {(subscription.remaining_events ?? (Number(subscription.max_events || 1) - Number(subscription.events_used || 0)))} credit(s) left
+              </span>
+            </div>
+          )}
+
           {submitError && (
             <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2.5 text-xs text-red-600 animate-fade-in">
               <span className="font-bold shrink-0">⚠️ Notice:</span>
@@ -1218,9 +1300,11 @@ export const CreateEventPage: React.FC = () => {
                 variant="primary"
                 size="md"
                 isLoading={isSubmitting}
+                disabled={isSubmitting || isLimitReached}
+                title={isLimitReached ? 'You have reached your event creation limit.' : undefined}
                 className="text-xs sm:text-sm font-semibold px-6 py-2.5 shadow-xs cursor-pointer w-full sm:w-auto"
               >
-                Publish Event & Generate Share Link
+                {isLimitReached ? 'Event Limit Reached' : 'Publish Event & Generate Share Link'}
               </Button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthRequest } from '../types';
 import { AdminService } from '../services/admin.service';
+import { SubscriptionService } from '../services/subscription.service';
 import { AuditService } from '../services/audit.service';
 import { sendSuccess, sendError } from '../utils/apiResponse';
 
@@ -357,6 +358,76 @@ export class AdminController {
       });
 
       return sendSuccess(res, result, 'System audit logs retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+  static async getAllSubscriptions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { search, status, paymentStatus, page, limit } = req.query as any;
+      const data = await SubscriptionService.getAllSubscriptions({
+        search,
+        subscriptionStatus: status,
+        paymentStatus,
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 20,
+      });
+      return sendSuccess(res, data, 'Organizer subscriptions and event limits retrieved.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getOrganizerSubscription(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const sub = await SubscriptionService.getOrganizerSubscription(id);
+      return sendSuccess(res, sub, 'Organizer subscription details retrieved.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateOrganizerAllowance(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const adminId = req.user!.userId;
+      const updated = await SubscriptionService.updateAllowance(id, adminId, req.body);
+      return sendSuccess(res, updated, 'Organizer event allowance and plan updated successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getAllowanceHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const history = await SubscriptionService.getAllowanceHistory(id);
+      return sendSuccess(res, history, 'Organizer allowance change history retrieved.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPlatformAttendees(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { search, page, limit } = req.query as any;
+      const data = await AdminService.getPlatformAttendees({
+        search,
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 20,
+      });
+      return sendSuccess(res, data, 'Platform attendees retrieved successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getAttendeeRegistrations(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const data = await AdminService.getAttendeeRegistrations(id);
+      return sendSuccess(res, data, 'Attendee registration records retrieved.');
     } catch (error) {
       next(error);
     }

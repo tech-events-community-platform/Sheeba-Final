@@ -821,6 +821,8 @@ export class AdminService {
       status: p.status,
       createdAt: p.created_at,
     }));
+
+
   }
 
 
@@ -1884,7 +1886,133 @@ export class AdminService {
     sql += ` ORDER BY l.created_at DESC LIMIT $${paramIdx++}`;
     params.push(limit);
 
+
     const res = await query(sql, params);
     return res.rows;
+
+
+
+
+
+  }
+
+  static async getPlatformAttendees(options?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = Math.max(1, options?.page || 1);
+    const limit = Math.min(100, Math.max(1, options?.limit || 20));
+    const offset = (page - 1) * limit;
+
+    const conditions: string[] = ["(u.role = 'attendee' OR u.role IS NULL)", "u.deleted_at IS NULL"];
+    const values: any[] = [];
+    let counter = 1;
+
+    if (options?.search && options.search.trim()) {
+      const term = `%${options.search.trim().toLowerCase()}%`;
+      conditions.push(`(LOWER(u.full_name) LIKE $${counter} OR LOWER(u.email) LIKE $${counter} OR LOWER(COALESCE(u.organization, '')) LIKE $${counter})`);
+      values.push(term);
+      counter++;
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    const countRes = await query(
+      `SELECT COUNT(*)::INTEGER AS total FROM users u WHERE ${whereClause}`,
+      values
+    );
+    const total = countRes.rows[0]?.total || 0;
+
+    const listQuery = `
+      SELECT 
+        u.id, u.full_name, u.email, u.phone, u.organization, u.is_active, u.created_at AS registered_at,
+        COUNT(DISTINCT r.id)::INTEGER AS registrations_count,
+        COUNT(DISTINCT CASE 
+          WHEN (ci.id IS NOT NULL AND ci.voided_at IS NULL) 
+            OR t.status IN ('CHECKED_IN', 'Used') 
+            OR (b.id IS NOT NULL AND b.revoked_at IS NULL) 
+          THEN r.id 
+        END)::INTEGER AS check_ins_count,
+        COUNT(DISTINCT b.id)::INTEGER AS badges_count
+      FROM users u
+      LEFT JOIN registrations r ON u.id = r.user_id AND r.status = 'registered' AND r.deleted_at IS NULL
+      LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
+      LEFT JOIN tickets t ON u.id = t.user_id AND t.registration_id = r.id
+      LEFT JOIN badge_awards b ON b.event_id = r.event_id AND b.user_id = u.id AND b.revoked_at IS NULL
+      WHERE ${whereClause}
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
+      LIMIT $${counter++} OFFSET $${counter++}
+    `;
+
+    values.push(limit, offset);
+    const listRes = await query(listQuery, values);
+
+    return {
+      attendees: listRes.rows.map(r => ({
+        id: r.id,
+        name: r.full_name,
+        email: r.email,
+        phone: r.phone || '',
+        organization: r.organization || '',
+        isActive: r.is_active,
+        registrationsCount: r.registrations_count,
+        checkInsCount: r.check_ins_count,
+        badgesCount: r.badges_count,
+        registeredAt: r.registered_at,
+      })),
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1,
+      }
+    };
+  }
+
+  static async getAttendeeRegistrations(attendeeId: string) {
+    const res = await query(
+      `SELECT 
+        r.id AS registration_id,
+        r.registered_at,
+        r.status AS registration_status,
+        r.approval_status,
+        e.id AS event_id,
+        e.title AS event_title,
+        e.event_date,
+        e.event_type,
+        e.location,
+        u_org.full_name AS organizer_name,
+        u_org.organization AS organizer_organization,
+        t.ticket_code,
+        t.status AS ticket_status,
+        ci.approved_at AS check_in_time
+       FROM registrations r
+       JOIN events e ON r.event_id = e.id
+       JOIN users u_org ON e.organizer_id = u_org.id
+       LEFT JOIN tickets t ON r.id = t.registration_id
+       LEFT JOIN check_ins ci ON r.id = ci.registration_id AND ci.voided_at IS NULL
+       WHERE r.user_id = $1 AND r.deleted_at IS NULL
+       ORDER BY r.registered_at DESC`,
+      [attendeeId]
+    );
+
+    return res.rows.map(row => ({
+      registrationId: row.registration_id,
+      registeredAt: row.registered_at,
+      registrationStatus: row.registration_status,
+      approvalStatus: row.approval_status,
+      eventId: row.event_id,
+      eventTitle: row.event_title,
+      eventDate: row.event_date,
+      eventType: row.event_type,
+      location: row.location,
+      organizerName: row.organizer_organization || row.organizer_name,
+      ticketCode: row.ticket_code,
+      ticketStatus: row.ticket_status,
+      isCheckedIn: Boolean(row.check_in_time || row.ticket_status === 'CHECKED_IN' || row.ticket_status === 'Used'),
+      checkInTime: row.check_in_time,
+    }));
   }
 }

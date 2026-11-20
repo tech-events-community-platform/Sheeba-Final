@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserService } from '../services/user.service';
 import { TicketService } from '../services/ticket.service';
+import { SubscriptionService } from '../services/subscription.service';
 import { sendSuccess } from '../utils/apiResponse';
 import { AuthRequest } from '../types';
 
@@ -102,6 +103,16 @@ export class UserController {
         history,
         'Attendance and verified participation history retrieved.'
       );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getMySubscription(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.userId;
+      const sub = await SubscriptionService.getOrganizerSubscription(userId);
+      return sendSuccess(res, sub, 'Subscription retrieved successfully.');
     } catch (error) {
       next(error);
     }

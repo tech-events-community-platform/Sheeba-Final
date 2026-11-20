@@ -693,3 +693,69 @@ CREATE INDEX IF NOT EXISTS idx_system_audit_logs_entity ON system_audit_logs(ent
 
 
 
+
+
+-- =========================================================================
+-- ORGANIZER SUBSCRIPTION & EVENT CREATION ALLOWANCE MANAGEMENT
+-- =========================================================================
+
+CREATE TABLE IF NOT EXISTS organizer_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organizer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plan_name VARCHAR(100) NOT NULL DEFAULT 'Starter (1 Event)',
+    max_events INTEGER NOT NULL DEFAULT 1 CHECK (max_events >= 0),
+    events_used INTEGER NOT NULL DEFAULT 0 CHECK (events_used >= 0),
+    payment_status VARCHAR(50) NOT NULL DEFAULT 'paid' CHECK (payment_status IN ('paid', 'pending', 'waived', 'overdue')),
+    subscription_status VARCHAR(50) NOT NULL DEFAULT 'active' CHECK (subscription_status IN ('active', 'suspended', 'expired', 'depleted')),
+    agreement_reference VARCHAR(255),
+    notes TEXT,
+    assigned_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    valid_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_organizer_subscription UNIQUE (organizer_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_organizer_subscriptions_organizer_id ON organizer_subscriptions(organizer_id);
+CREATE INDEX IF NOT EXISTS idx_organizer_subscriptions_status ON organizer_subscriptions(subscription_status);
+CREATE INDEX IF NOT EXISTS idx_organizer_subscriptions_payment ON organizer_subscriptions(payment_status);
+
+CREATE TABLE IF NOT EXISTS organizer_allowance_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organizer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    changed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    previous_max_events INTEGER NOT NULL DEFAULT 0,
+    new_max_events INTEGER NOT NULL,
+    previous_plan VARCHAR(100),
+    new_plan VARCHAR(100),
+    change_type VARCHAR(50) NOT NULL, -- 'INITIAL_ASSIGNMENT', 'ALLOWANCE_INCREASE', 'ALLOWANCE_DECREASE', 'CREDIT_GRANT', 'PLAN_CHANGE', 'STATUS_CHANGE'
+    reason TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_organizer_allowance_history_organizer ON organizer_allowance_history(organizer_id);
+CREATE INDEX IF NOT EXISTS idx_organizer_allowance_history_created_at ON organizer_allowance_history(created_at DESC);
+
+-- Safe idempotent backfill for existing organizers
+INSERT INTO organizer_subscriptions (organizer_id, plan_name, max_events, events_used, payment_status, subscription_status)
+SELECT 
+    u.id,
+    CASE 
+        WHEN COALESCE(e_cnt.cnt, 0) > 3 THEN 'Enterprise (' || GREATEST(e_cnt.cnt, 5) || ' Events)'
+        WHEN COALESCE(e_cnt.cnt, 0) > 1 THEN 'Growth (' || GREATEST(e_cnt.cnt, 3) || ' Events)'
+        ELSE 'Starter (1 Event)'
+    END AS plan_name,
+    GREATEST(COALESCE(e_cnt.cnt, 0), 1) AS max_events,
+    COALESCE(e_cnt.cnt, 0) AS events_used,
+    'paid' AS payment_status,
+    'active' AS subscription_status
+FROM users u
+LEFT JOIN (
+    SELECT organizer_id, COUNT(*)::INTEGER as cnt 
+    FROM events 
+    WHERE deleted_at IS NULL 
+    GROUP BY organizer_id
+) e_cnt ON u.id = e_cnt.organizer_id
+WHERE (u.role = 'organizer' OR u.is_organizer = TRUE) AND u.deleted_at IS NULL
+ON CONFLICT (organizer_id) DO NOTHING;

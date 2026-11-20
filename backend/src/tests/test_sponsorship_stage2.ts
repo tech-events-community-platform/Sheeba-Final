@@ -367,7 +367,7 @@ async function runStage2Tests() {
     try {
       console.log('\nTEST 13: Admin list & detail endpoints with pagination and attempt history...');
       const adminList = await AdminService.getSponsorshipApplications({ status: 'APPROVED' });
-      const foundApproved = adminList.applications.some((a) => a.id === deal2Id);
+      const foundApproved = adminList.applications.some((a: any) => a.id === deal2Id);
 
       const detail = await AdminService.getSponsorshipApplicationDetail(deal2Id);
 

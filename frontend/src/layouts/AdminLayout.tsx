@@ -11,16 +11,26 @@ import {
   User,
   Trash2,
   HandCoins,
+  Building2,
+  Key,
+  Activity,
+  ShieldAlert,
 } from 'lucide-react';
 
 export const AdminLayout: React.FC = () => {
   const location = useLocation();
 
   const isTabActive = (path: string) => {
-    if (path.includes('#')) {
-      return location.pathname + location.hash === path;
+    if (path === '/admin?tab=overview') {
+      return location.pathname === '/admin' && (!location.search || location.search === '?tab=overview');
     }
-    if (path === '/admin') return location.pathname === '/admin' && !location.hash;
+    if (path.includes('?')) {
+      return (location.pathname + location.search) === path;
+    }
+    if (path.includes('#')) {
+      return (location.pathname + location.hash) === path;
+    }
+    if (path === '/admin') return location.pathname === '/admin' && !location.hash && !location.search;
     return location.pathname.startsWith(path);
   };
 
@@ -36,13 +46,15 @@ export const AdminLayout: React.FC = () => {
         {/* Mobile Top Sub-bar for Admin */}
         <div className="md:hidden bg-[#63474D] text-white py-2.5 px-4 border-b border-[#AA767C]/40 overflow-x-auto scrollbar-none flex gap-2 shrink-0 text-xs">
           {[
-            { label: 'Overview', path: '/admin', icon: LayoutDashboard },
-            { label: 'Events', path: '/admin/events', icon: Calendar },
-            { label: 'Users', path: '/admin/users', icon: Users },
+            { label: 'Overview', path: '/admin?tab=overview', icon: LayoutDashboard },
+            { label: 'Organizers', path: '/admin?tab=organizers', icon: Building2 },
+            { label: 'Allowances', path: '/admin?tab=access', icon: Key },
+            { label: 'Events', path: '/admin?tab=events', icon: Calendar },
+            { label: 'Attendees', path: '/admin?tab=attendees', icon: Users },
+            { label: 'Plans', path: '/admin?tab=plans', icon: CreditCard },
+            { label: 'Activity', path: '/admin?tab=activity', icon: Activity },
             { label: 'Sponsorships', path: '/admin/sponsorship-applications', icon: HandCoins },
             { label: 'Recycle Bin', path: '/admin/recycle-bin', icon: Trash2 },
-            { label: 'Badge Queue', path: '/admin#badges', icon: Award },
-            { label: 'Payments', path: '/admin#payments', icon: CreditCard },
             { label: 'Profile', path: '/admin/profile', icon: User },
           ].map((item) => {
             const Icon = item.icon;

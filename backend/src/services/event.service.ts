@@ -7,6 +7,7 @@ import { PaymentService } from './payment.service';
 import { RecycleBinService } from './recycleBin.service';
 import { ScannerService } from './scanner.service';
 import { AuditService } from './audit.service';
+import { SubscriptionService } from './subscription.service';
 import { getFrontendUrl } from '../config/env';
 
 export class EventService {
@@ -146,8 +147,13 @@ export class EventService {
     const poster = posterImageUrl || bannerUrl || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
     const timeStr = `${startTime} - ${endTime} EAT`;
     const shareLinkToken = `shb-${Math.random().toString(36).substring(2, 8)}`;
+    const client = await getClient();
+    let insertedEvent: any;
+    try {
+      await client.query('BEGIN');
+      await SubscriptionService.validateCanCreateEvent(organizerId, client);
 
-    const result = await query(
+      const result = await client.query(
       `INSERT INTO events (
         organizer_id, title, description, event_type, category, event_date,
         start_time, end_time, time_str, location, venue_name, capacity,
@@ -182,7 +188,15 @@ export class EventService {
       ]
     );
 
-    const insertedEvent = result.rows[0];
+      insertedEvent = result.rows[0];
+      await SubscriptionService.syncEventsUsed(organizerId, client);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
 
     // Assign scanners if enabled and provided
     if (effectiveRequiresScanners && effectiveScannerEmails.length > 0) {
@@ -558,6 +572,7 @@ export class EventService {
 
     const title = (existing.rows[0] as any).title || 'Event';
     await query('UPDATE events SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2', [userId, realId]);
+    await SubscriptionService.syncEventsUsed(existing.rows[0].organizer_id);
 
     await RecycleBinService.recordAuditLog({
       entityType: 'event',

@@ -19,6 +19,7 @@ router.delete('/me', authenticate, UserController.deleteAccount);
 router.get('/me/export', authenticate, validateQuery(exportUserDataQuerySchema), UserController.exportUserData);
 router.get('/me/tickets', authenticate, UserController.getMyTickets);
 router.get('/me/attendance', authenticate, UserController.getAttendanceHistory);
+router.get('/me/subscription', authenticate, UserController.getMySubscription);
 
 // Public profile (optionalAuth detects if the viewer is the profile owner or admin)
 router.get(

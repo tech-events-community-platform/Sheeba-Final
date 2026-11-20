@@ -84,7 +84,7 @@ export class CacheService {
             maxRetriesPerRequest: 1,
             connectTimeout: 3000,
             lazyConnect: true,
-            retryStrategy: (times) => (times > 3 ? null : Math.min(times * 500, 2000)),
+            retryStrategy: (times: number) => (times > 3 ? null : Math.min(times * 500, 2000)),
           })
         : new Redis({
             host: redisHost,
@@ -93,7 +93,7 @@ export class CacheService {
             maxRetriesPerRequest: 1,
             connectTimeout: 3000,
             lazyConnect: true,
-            retryStrategy: (times) => (times > 3 ? null : Math.min(times * 500, 2000)),
+            retryStrategy: (times: number) => (times > 3 ? null : Math.min(times * 500, 2000)),
           });
 
       client.on('ready', () => {
@@ -102,7 +102,7 @@ export class CacheService {
         console.log('[CacheService] Redis ready. Active cache provider: Redis.');
       });
 
-      client.on('error', (err) => {
+      client.on('error', (err: any) => {
         this.isRedisReady = false;
         this.stats.provider = 'memory';
         console.warn(`[CacheService] Redis issue (${err.message}). Seamlessly utilizing in-memory fallback.`);
@@ -115,7 +115,7 @@ export class CacheService {
 
       this.redisClient = client;
 
-      client.connect().catch((err) => {
+      client.connect().catch((err: any) => {
         this.isRedisReady = false;
         this.stats.provider = 'memory';
         console.warn(`[CacheService] Initial Redis connect failed (${err.message}). Active cache provider: In-Memory.`);
