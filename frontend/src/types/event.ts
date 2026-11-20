@@ -67,6 +67,7 @@ export interface Event {
   requiresApproval?: boolean;
   requiresScanners?: boolean;
   scannerEmails?: string[];
+  requestExhibitors?: boolean;
   shareLinkToken: string;
   customQuestions: RegistrationQuestion[];
   includeDefaultQuestions?: boolean;

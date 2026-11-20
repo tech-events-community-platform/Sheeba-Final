@@ -201,7 +201,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
     try {
       await api.exhibitors.saveCall(eventId, {
         isEnabled: enableState,
-        status: callStatus,
+        status: enableState ? 'open' : 'closed',
         pricingMode,
         totalSpaceSqm: Number(totalSpaceSqm) || 0,
         pricePerSqm: Number(pricePerSqm) || 0,
@@ -345,32 +345,27 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
     }
   };
 
-  // Accept Application (transitions pending -> accepted_awaiting_payment or confirmed for free applications)
-  const handleAcceptVendor = async (vendor: IEventVendor) => {
+  // Accept Application / Make Deal with Exhibitor
+  const handleDealVendor = async (vendor: IEventVendor) => {
     if (acceptingVendorId || isSubmittingDecision) return;
     setAcceptingVendorId(vendor.id);
-    const isFree = (vendor.totalFinalAmount || 0) <= 0;
     try {
       const updated = await api.exhibitors.updateVendor(eventId, vendor.id, {
-        status: isFree ? 'confirmed' : 'accepted_awaiting_payment',
+        status: 'confirmed',
       });
       await fetchData();
-      showNotification(
-        'success',
-        isFree
-          ? `Application for "${vendor.businessName}" approved! Booth confirmed (free application).`
-          : `Application for "${vendor.businessName}" approved! Status moved to "Accepted — Awaiting Payment" and space reserved.`
-      );
+      showNotification('success', `Deal confirmed with "${vendor.businessName}"! Moved to Dealt Exhibitors.`);
       if (reviewingVendor && reviewingVendor.id === vendor.id) {
         setReviewingVendor(updated);
       }
       setConfirmingVendor(null);
     } catch (err: any) {
-      showNotification('error', err.message || 'Failed to accept application.');
+      showNotification('error', err.message || 'Failed to complete deal.');
     } finally {
       setAcceptingVendorId(null);
     }
   };
+  const handleAcceptVendor = handleDealVendor;
 
   // Reject Application (transitions pending -> rejected)
   const handleRejectVendor = async (e: React.FormEvent) => {
@@ -527,7 +522,16 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
       booth.includes(q);
 
     const matchesSource = sourceFilter === 'all' || v.source === sourceFilter;
-    const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
+    const matchesStatus =
+      statusFilter === 'all'
+        ? true
+        : statusFilter === 'interested'
+        ? v.status === 'pending'
+        : statusFilter === 'dealt'
+        ? v.status === 'confirmed' || v.status === 'accepted_awaiting_payment'
+        : statusFilter === 'rejected'
+        ? v.status === 'rejected' || v.status === 'cancelled'
+        : v.status === statusFilter;
 
     return matchesSearch && matchesSource && matchesStatus;
   });
@@ -1273,23 +1277,19 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
               {/* Status Filter Tabs */}
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
-                  { id: 'all', label: `All Statuses (${vendors.length})` },
+                  { id: 'all', label: `All (${vendors.length})` },
                   {
-                    id: 'pending',
-                    label: `Pending Review (${vendors.filter((v) => v.status === 'pending').length})`,
+                    id: 'interested',
+                    label: `Interested Exhibitors (${vendors.filter((v) => v.status === 'pending').length})`,
                     highlight: vendors.some((v) => v.status === 'pending'),
                   },
                   {
-                    id: 'accepted_awaiting_payment',
-                    label: `Awaiting Payment (${vendors.filter((v) => v.status === 'accepted_awaiting_payment').length})`,
-                  },
-                  {
-                    id: 'confirmed',
-                    label: `Confirmed (${vendors.filter((v) => v.status === 'confirmed').length})`,
+                    id: 'dealt',
+                    label: `Dealt Exhibitors (${vendors.filter((v) => v.status === 'confirmed' || v.status === 'accepted_awaiting_payment').length})`,
                   },
                   {
                     id: 'rejected',
-                    label: `Rejected (${vendors.filter((v) => v.status === 'rejected').length})`,
+                    label: `Rejected Exhibitors (${vendors.filter((v) => v.status === 'rejected' || v.status === 'cancelled').length})`,
                   },
                 ].map((tab) => (
                   <button
@@ -1440,55 +1440,13 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                             {vendor.status === 'pending' ? (
                               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1 w-max">
                                 <Clock className="w-2.5 h-2.5 text-amber-600" />
-                                <span>Pending Review</span>
+                                <span>Interested</span>
                               </span>
-                            ) : vendor.status === 'accepted_awaiting_payment' ? (
-                              <div className="flex flex-col gap-1 items-start">
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1 w-max">
-                                  <CreditCard className="w-2.5 h-2.5 text-indigo-600" />
-                                  <span>Awaiting Payment</span>
-                                </span>
-                                {vendor.latestReceipt?.status === 'PENDING' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenReceiptReview(vendor)}
-                                    className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
-                                    title="Exhibitor has submitted a receipt. Click to review."
-                                  >
-                                    <Clock className="w-2.5 h-2.5 text-amber-700 animate-pulse" />
-                                    <span>Receipt Pending Review</span>
-                                  </button>
-                                )}
-                                {vendor.latestReceipt?.status === 'FAILED' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenReceiptReview(vendor)}
-                                    className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-100 text-red-800 border border-red-200 hover:bg-red-200 flex items-center gap-1 cursor-pointer transition-colors"
-                                    title="Previous receipt was rejected. Click to view history."
-                                  >
-                                    <X className="w-2.5 h-2.5 text-red-600" />
-                                    <span>Receipt Rejected</span>
-                                  </button>
-                                )}
-                              </div>
-                            ) : vendor.status === 'confirmed' ? (
-                              <div className="flex flex-col gap-1 items-start">
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 w-max">
-                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
-                                  <span>Confirmed (Paid)</span>
-                                </span>
-                                {(vendor.latestReceipt?.screenshotUrl || vendor.latestReceipt?.status === 'SETTLED') && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenReceiptReview(vendor)}
-                                    className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 flex items-center gap-1 cursor-pointer transition-colors"
-                                    title="View uploaded payment receipt"
-                                  >
-                                    <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
-                                    <span>View Receipt</span>
-                                  </button>
-                                )}
-                              </div>
+                            ) : vendor.status === 'confirmed' || vendor.status === 'accepted_awaiting_payment' ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 w-max">
+                                <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>Dealt</span>
+                              </span>
                             ) : vendor.status === 'rejected' ? (
                               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-200 flex items-center gap-1 w-max">
                                 <X className="w-2.5 h-2.5 text-red-600" />
@@ -1533,20 +1491,23 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                                 </button>
                               )}
 
-                              {/* Quick Accept/Reject for Pending applications */}
+                              {/* Quick Deal/Reject for Interested applications */}
                               {vendor.status === 'pending' && (
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => setConfirmingVendor(vendor)}
+                                    onClick={() => handleDealVendor(vendor)}
                                     disabled={acceptingVendorId === vendor.id || isSubmittingDecision}
-                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
-                                    title={(vendor.totalFinalAmount || 0) <= 0 ? 'Accept and confirm free application' : 'Approve application (move to Awaiting Payment)'}
+                                    className="px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                                    title="Make Deal with Exhibitor"
                                   >
                                     {acceptingVendorId === vendor.id ? (
-                                      <span className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin inline-block" />
+                                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
                                     ) : (
-                                      <Check className="w-3.5 h-3.5" />
+                                      <>
+                                        <Check className="w-3.5 h-3.5" />
+                                        <span>Deal</span>
+                                      </>
                                     )}
                                   </button>
                                   <button
@@ -1556,12 +1517,27 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                                       setRejectionReason('');
                                     }}
                                     disabled={acceptingVendorId === vendor.id || isSubmittingDecision}
-                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-                                    title="Reject application"
+                                    className="px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 border border-red-200 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                                    title="Reject Exhibitor"
                                   >
                                     <X className="w-3.5 h-3.5" />
+                                    <span>Reject</span>
                                   </button>
                                 </>
+                              )}
+
+                              {/* Allow Deal for Rejected exhibitors if organizer reconsiders */}
+                              {(vendor.status === 'rejected' || vendor.status === 'cancelled') && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDealVendor(vendor)}
+                                  disabled={acceptingVendorId === vendor.id || isSubmittingDecision}
+                                  className="px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50 border border-emerald-300 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                                  title="Reconsider and make deal"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Deal</span>
+                                </button>
                               )}
 
                               <button
@@ -2509,7 +2485,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                       isLoading={acceptingVendorId === reviewingVendor.id}
                       icon={<Check className="w-4 h-4" />}
                     >
-                      {(reviewingVendor.totalFinalAmount || 0) <= 0 ? 'Accept & Confirm Free Application' : 'Approve Application'}
+                      Deal With Exhibitor
                     </Button>
                   </div>
                 )}
@@ -2528,12 +2504,10 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
               </div>
               <div className="space-y-1">
                 <h4 className="font-serif font-bold text-base text-[#2D1F23]">
-                  {(confirmingVendor.totalFinalAmount || 0) <= 0
-                    ? 'Confirm Free Application Approval'
-                    : 'Approve Exhibitor Application?'}
+                  Confirm Deal With Exhibitor
                 </h4>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  You are approving the booth application from{' '}
+                  You are making a deal and approving the booth application from{' '}
                   <strong className="text-[#2D1F23]">"{confirmingVendor.businessName}"</strong>.
                 </p>
               </div>
@@ -2554,18 +2528,12 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-500 font-medium">Next Status:</span>
-                <span className="font-bold text-indigo-700">
-                  {(confirmingVendor.totalFinalAmount || 0) <= 0
-                    ? 'Confirmed'
-                    : 'Accepted — Awaiting Payment'}
-                </span>
+                <span className="font-bold text-emerald-700">Dealt</span>
               </div>
             </div>
 
             <p className="text-[11px] text-gray-500 leading-normal">
-              {(confirmingVendor.totalFinalAmount || 0) <= 0
-                ? 'Because this booth is free, approving it will immediately mark the booth as confirmed.'
-                : 'Approving reserves the requested floor space. The applicant will be instructed to submit payment and offline receipt for your verification before the booth is confirmed.'}
+              Approving will make a deal with this exhibitor and confirm their booth at your event.
             </p>
 
             <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
@@ -2579,7 +2547,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
               </button>
               <button
                 type="button"
-                onClick={() => handleAcceptVendor(confirmingVendor)}
+                onClick={() => handleDealVendor(confirmingVendor)}
                 disabled={acceptingVendorId === confirmingVendor.id}
                 className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
               >
@@ -2589,11 +2557,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                   <Check className="w-3.5 h-3.5" />
                 )}
                 <span>
-                  {acceptingVendorId === confirmingVendor.id
-                    ? 'Approving...'
-                    : (confirmingVendor.totalFinalAmount || 0) <= 0
-                    ? 'Confirm Free Application'
-                    : 'Approve & Request Payment'}
+                  {acceptingVendorId === confirmingVendor.id ? 'Dealing...' : 'Confirm Deal'}
                 </span>
               </button>
             </div>

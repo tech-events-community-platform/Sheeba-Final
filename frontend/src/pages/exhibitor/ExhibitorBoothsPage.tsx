@@ -42,7 +42,7 @@ export const ExhibitorBoothsPage: React.FC = () => {
   const [booths, setBooths] = useState<IExhibitorBooth[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterTab, setFilterTab] = useState<'all' | 'confirmed' | 'pending' | 'awaiting_payment' | 'rejected'>('all');
+  const [filterTab, setFilterTab] = useState<'all' | 'awaiting' | 'dealt' | 'rejected'>('all');
 
   // Modal states
   const [payingBooth, setPayingBooth] = useState<IExhibitorBooth | null>(null);
@@ -124,7 +124,7 @@ export const ExhibitorBoothsPage: React.FC = () => {
         const target = booths.find((b) => b.id === payBoothId);
         if (target && target.status === 'accepted_awaiting_payment') {
           setPayingBooth(target);
-          setFilterTab('awaiting_payment');
+          setFilterTab('dealt');
         }
         const nextParams = new URLSearchParams(searchParams);
         nextParams.delete('payBoothId');
@@ -419,11 +419,10 @@ export const ExhibitorBoothsPage: React.FC = () => {
   };
 
   const filteredBooths = booths.filter((b) => {
-    if (filterTab === 'confirmed') return b.status === 'confirmed';
-    if (filterTab === 'pending') return b.status === 'pending';
-    if (filterTab === 'awaiting_payment') return b.status === 'accepted_awaiting_payment';
+    if (filterTab === 'awaiting') return b.status === 'pending';
+    if (filterTab === 'dealt') return b.status === 'confirmed' || b.status === 'accepted_awaiting_payment';
     if (filterTab === 'rejected') return b.status === 'rejected' || b.status === 'cancelled';
-    return true;
+    return true; // 'all' (On Booking)
   });
 
   return (
@@ -470,11 +469,10 @@ export const ExhibitorBoothsPage: React.FC = () => {
       {/* Filter Tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-2">
         {[
-          { id: 'all', label: 'All Bookings', count: booths.length },
-          { id: 'confirmed', label: 'Confirmed (Paid)', count: booths.filter((b) => b.status === 'confirmed').length },
-          { id: 'awaiting_payment', label: 'Awaiting Payment', count: booths.filter((b) => b.status === 'accepted_awaiting_payment').length },
-          { id: 'pending', label: 'Under Review', count: booths.filter((b) => b.status === 'pending').length },
-          { id: 'rejected', label: 'Rejected / Cancelled', count: booths.filter((b) => b.status === 'rejected' || b.status === 'cancelled').length },
+          { id: 'all', label: 'On Booking', count: booths.length },
+          { id: 'awaiting', label: 'Awaiting Organizer Approval', count: booths.filter((b) => b.status === 'pending').length },
+          { id: 'dealt', label: 'Dealt Events', count: booths.filter((b) => b.status === 'confirmed' || b.status === 'accepted_awaiting_payment').length },
+          { id: 'rejected', label: 'Rejected Events', count: booths.filter((b) => b.status === 'rejected' || b.status === 'cancelled').length },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -542,31 +540,17 @@ export const ExhibitorBoothsPage: React.FC = () => {
                   <h3 className="font-serif font-bold text-lg text-[#2D1F23]">
                     {booth.eventTitle || 'Event Exhibition Space'}
                   </h3>
-                  {booth.status === 'confirmed' ? (
+                  {booth.status === 'confirmed' || booth.status === 'accepted_awaiting_payment' ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Confirmed & Active
+                      <Check className="w-3 h-3 text-emerald-600" /> Dealt
                     </span>
-                  ) : booth.status === 'accepted_awaiting_payment' ? (
-                    booth.latestReceipt?.status === 'PENDING' ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-amber-600" /> Receipt Under Review
-                      </span>
-                    ) : booth.latestReceipt?.status === 'FAILED' ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-300 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 text-red-600" /> Receipt Rejected • Resubmit
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Accepted • Awaiting Payment
-                      </span>
-                    )
                   ) : booth.status === 'pending' ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Under Review
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-amber-600" /> Awaiting Organizer Approval
                     </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 flex items-center gap-1">
-                      <X className="w-3 h-3" /> {booth.status === 'rejected' ? 'Rejected' : 'Cancelled'}
+                      <X className="w-3 h-3 text-red-600" /> {booth.status === 'rejected' ? 'Rejected' : 'Cancelled'}
                     </span>
                   )}
                 </div>
@@ -605,41 +589,15 @@ export const ExhibitorBoothsPage: React.FC = () => {
             </div>
 
             {/* Dedicated Applicant Status Banners */}
-            {booth.status === 'accepted_awaiting_payment' && (
-              <div className="p-4 bg-indigo-50/90 border border-indigo-200 rounded-2xl space-y-2 text-xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-2 font-bold text-indigo-950 text-sm">
-                    <CreditCard className="w-4 h-4 text-indigo-600 shrink-0" />
-                    <span>Application approved — payment required</span>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200/80 text-indigo-900 border border-indigo-300 w-max">
-                    {booth.spaceSqm} m² Floor Space Allocated
-                  </span>
+            {(booth.status === 'confirmed' || booth.status === 'accepted_awaiting_payment') && (
+              <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-2xl space-y-1 text-xs text-emerald-950">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-900 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Dealt with Organizer</span>
                 </div>
-                <p className="text-indigo-900 text-xs leading-relaxed">
-                  Your application has been approved by the event organizer. The total booth fee due from the server is{' '}
-                  <strong className="text-emerald-700 text-sm font-serif">
-                    {(booth.totalFinalAmount || 0).toLocaleString()} ETB
-                  </strong>.
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  The organizer has approved and confirmed the deal for your exhibition space ({booth.spaceSqm} m²). {booth.boothNumber ? `Booth #${booth.boothNumber}` : ''}
                 </p>
-                <div className="p-2.5 bg-white/90 rounded-xl border border-indigo-100 text-[11px] text-indigo-900 flex items-start gap-2">
-                  <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong>Next step:</strong> Click <strong>"Continue to Payment"</strong> below to review the organizer's payment accounts and submit your bank receipt for verification. Your booth will become <strong>Confirmed</strong> only after payment is verified.
-                  </div>
-                </div>
-                {booth.latestReceipt?.status === 'PENDING' && (
-                  <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-center gap-2 font-medium">
-                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Receipt submitted (Ref: {booth.latestReceipt.transactionReference || 'N/A'}). Currently awaiting organizer review.</span>
-                  </div>
-                )}
-                {booth.latestReceipt?.status === 'FAILED' && (
-                  <div className="p-2.5 bg-red-50 rounded-xl border border-red-200 text-[11px] text-red-900 flex items-center gap-2 font-medium">
-                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
-                    <span>Previous receipt was rejected: {booth.latestReceipt.failureReason || 'Please resubmit a valid receipt.'}</span>
-                  </div>
-                )}
               </div>
             )}
 
@@ -647,36 +605,24 @@ export const ExhibitorBoothsPage: React.FC = () => {
               <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-2xl space-y-1 text-xs text-amber-950">
                 <div className="flex items-center gap-1.5 font-bold text-amber-900">
                   <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Application Pending Organizer Review</span>
+                  <span>Awaiting Organizer Approval</span>
                 </div>
                 <p className="text-[11px] text-amber-800 leading-relaxed">
-                  Your application has been received and is currently under review by the organizer. Your floor space is not yet confirmed and no payment is due at this time.
+                  Your exhibition request has been submitted and is currently awaiting approval from the organizer.
                 </p>
               </div>
             )}
 
-            {booth.status === 'confirmed' && (
-              <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-2xl space-y-1 text-xs text-emerald-950">
-                <div className="flex items-center gap-1.5 font-bold text-emerald-900 text-sm">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Booth confirmed</span>
-                </div>
-                <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Your booth space is fully settled and confirmed! Booth #{booth.boothNumber || 'Assigned'} ({booth.spaceSqm} m²).
-                </p>
-              </div>
-            )}
-
-            {booth.status === 'rejected' && (
+            {(booth.status === 'rejected' || booth.status === 'cancelled') && (
               <div className="p-3.5 bg-red-50/90 border border-red-200 rounded-2xl space-y-1 text-xs text-red-950">
                 <div className="flex items-center gap-1.5 font-bold text-red-900">
                   <XCircle className="w-4 h-4 text-red-600 shrink-0" />
-                  <span>Application Declined</span>
+                  <span>Request Declined</span>
                 </div>
                 <p className="text-[11px] text-red-800 leading-relaxed">
                   {booth.rejectionReason
                     ? `Reason: "${booth.rejectionReason}"`
-                    : 'Your booth application was declined by the organizer.'}
+                    : 'The organizer has declined this exhibition request.'}
                 </p>
               </div>
             )}

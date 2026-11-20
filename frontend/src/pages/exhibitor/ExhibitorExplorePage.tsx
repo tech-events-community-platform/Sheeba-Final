@@ -569,25 +569,15 @@ export const ExhibitorExplorePage: React.FC = () => {
                     </span>
 
                     {userBooth ? (
-                      userBooth.status === 'accepted_awaiting_payment' ? (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => navigate(`/exhibitor/booths?payBoothId=${userBooth.id}`)}
-                          icon={<CreditCard className="w-3.5 h-3.5" />}
-                          className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
-                        >
-                          Continue to Payment
-                        </Button>
-                      ) : userBooth.status === 'confirmed' ? (
+                      userBooth.status === 'confirmed' || userBooth.status === 'accepted_awaiting_payment' ? (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => navigate('/exhibitor/booths')}
                           icon={<Check className="w-3.5 h-3.5 text-emerald-600" />}
-                          className="shrink-0 text-emerald-800 border-emerald-300 hover:bg-emerald-50"
+                          className="shrink-0 text-emerald-800 border-emerald-300 hover:bg-emerald-50 font-bold"
                         >
-                          View Confirmed Booth
+                          Dealt
                         </Button>
                       ) : userBooth.status === 'pending' ? (
                         <Button
@@ -595,18 +585,19 @@ export const ExhibitorExplorePage: React.FC = () => {
                           size="sm"
                           onClick={() => navigate('/exhibitor/booths')}
                           icon={<Clock className="w-3.5 h-3.5 text-amber-600" />}
-                          className="shrink-0 text-amber-800 border-amber-300 hover:bg-amber-50"
+                          className="shrink-0 text-amber-800 border-amber-300 hover:bg-amber-50 font-semibold"
                         >
-                          View in My Booths
+                          Requested (Awaiting Approval)
                         </Button>
                       ) : (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => navigate('/exhibitor/booths')}
-                          className="shrink-0 text-gray-600 border-gray-300"
+                          icon={<X className="w-3.5 h-3.5 text-red-600" />}
+                          className="shrink-0 text-red-700 border-red-300 hover:bg-red-50"
                         >
-                          View in My Booths
+                          Rejected
                         </Button>
                       )
                     ) : (
@@ -617,7 +608,7 @@ export const ExhibitorExplorePage: React.FC = () => {
                         icon={<ArrowRight className="w-3.5 h-3.5" />}
                         className="shrink-0"
                       >
-                        Apply for Booth
+                        Request to Exhibit
                       </Button>
                     )}
                   </div>
@@ -692,7 +683,7 @@ export const ExhibitorExplorePage: React.FC = () => {
             <div className="flex items-start justify-between pb-3 border-b border-gray-100">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
-                  Booth Application
+                  Request to Exhibit
                 </span>
                 <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
                   {applyingCall.eventTitle}
@@ -922,7 +913,7 @@ export const ExhibitorExplorePage: React.FC = () => {
                   size="sm"
                   icon={<Check className="w-3.5 h-3.5" />}
                 >
-                  Submit Application
+                  Submit Request
                 </Button>
               </div>
             </form>
@@ -945,10 +936,10 @@ export const ExhibitorExplorePage: React.FC = () => {
 
             <div className="space-y-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
-                Application Received
+                Request Received
               </span>
               <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
-                Application Submitted Successfully!
+                Exhibition Request Sent!
               </h3>
               <p className="text-xs text-gray-500">
                 for <strong className="text-[#2D1F23]">{submittedAppSummary.eventTitle}</strong>
@@ -959,19 +950,15 @@ export const ExhibitorExplorePage: React.FC = () => {
             <div className="p-4 bg-amber-50/80 border border-amber-200/90 rounded-2xl text-left space-y-2 text-xs text-amber-950">
               <div className="flex items-center gap-1.5 font-bold text-amber-900">
                 <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Status: Under Organizer Review</span>
+                <span>Status: Awaiting Organizer Approval</span>
               </div>
               <p className="text-[11px] leading-relaxed text-amber-900">
-                The event organizer will review your business profile, requested floor space ({submittedAppSummary.spaceRequested} m²), showcase pitch, and custom answers.
+                The event organizer will review your business profile, requested floor space ({submittedAppSummary.spaceRequested} m²), and showcase description.
               </p>
               <div className="p-2.5 bg-white/80 rounded-xl border border-amber-200 text-[11px] text-amber-900 leading-normal font-medium">
-                <strong>Important:</strong> Your booth space is <u>not confirmed yet</u>, and <strong>no payment is due at this time</strong>.
+                <strong>Next:</strong> Track this request in <strong>My Booths & Applications</strong>. Once the organizer agrees to the deal, your status will update to <strong>Dealt</strong>.
               </div>
             </div>
-
-            <p className="text-[11px] text-gray-500 leading-relaxed text-left">
-              Once the organizer approves your application, your status will update to <strong>Application approved — payment required</strong>, and you will be provided with offline payment instructions and receipt submission.
-            </p>
 
             <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
               <button

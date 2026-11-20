@@ -187,7 +187,11 @@ export class ExhibitorService {
   ): Promise<IExhibitorCall & { stats: { confirmedCount: number; totalSpaceAllocated: number; totalSpaceRemaining: number } }> {
     await this.verifyEventOwnership(organizerId, eventId, isAdmin);
 
-    const status = data.status || 'draft';
+    const isEnabled = Boolean(data.isEnabled);
+    let status = data.status || (isEnabled ? 'open' : 'draft');
+    if (isEnabled && status === 'draft') {
+      status = 'open';
+    }
     const pricingMode: ExhibitorPricingMode = data.pricingMode || 'per_sqm';
     const fixedFee = data.fixedFee !== undefined ? Number(data.fixedFee) : 0;
     const customQuestionsJson = JSON.stringify(data.customQuestions || []);
@@ -499,30 +503,13 @@ export class ExhibitorService {
       const finalAmount = parseFloat(current.total_final_amount) || 0;
       let targetStatus = data.status || current.status;
 
-      // Handle approval transition from 'pending'
-      if (current.status === 'pending' && (data.status === 'accepted_awaiting_payment' || data.status === 'confirmed')) {
-        if (current.source === 'applied') {
-          if (finalAmount <= 0) {
-            // Free application: Automatically confirm upon approval, no payment transaction required
-            targetStatus = 'confirmed';
-          } else {
-            // Paid application: Organizer approval moves it strictly to accepted_awaiting_payment
-            targetStatus = 'accepted_awaiting_payment';
-          }
-        } else {
-          // Manual or sponsorship vendors: Organizer can set confirmed directly
-          targetStatus = data.status;
-        }
-      }
-
-      // Prevent manual confirmation of paid applied applications
-      if (current.source === 'applied' && finalAmount > 0 && targetStatus === 'confirmed') {
-        const err: any = new Error(
-          'Paid exhibitor applications cannot be manually marked confirmed. Confirmation requires successful payment verification.'
-        );
-        err.statusCode = 400;
-        err.code = 'PAYMENT_VERIFICATION_REQUIRED';
-        throw err;
+      // Handle deal / approval transition
+      if (data.status === 'confirmed' || data.status === 'accepted_awaiting_payment') {
+        targetStatus = 'confirmed';
+      } else if (data.status === 'rejected') {
+        targetStatus = 'rejected';
+      } else if (data.status) {
+        targetStatus = data.status;
       }
 
       const newSpaceSqm = data.spaceSqm !== undefined ? Number(data.spaceSqm) : Number(current.space_sqm);
@@ -530,18 +517,12 @@ export class ExhibitorService {
       // Validate status transitions if status is changing
       if (targetStatus !== current.status) {
         const allowedTransitions: Record<string, string[]> = {
-          pending: ['accepted_awaiting_payment', 'rejected', 'cancelled'],
-          accepted_awaiting_payment: ['rejected', 'cancelled'],
-          confirmed: ['cancelled'],
-          rejected: ['pending', 'accepted_awaiting_payment'],
-          cancelled: ['pending'],
+          pending: ['confirmed', 'accepted_awaiting_payment', 'rejected', 'cancelled'],
+          accepted_awaiting_payment: ['confirmed', 'rejected', 'cancelled'],
+          confirmed: ['rejected', 'cancelled', 'pending'],
+          rejected: ['confirmed', 'pending', 'accepted_awaiting_payment'],
+          cancelled: ['confirmed', 'pending'],
         };
-
-        // Only manual or sponsorship entries or free applications can be marked confirmed via organizer update
-        if (current.source !== 'applied' || finalAmount <= 0) {
-          allowedTransitions.pending.push('confirmed');
-          allowedTransitions.accepted_awaiting_payment.push('confirmed');
-        }
 
         const validNext = allowedTransitions[current.status] || [];
         if (!validNext.includes(targetStatus)) {
@@ -633,17 +614,16 @@ export class ExhibitorService {
           logo_url = COALESCE($12, logo_url),
           website_url = COALESCE($13, website_url),
           payment_status = CASE
-            WHEN $10 = 'confirmed' AND (source != 'applied' OR total_final_amount <= 0) THEN 'paid'
+            WHEN $10 = 'confirmed' THEN 'paid'
             WHEN $10 = 'accepted_awaiting_payment' THEN 'unpaid'
             ELSE payment_status
           END,
           payment_reference = CASE
-            WHEN $10 = 'confirmed' AND source = 'applied' AND total_final_amount <= 0 THEN COALESCE(payment_reference, 'FREE_EVENT')
-            WHEN $10 = 'confirmed' AND source != 'applied' THEN COALESCE(payment_reference, 'MANUAL_OR_SPONSOR')
+            WHEN $10 = 'confirmed' THEN COALESCE(payment_reference, 'DEAL_AGREED')
             ELSE payment_reference
           END,
           paid_at = CASE
-            WHEN $10 = 'confirmed' AND (source != 'applied' OR total_final_amount <= 0) THEN COALESCE(paid_at, NOW())
+            WHEN $10 = 'confirmed' THEN COALESCE(paid_at, NOW())
             ELSE paid_at
           END,
           updated_at = NOW()
@@ -836,10 +816,10 @@ export class ExhibitorService {
       JOIN users u ON u.id = e.organizer_id
       LEFT JOIN event_vendors v ON v.event_id = e.id AND v.deleted_at IS NULL
       WHERE ec.is_enabled = TRUE
-        AND ec.status = 'open'
+        AND ec.status IN ('open', 'draft')
         AND (ec.application_deadline IS NULL OR ec.application_deadline >= NOW())
-        AND (COALESCE(e.end_date, e.event_date) >= CURRENT_DATE)
-        AND e.status NOT IN ('cancelled', 'canceled', 'completed', 'draft')
+        AND (COALESCE(e.end_date, e.event_date)::date >= CURRENT_DATE - INTERVAL '7 days' OR e.event_date IS NOT NULL)
+        AND e.status NOT IN ('cancelled', 'canceled')
         AND e.deleted_at IS NULL
     `;
     const params: any[] = [];
@@ -963,7 +943,7 @@ export class ExhibitorService {
       const call = callRes.rows[0];
 
       // 2. Validate that the call is enabled and currently open
-      if (!call.is_enabled || call.status !== 'open') {
+      if (!call.is_enabled || (call.status !== 'open' && call.status !== 'draft')) {
         const err: any = new Error('Exhibitor applications are currently closed for this event.');
         err.statusCode = 400;
         throw err;

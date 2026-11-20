@@ -12,6 +12,7 @@ import {
   QrCode,
   BarChart3,
   Award,
+  Store,
   Copy,
   Trash2,
   AlertTriangle,
@@ -228,6 +229,11 @@ export const EventListPage: React.FC = () => {
                   <Link to={`/organizer/events/${evt.id}/scanner`}>
                     <Button variant="accent" size="sm" icon={<QrCode className="w-3.5 h-3.5" />}>
                       Scanner
+                    </Button>
+                  </Link>
+                  <Link to={`/organizer/exhibitors/${evt.id}`}>
+                    <Button variant="outline" size="sm" icon={<Store className="w-3.5 h-3.5 text-[#AA767C]" />}>
+                      Exhibitors
                     </Button>
                   </Link>
                   <Link to={`/organizer/events/${evt.id}/attendees`}>
