@@ -1,63 +1,34 @@
-{
-  "name": "sheba-backend",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc && copyfiles -u 2 src/db/schema.sql dist/db",
-    "start": "node dist/server.js",
-    "db:migrate": "ts-node src/db/migrate.ts",
-    "db:seed": "ts-node src/db/seed.ts",
-    "test": "ts-node src/tests/test_security_remediation.ts && ts-node src/tests/test_background_email_delivery.ts && ts-node src/tests/test_random_password_and_manual_registration.ts && ts-node src/tests/test_redis_caching_and_isolation.ts && ts-node src/tests/test_scanner_delegation.ts && ts-node src/tests/test_content_moderation.ts",
-    "test:all": "ts-node src/tests/test_security_remediation.ts && ts-node src/tests/test_background_email_delivery.ts && ts-node src/tests/test_random_password_and_manual_registration.ts && ts-node src/tests/test_redis_caching_and_isolation.ts && ts-node src/tests/test_scanner_delegation.ts && ts-node src/tests/test_content_moderation.ts",
-    "test:moderation": "ts-node src/tests/test_content_moderation.ts",
-    "test:scanner": "ts-node src/tests/test_scanner_delegation.ts",
-    "test:cache": "ts-node src/tests/test_redis_caching_and_isolation.ts",
-    "test:verify-redis": "ts-node src/tests/test_redis_multi_instance_verification.ts",
-    "test:upstash": "ts-node src/tests/test_upstash_live_verification.ts",
-    "test:security": "ts-node src/tests/test_security_remediation.ts",
-    "test:background-email": "ts-node src/tests/test_background_email_delivery.ts",
-    "test:credentials": "ts-node src/tests/test_random_password_and_manual_registration.ts",
-    "test:payment": "ts-node src/tests/test_payment_integration.ts",
-    "test:manual-reg": "ts-node src/tests/test_enhanced_manual_registration.ts",
-    "test:exhibitors": "ts-node src/tests/test_exhibitor_receipt_workflow.ts",
-    "test:organizer": "ts-node src/tests/test_organizer_flow_stabilization.ts",
-    "test:recycle-bin": "ts-node src/tests/test_recycle_bin.ts",
-    "test:audit-fixes": "ts-node src/tests/test_audit_fixes.ts"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "express-rate-limit": "^8.7.0",
-    "google-auth-library": "^11.0.2",
-    "helmet": "^8.3.0",
-    "ioredis": "^6.0.0",
-    "jsonwebtoken": "^9.0.3",
-    "nodemailer": "^9.1.1",
-    "pg": "^8.23.0",
-    "qrcode": "^1.5.4",
-    "zod": "^4.6.5"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^26.2.0",
-    "@types/nodemailer": "^8.0.1",
-    "@types/pg": "^8.23.1",
-    "@types/qrcode": "^1.5.6",
-    "copyfiles": "^2.4.1",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.9.3"
-  }
-}
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    expose:
+      - "5000"
+    networks:
+      - sheeba-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://api-staging.sheebanet.com/api
+        VITE_GOOGLE_CLIENT_ID: 415994350759-tfifv80t1u3efof3m136g0i0d9nkg4p6.apps.googleusercontent.com
+        VITE_CLOUDINARY_CLOUD_NAME: dktpwqspb
+        VITE_CLOUDINARY_UPLOAD_PRESET: ml_default
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      - backend
+    networks:
+      - sheeba-network
+
+networks:
+  sheeba-network:
+    driver: bridge
