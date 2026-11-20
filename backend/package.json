@@ -1,34 +1,41 @@
 
-services:
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    env_file:
-      - ./.env
-    expose:
-      - "5000"
-    networks:
-      - sheeba-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: https://api-staging.sheebanet.com/api
-        VITE_GOOGLE_CLIENT_ID: 415994350759-tfifv80t1u3efof3m136g0i0d9nkg4p6.apps.googleusercontent.com
-        VITE_CLOUDINARY_CLOUD_NAME: dktpwqspb
-        VITE_CLOUDINARY_UPLOAD_PRESET: ml_default
-    restart: unless-stopped
-    expose:
-      - "80"
-    depends_on:
-      - backend
-    networks:
-      - sheeba-network
-
-networks:
-  sheeba-network:
-    driver: bridge
+{
+  "name": "sheba-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc && copyfiles -u 2 src/db/schema.sql dist/db",
+    "start": "node dist/server.js",
+    "db:migrate": "ts-node src/db/migrate.ts",
+    "db:seed": "ts-node src/db/seed.ts",
+    "test": "ts-node src/tests/test-all.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.2.0",
+    "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
+    "copyfiles": "^2.4.1",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}
