@@ -1060,6 +1060,16 @@ export const api = {
       return eventsStore.filter((e) => Boolean(e.isPublicized));
     },
 
+    getMySubscription: async (): Promise<any> => {
+      try {
+        const res = await requestApi('/users/me/subscription');
+        return res.data;
+      } catch (e) {
+        console.warn('Failed to fetch subscription:', e);
+        return null;
+      }
+    },
+
     getById: async (id: string): Promise<Event | null> => {
       try {
         const res = await requestApi(`/events/${id}`);
@@ -2530,6 +2540,51 @@ export const api = {
       });
       return res.data;
     },
+    getSubscriptions: async (params?: { search?: string; status?: string; paymentStatus?: string; page?: number; limit?: number }) => {
+      const queryParts: string[] = [];
+      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+      if (params?.status && params.status !== 'All') queryParts.push(`status=${encodeURIComponent(params.status)}`);
+      if (params?.paymentStatus && params.paymentStatus !== 'All') queryParts.push(`paymentStatus=${encodeURIComponent(params.paymentStatus)}`);
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi<{ success: boolean; data: { subscriptions: any[]; pagination: any } }>(`/admin/subscriptions${queryStr}`);
+      return res.data || { subscriptions: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 1 } };
+    },
+
+    getOrganizerSubscription: async (organizerId: string) => {
+      const res = await requestApi<{ success: boolean; data: any }>(`/admin/subscriptions/${organizerId}`);
+      return res.data;
+    },
+
+    updateOrganizerAllowance: async (organizerId: string, data: any) => {
+      const res = await requestApi<{ success: boolean; data: any }>(`/admin/subscriptions/${organizerId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+      return res.data;
+    },
+
+    getAllowanceHistory: async (organizerId: string) => {
+      const res = await requestApi<{ success: boolean; data: any[] }>(`/admin/subscriptions/${organizerId}/history`);
+      return res.data || [];
+    },
+
+    getPlatformAttendees: async (params?: { search?: string; page?: number; limit?: number }) => {
+      const queryParts: string[] = [];
+      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+      if (params?.page) queryParts.push(`page=${params.page}`);
+      if (params?.limit) queryParts.push(`limit=${params.limit}`);
+      const queryStr = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+      const res = await requestApi<{ success: boolean; data: { attendees: any[]; pagination: any } }>(`/admin/attendees${queryStr}`);
+      return res.data || { attendees: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 1 } };
+    },
+
+    getAttendeeRegistrations: async (attendeeId: string) => {
+      const res = await requestApi<{ success: boolean; data: any[] }>(`/admin/attendees/${attendeeId}/registrations`);
+      return res.data || [];
+    },
+
   },
 
   exhibitors: {

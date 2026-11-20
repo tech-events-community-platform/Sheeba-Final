@@ -28,6 +28,16 @@ router.patch('/users/:id/reject-sponsor', validateParams(idParamSchema), AdminCo
 router.patch('/users/:id/status', validateParams(idParamSchema), AdminController.toggleUserStatus);
 router.get('/payments', AdminController.getPayments);
 
+// Organizer Subscriptions & Event Allowance Management
+router.get('/subscriptions', AdminController.getAllSubscriptions);
+router.get('/subscriptions/:id', validateParams(idParamSchema), AdminController.getOrganizerSubscription);
+router.patch('/subscriptions/:id', validateParams(idParamSchema), AdminController.updateOrganizerAllowance);
+router.get('/subscriptions/:id/history', validateParams(idParamSchema), AdminController.getAllowanceHistory);
+
+// Platform Attendees Directory
+router.get('/attendees', AdminController.getPlatformAttendees);
+router.get('/attendees/:id/registrations', validateParams(idParamSchema), AdminController.getAttendeeRegistrations);
+
 // Sponsorship Pitch Moderation & Take-down
 router.get('/sponsorship-pitches', SponsorshipController.getApplicationsForAdmin);
 router.delete('/sponsorship-pitches/:id', validateParams(idParamSchema), SponsorshipController.deleteApplication);

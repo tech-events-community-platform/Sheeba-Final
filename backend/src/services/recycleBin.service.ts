@@ -1,6 +1,7 @@
 import { query } from '../config/db';
 import { CacheService } from './cache.service';
 import { AuditService } from './audit.service';
+import { SubscriptionService } from './subscription.service';
 import { UserRole } from '../types';
 
 export type RecycleBinEntityType =
@@ -579,6 +580,8 @@ export class RecycleBinService {
         [restoredStatus, entityId]
       );
 
+      await SubscriptionService.syncEventsUsed(event.organizer_id);
+
       // Invalidate relevant caches
       await CacheService.delPattern('events:list*');
       await CacheService.delPattern(`event:${entityId}*`);
@@ -1018,6 +1021,7 @@ export class RecycleBinService {
 
       // Hard delete
       await query('DELETE FROM events WHERE id = $1', [entityId]);
+      await SubscriptionService.syncEventsUsed(event.organizer_id);
 
       // Cache invalidation
       await CacheService.delPattern('events:list*');

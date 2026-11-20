@@ -687,3 +687,65 @@ export interface ISponsorAttendeeResponse {
   created_at: Date | string;
   updated_at: Date | string;
 }
+
+
+// =========================================================================
+// Organizer Subscription & Event Creation Allowance Management
+// =========================================================================
+
+export type SubscriptionPlanName =
+  | 'Starter (1 Event)'
+  | 'Growth (3 Events)'
+  | 'Enterprise (5 Events)'
+  | 'Custom Agreement'
+  | string;
+
+export type SubscriptionPaymentStatus = 'paid' | 'pending' | 'waived' | 'overdue';
+export type SubscriptionStatus = 'active' | 'suspended' | 'expired' | 'depleted';
+export type AllowanceChangeType =
+  | 'INITIAL_ASSIGNMENT'
+  | 'ALLOWANCE_INCREASE'
+  | 'ALLOWANCE_DECREASE'
+  | 'CREDIT_GRANT'
+  | 'PLAN_CHANGE'
+  | 'STATUS_CHANGE';
+
+export interface IOrganizerSubscription {
+  id: string;
+  organizer_id: string;
+  plan_name: SubscriptionPlanName;
+  max_events: number;
+  events_used: number;
+  remaining_events?: number;
+  payment_status: SubscriptionPaymentStatus;
+  subscription_status: SubscriptionStatus;
+  agreement_reference?: string | null;
+  notes?: string | null;
+  assigned_by?: string | null;
+  assigned_by_name?: string | null;
+  valid_until?: Date | string | null;
+  created_at: Date | string;
+  updated_at: Date | string;
+  // Attached organizer info
+  organizer_name?: string;
+  organizer_email?: string;
+  organization?: string;
+  approval_status?: string;
+  is_active?: boolean;
+}
+
+export interface IOrganizerAllowanceHistory {
+  id: string;
+  organizer_id: string;
+  changed_by?: string | null;
+  changed_by_name?: string | null;
+  changed_by_email?: string | null;
+  previous_max_events: number;
+  new_max_events: number;
+  previous_plan?: string | null;
+  new_plan?: string | null;
+  change_type: AllowanceChangeType;
+  reason?: string | null;
+  metadata?: Record<string, any>;
+  created_at: Date | string;
+}

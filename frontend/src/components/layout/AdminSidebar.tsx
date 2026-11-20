@@ -13,6 +13,9 @@ import {
   HandCoins,
   ShieldAlert,
   Activity,
+  Building2,
+  Key,
+  CreditCard,
 } from 'lucide-react';
 
 export const AdminSidebar: React.FC = () => {
@@ -31,23 +34,31 @@ export const AdminSidebar: React.FC = () => {
   };
 
   const navItems = [
-    { label: 'Platform Dashboard', path: '/admin', icon: LayoutDashboard },
-    { label: 'Event Oversight', path: '/admin/events', icon: Calendar },
-    { label: 'Users & Organizers', path: '/admin/users', icon: Users },
+    { label: 'Platform Overview', path: '/admin?tab=overview', icon: LayoutDashboard },
+    { label: 'Organizers & Plans', path: '/admin?tab=organizers', icon: Building2 },
+    { label: 'Event Allowances', path: '/admin?tab=access', icon: Key },
+    { label: 'Platform Events', path: '/admin?tab=events', icon: Calendar },
+    { label: 'Platform Attendees', path: '/admin?tab=attendees', icon: Users },
+    { label: 'Payments & Plans', path: '/admin?tab=plans', icon: CreditCard },
+    { label: 'Activity & Audit', path: '/admin?tab=activity', icon: Activity },
     { label: 'Sponsorship Applications', path: '/admin/sponsorship-applications', icon: HandCoins },
     { label: 'Content Moderation', path: '/admin/moderation', icon: ShieldAlert },
-    { label: 'System Audit Logs', path: '/admin/audit-logs', icon: Activity },
     { label: 'Recycle Bin', path: '/admin/recycle-bin', icon: Trash2 },
-    { label: 'Badge Revocation Queue', path: '/admin#badges', icon: Award },
     { label: 'Admin Profile', path: '/admin/profile', icon: User },
   ];
 
   const isActive = (path: string) => {
+    if (path === '/admin?tab=overview') {
+      return location.pathname === '/admin' && (!location.search || location.search === '?tab=overview');
+    }
+    if (path.includes('?')) {
+      return (location.pathname + location.search) === path;
+    }
     if (path.includes('#')) {
-      return location.pathname + location.hash === path;
+      return (location.pathname + location.hash) === path;
     }
     if (path === '/admin') {
-      return location.pathname === '/admin' && !location.hash;
+      return location.pathname === '/admin' && !location.search && !location.hash;
     }
     return location.pathname.startsWith(path);
   };

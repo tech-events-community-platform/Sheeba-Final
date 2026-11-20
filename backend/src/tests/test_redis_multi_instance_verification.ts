@@ -9,6 +9,7 @@
  */
 
 import net from 'net';
+// @ts-ignore
 import Redis from 'ioredis';
 import fs from 'fs';
 import path from 'path';
