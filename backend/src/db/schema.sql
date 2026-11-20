@@ -305,25 +305,29 @@ CREATE TABLE IF NOT EXISTS sponsorship_applications (
 );
 
 -- Sponsorship Deals Table (Connects sponsors to applications with status INTERESTED or DECLINED)
+CREATE TABLE IF NOT EXISTS sponsorship_deals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    application_id UUID NOT NULL REFERENCES sponsorship_applications(id) ON DELETE CASCADE,
+    sponsor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL DEFAULT 'INTERESTED',
+    package_name VARCHAR(100),
+    pledged_amount NUMERIC(12, 2),
+    sponsor_notes TEXT,
+    proposal_message TEXT,
+    rejection_reason TEXT,
+    reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_sponsor_application_deal UNIQUE (application_id, sponsor_id)
+);
+
 ALTER TABLE sponsorship_deals ADD COLUMN IF NOT EXISTS proposal_message TEXT;
 ALTER TABLE sponsorship_deals ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
 ALTER TABLE sponsorship_deals ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE sponsorship_deals ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 ALTER TABLE sponsorship_deals DROP CONSTRAINT IF EXISTS sponsorship_deals_status_check;
 ALTER TABLE sponsorship_deals ADD CONSTRAINT sponsorship_deals_status_check CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'INTERESTED', 'DECLINED'));
-
-CREATE TABLE IF NOT EXISTS sponsorship_deals (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    application_id UUID NOT NULL REFERENCES sponsorship_applications(id) ON DELETE CASCADE,
-    sponsor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL DEFAULT 'INTERESTED' CHECK (status IN ('INTERESTED', 'DECLINED')),
-    package_name VARCHAR(100),
-    pledged_amount NUMERIC(12, 2),
-    sponsor_notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT unique_sponsor_application_deal UNIQUE (application_id, sponsor_id)
-);
 
 CREATE INDEX IF NOT EXISTS idx_sponsorship_applications_organizer_id ON sponsorship_applications(organizer_id);
 CREATE INDEX IF NOT EXISTS idx_sponsorship_applications_category ON sponsorship_applications(category);
