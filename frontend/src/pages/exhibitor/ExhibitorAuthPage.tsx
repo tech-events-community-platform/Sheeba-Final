@@ -15,8 +15,12 @@ import {
   EyeOff,
   CheckCircle2,
   UserPlus,
+  Upload,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { formatPhoneInput } from '../../utils/phone';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 
 export const ExhibitorAuthPage: React.FC = () => {
   const navigate = useNavigate();
@@ -73,12 +77,42 @@ export const ExhibitorAuthPage: React.FC = () => {
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || user?.companyPhone || '');
   const [password, setPassword] = useState('');
+  const [companyLogo, setCompanyLogo] = useState(user?.avatarUrl || '');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // State for existing-account exhibitor role addition flow
   const [showAddRoleFlow, setShowAddRoleFlow] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setLogoUploadError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setLogoUploadError(null);
+    try {
+      const url = await uploadToCloudinary(file, { folder: 'sheeba_exhibitor_logos' });
+      setCompanyLogo(url);
+    } catch (err: any) {
+      setLogoUploadError(err.message || 'Failed to upload company logo.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
 
   const handleAddExhibitorRole = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +121,10 @@ export const ExhibitorAuthPage: React.FC = () => {
     try {
       if (!companyName.trim()) {
         setError('Company / Organization name is required.');
+        return;
+      }
+      if (!companyLogo && !user?.avatarUrl) {
+        setError('Company logo is required. Please upload your company logo.');
         return;
       }
       if (user?.hasPassword !== false && (!password || password.length < 6)) {
@@ -102,7 +140,9 @@ export const ExhibitorAuthPage: React.FC = () => {
         companyName: companyName.trim(),
         industryCategory: category,
         companyPhone: phone.trim() || undefined,
-        password,
+        password: password || undefined,
+        companyLogo: companyLogo || user?.avatarUrl,
+        logoUrl: companyLogo || user?.avatarUrl,
       });
 
       // Switch session to exhibitor role
@@ -141,6 +181,10 @@ export const ExhibitorAuthPage: React.FC = () => {
           setError('Representative contact name is required.');
           return;
         }
+        if (!companyLogo) {
+          setError('Company logo is required. Please upload your company logo.');
+          return;
+        }
         if (!password || password.length < 6) {
           setError('Password must be at least 6 characters.');
           return;
@@ -154,6 +198,10 @@ export const ExhibitorAuthPage: React.FC = () => {
           phone: phone.trim() || undefined,
           role: 'EXHIBITOR',
           industry_category: category,
+          avatar_url: companyLogo,
+          companyLogo: companyLogo,
+          company_logo: companyLogo,
+          organization_logo: companyLogo,
         } as any);
 
         if (res.requireOtp) {
@@ -306,6 +354,59 @@ export const ExhibitorAuthPage: React.FC = () => {
                     className="w-full pl-9 pr-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] disabled:opacity-60"
                   />
                 </div>
+              </div>
+
+              {/* Company Logo Upload (via Cloudinary) */}
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Company Logo <span className="text-red-500 font-bold">*</span> <span className="text-gray-400 font-normal">(PNG, JPG, WebP up to 5MB)</span>
+                </label>
+                {companyLogo ? (
+                  <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                    <img
+                      src={companyLogo}
+                      alt="Company Logo"
+                      className="w-10 h-10 rounded-xl object-contain bg-white border border-[#E8DDD7] p-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-semibold text-[#2D1F23] flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                        <span className="truncate">Logo uploaded successfully</span>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCompanyLogo('')}
+                      className="p-1 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
+                      title="Remove logo"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="flex items-center justify-center gap-2 p-2.5 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
+                      {isUploadingLogo ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
+                      ) : (
+                        <Upload className="w-4 h-4 text-[#756366]" />
+                      )}
+                      <span className="text-xs font-medium text-[#756366]">
+                        {isUploadingLogo ? 'Uploading logo to Cloudinary...' : 'Upload company logo *'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        className="hidden"
+                        disabled={isUploadingLogo}
+                        onChange={handleLogoUpload}
+                      />
+                    </label>
+                    {logoUploadError && (
+                      <p className="text-[11px] text-red-600">{logoUploadError}</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {user?.hasPassword !== false ? (
@@ -498,6 +599,59 @@ export const ExhibitorAuthPage: React.FC = () => {
                       className="w-full pl-9 pr-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                     />
                   </div>
+                </div>
+
+                {/* Company Logo Upload (via Cloudinary) */}
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                    Company Logo <span className="text-red-500 font-bold">*</span> <span className="text-gray-400 font-normal">(PNG, JPG, WebP up to 5MB)</span>
+                  </label>
+                  {companyLogo ? (
+                    <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                      <img
+                        src={companyLogo}
+                        alt="Company Logo"
+                        className="w-10 h-10 rounded-xl object-contain bg-white border border-[#E8DDD7] p-0.5"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-semibold text-[#2D1F23] flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                          <span className="truncate">Logo uploaded successfully</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCompanyLogo('')}
+                        className="p-1 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
+                        title="Remove logo"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="flex items-center justify-center gap-2 p-2.5 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
+                        {isUploadingLogo ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
+                        ) : (
+                          <Upload className="w-4 h-4 text-[#756366]" />
+                        )}
+                        <span className="text-xs font-medium text-[#756366]">
+                          {isUploadingLogo ? 'Uploading logo to Cloudinary...' : 'Upload company logo *'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          className="hidden"
+                          disabled={isUploadingLogo}
+                          onChange={handleLogoUpload}
+                        />
+                      </label>
+                      {logoUploadError && (
+                        <p className="text-[11px] text-red-600">{logoUploadError}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             )}

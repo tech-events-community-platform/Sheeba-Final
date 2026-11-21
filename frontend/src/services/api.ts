@@ -433,7 +433,10 @@ export const api = {
       companyPhone?: string;
       companyWebsite?: string;
       exhibitorDescription?: string;
-      password: string;
+      password?: string;
+      companyLogo?: string;
+      logoUrl?: string;
+      avatar_url?: string;
     }): Promise<{ user: User; message: string }> => {
       const res = await requestApi<{ success: boolean; data: { user: User; message: string } }>('/auth/add-exhibitor-role', {
         method: 'POST',
@@ -2629,7 +2632,11 @@ export const api = {
       return res.data;
     },
 
-    updateVendor: async (eventId: string, vendorId: string, payload: Partial<IManualVendorPayload & { status: string; rejectionReason: string }>) => {
+    updateVendor: async (
+      eventId: string,
+      vendorId: string,
+      payload: Partial<IManualVendorPayload & { status: string; rejectionReason: string; pricePerSqm?: number; totalFinalAmount?: number; paymentStatus?: string }>
+    ) => {
       const res = await requestApi<{ success: boolean; data: IEventVendor }>(
         `/exhibitors/events/${eventId}/vendors/${vendorId}`,
         {
@@ -2891,6 +2898,7 @@ export const api = {
       companyWebsite?: string;
       company_website?: string;
       avatarUrl?: string;
+      avatar_url?: string;
       visibility?: 'public' | 'private';
       applicantType?: string;
       applicant_type?: string;

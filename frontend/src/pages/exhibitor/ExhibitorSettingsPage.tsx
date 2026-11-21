@@ -12,8 +12,14 @@ import {
   Check,
   AlertCircle,
   FileText,
+  Upload,
+  X,
+  Loader2,
+  CheckCircle2,
+  Image,
 } from 'lucide-react';
 import { formatPhoneInput } from '../../utils/phone';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 
 export const ExhibitorSettingsPage: React.FC = () => {
   const { user, refreshUser, switchRole } = useAuth();
@@ -30,6 +36,9 @@ export const ExhibitorSettingsPage: React.FC = () => {
   const [phone, setPhone] = useState(user?.companyPhone || user?.phone || '');
   const [website, setWebsite] = useState(user?.companyWebsite || '');
   const [bio, setBio] = useState(user?.bio || '');
+  const [companyLogo, setCompanyLogo] = useState(user?.avatarUrl || '');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +51,37 @@ export const ExhibitorSettingsPage: React.FC = () => {
       if (user.companyPhone || user.phone) setPhone(user.companyPhone || user.phone || '');
       if (user.companyWebsite) setWebsite(user.companyWebsite);
       if (user.bio) setBio(user.bio);
+      if (user.avatarUrl) setCompanyLogo(user.avatarUrl);
     }
   }, [user]);
 
-  
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setLogoUploadError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoUploadError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setLogoUploadError(null);
+    try {
+      const url = await uploadToCloudinary(file, { folder: 'sheeba_exhibitor_logos' });
+      setCompanyLogo(url);
+    } catch (err: any) {
+      setLogoUploadError(err.message || 'Failed to upload company logo.');
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   const handleSwitchWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -84,6 +120,8 @@ export const ExhibitorSettingsPage: React.FC = () => {
         industryCategory: industryCategory.trim(),
         companyPhone: phone.trim(),
         companyWebsite: website.trim(),
+        avatarUrl: companyLogo.trim() || undefined,
+        avatar_url: companyLogo.trim() || undefined,
       });
       if (refreshUser) {
         await refreshUser();
@@ -127,6 +165,82 @@ export const ExhibitorSettingsPage: React.FC = () => {
       )}
 
       <form onSubmit={handleSave} className="bg-white border border-[#E8DDD7] rounded-3xl p-6 sm:p-8 shadow-2xs space-y-5">
+        {/* Company Logo Upload & Edit (Cloudinary) */}
+        <div>
+          <label className="block text-xs font-bold text-[#2D1F23] mb-1.5 flex items-center gap-1.5">
+            <Image className="w-3.5 h-3.5 text-[#63474D]" />
+            <span>Company Logo</span>
+            <span className="text-gray-400 font-normal lowercase">(PNG, JPG, WebP up to 5MB)</span>
+          </label>
+          {companyLogo ? (
+            <div className="flex items-center gap-3.5 p-3 bg-[#FAF7F5] border border-[#E8DDD7] rounded-2xl">
+              <img
+                src={companyLogo}
+                alt="Company Logo Preview"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+                className="w-14 h-14 object-contain rounded-xl border border-[#E8DDD7] bg-white p-1 shadow-2xs shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-[#2D1F23] flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Company Logo Attached</span>
+                </p>
+                <p className="text-[11px] text-gray-500 truncate mt-0.5">{companyLogo}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <label className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#63474D] bg-white border border-[#E8DDD7] rounded-lg hover:bg-stone-50 cursor-pointer transition-colors shadow-2xs">
+                    {isUploadingLogo ? (
+                      <Loader2 className="w-3 h-3 animate-spin text-[#63474D]" />
+                    ) : (
+                      <Upload className="w-3 h-3" />
+                    )}
+                    <span>{isUploadingLogo ? 'Uploading...' : 'Change Logo'}</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      disabled={isUploadingLogo}
+                      onChange={handleLogoUpload}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setCompanyLogo('')}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Remove</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <label className="flex items-center justify-center gap-2 p-4 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-2xl cursor-pointer transition-all">
+                {isUploadingLogo ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
+                ) : (
+                  <Upload className="w-4 h-4 text-gray-500" />
+                )}
+                <span className="text-xs font-medium text-gray-600">
+                  {isUploadingLogo ? 'Uploading logo to Cloudinary...' : 'Click to upload company logo from your computer'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  disabled={isUploadingLogo}
+                  onChange={handleLogoUpload}
+                />
+              </label>
+              {logoUploadError && (
+                <p className="text-[11px] text-red-600">{logoUploadError}</p>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-[#2D1F23] mb-1">

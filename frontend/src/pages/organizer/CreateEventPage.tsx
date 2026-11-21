@@ -128,6 +128,7 @@ export const CreateEventPage: React.FC = () => {
   // Scanner Staff Requirement & Assignments (Specification v2.1)
   const [requiresScanners, setRequiresScanners] = useState<boolean>(false);
   const [scannerEmails, setScannerEmails] = useState<string[]>(['']);
+  const [requestExhibitors, setRequestExhibitors] = useState<boolean>(true);
 
   const handleAddScannerEmail = () => {
     setScannerEmails((prev) => [...prev, '']);
@@ -433,9 +434,26 @@ export const CreateEventPage: React.FC = () => {
         posterImageUrl: formData.posterImageUrl,
         requiresScanners,
         scannerEmails: cleanScannerEmails,
+        requestExhibitors,
         customQuestions: formattedQuestions,
         includeDefaultQuestions,
       });
+
+      // Automatically publish exhibitor call if requested
+      if (requestExhibitors && newEvent?.id) {
+        try {
+          await api.exhibitors.saveCall(newEvent.id, {
+            isEnabled: true,
+            status: 'open',
+            totalSpaceSqm: 50,
+            pricePerSqm: 0,
+            pricingMode: 'per_sqm',
+            maxExhibitors: 20,
+          });
+        } catch (exErr) {
+          console.warn('Could not auto-initialize exhibitor call for new event:', exErr);
+        }
+      }
 
       setCreatedEvent(newEvent);
     } catch (err: any) {
@@ -1084,6 +1102,27 @@ export const CreateEventPage: React.FC = () => {
                   </p>
                 </div>
               )}
+
+              {/* Exhibitors Requirement Toggle */}
+              <div className="flex items-center justify-between gap-4 pt-4 border-t border-[#E8DDD7]/60">
+                <div>
+                  <span className="text-xs font-bold text-[#2D1F23] block">
+                    Request / Enable Exhibitors for this event?
+                  </span>
+                  <span className="text-[11px] text-[#756366] block mt-0.5">
+                    Allow exhibitors and vendors to discover this event on Explore Events and submit booth exhibition requests.
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={requestExhibitors}
+                    onChange={(e) => setRequestExhibitors(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#63474D]"></div>
+                </label>
+              </div>
             </div>
           </div>
 

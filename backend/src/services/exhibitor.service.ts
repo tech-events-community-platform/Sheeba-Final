@@ -60,6 +60,8 @@ export class ExhibitorService {
         eventId,
         is_enabled: false,
         isEnabled: false,
+        is_paid: false,
+        isPaid: false,
         status: 'draft',
         description: '',
         pricing_mode: 'per_sqm',
@@ -106,6 +108,7 @@ export class ExhibitorService {
     const remainingSpace = Math.max(0, totalSpaceSqm - totalSpaceAllocated);
     const isEnabled = !!row.is_enabled;
     const pricingMode: ExhibitorPricingMode = row.pricing_mode || 'per_sqm';
+    const isPaid = row.is_paid !== false && pricingMode !== 'free';
     const hasBoothNumbers = !!row.has_booth_numbers;
     const hasVendorCheckin = !!row.has_vendor_checkin;
     const customQuestions = row.custom_questions || [];
@@ -117,6 +120,8 @@ export class ExhibitorService {
       eventId: row.event_id,
       is_enabled: isEnabled,
       isEnabled,
+      is_paid: isPaid,
+      isPaid,
       status: row.status,
       description: row.description,
       pricing_mode: pricingMode,
@@ -168,6 +173,7 @@ export class ExhibitorService {
     eventId: string,
     data: {
       isEnabled: boolean;
+      isPaid?: boolean;
       status?: 'draft' | 'open' | 'closed';
       description?: string | null;
       pricingMode?: ExhibitorPricingMode;
@@ -187,11 +193,17 @@ export class ExhibitorService {
   ): Promise<IExhibitorCall & { stats: { confirmedCount: number; totalSpaceAllocated: number; totalSpaceRemaining: number } }> {
     await this.verifyEventOwnership(organizerId, eventId, isAdmin);
 
-    const status = data.status || 'draft';
-    const pricingMode: ExhibitorPricingMode = data.pricingMode || 'per_sqm';
-    const fixedFee = data.fixedFee !== undefined ? Number(data.fixedFee) : 0;
+    const isEnabled = Boolean(data.isEnabled);
+    const isPaid = data.isPaid !== undefined ? Boolean(data.isPaid) : ((data as any).is_paid !== undefined ? Boolean((data as any).is_paid) : (data.pricingMode !== 'free'));
+    let status = data.status || (isEnabled ? 'open' : 'draft');
+    if (isEnabled && status === 'draft') {
+      status = 'open';
+    }
+    const pricingMode: ExhibitorPricingMode = isPaid ? (data.pricingMode || 'per_sqm') : 'free';
+    const pricePerSqm = isPaid ? (Number(data.pricePerSqm) || 0) : 0;
+    const fixedFee = isPaid && data.fixedFee !== undefined ? Number(data.fixedFee) : 0;
     const customQuestionsJson = JSON.stringify(data.customQuestions || []);
-    const paymentConfigJson = JSON.stringify(data.paymentConfig || {});
+    const paymentConfigJson = JSON.stringify(isPaid ? (data.paymentConfig || {}) : {});
     const sheebaCutPercent = data.sheebaCutPercent ?? 30.0;
     const maxExhibitors = data.maxExhibitors ?? 10;
     const hasBoothNumbers = !!data.hasBoothNumbers;
@@ -200,14 +212,15 @@ export class ExhibitorService {
 
     const upsertSql = `
       INSERT INTO exhibitor_calls (
-        event_id, is_enabled, status, description, pricing_mode,
+        event_id, is_enabled, is_paid, status, description, pricing_mode,
         total_space_sqm, price_per_sqm, fixed_fee, sheeba_cut_percent,
         max_exhibitors, specifications, custom_questions, payment_config,
         application_deadline, has_booth_numbers, has_vendor_checkin,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14, $15, $16, NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb, $15, $16, $17, NOW())
       ON CONFLICT (event_id) DO UPDATE SET
         is_enabled = EXCLUDED.is_enabled,
+        is_paid = EXCLUDED.is_paid,
         status = EXCLUDED.status,
         description = EXCLUDED.description,
         pricing_mode = EXCLUDED.pricing_mode,
@@ -229,11 +242,12 @@ export class ExhibitorService {
     await query(upsertSql, [
       eventId,
       data.isEnabled,
+      isPaid,
       status,
       data.description || null,
       pricingMode,
       data.totalSpaceSqm,
-      data.pricePerSqm,
+      pricePerSqm,
       fixedFee,
       sheebaCutPercent,
       maxExhibitors,
@@ -245,11 +259,55 @@ export class ExhibitorService {
       hasVendorCheckin,
     ]);
 
+    // Automatically synchronize pricing for event vendors when call specifications update
+    if (!isPaid) {
+      await query(
+        `UPDATE event_vendors SET
+           is_paid = false,
+           pricing_mode = 'free',
+           organizer_price_per_sqm = 0,
+           total_organizer_amount = 0,
+           total_cut_amount = 0,
+           total_final_amount = 0,
+           updated_at = NOW()
+         WHERE event_id = $1 AND status != 'cancelled'`,
+        [eventId]
+      );
+    } else if (data.pricePerSqm !== undefined || sheebaCutPercent !== undefined) {
+      const newPrice = Number(data.pricePerSqm) || 0;
+      const newCut = Number(sheebaCutPercent) || 30.0;
+      await query(
+        `UPDATE event_vendors SET
+           is_paid = true,
+           organizer_price_per_sqm = CASE
+             WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1
+             ELSE organizer_price_per_sqm
+           END,
+           sheeba_cut_percent = $2,
+           total_organizer_amount = CASE
+             WHEN pricing_mode = 'fixed' THEN total_organizer_amount
+             ELSE (ROUND((space_sqm * (CASE WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1 ELSE organizer_price_per_sqm END))::numeric, 2))
+           END,
+           total_cut_amount = CASE
+             WHEN pricing_mode = 'fixed' THEN total_cut_amount
+             ELSE (ROUND(((space_sqm * (CASE WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1 ELSE organizer_price_per_sqm END)) * ($2 / 100))::numeric, 2))
+           END,
+           total_final_amount = CASE
+             WHEN pricing_mode = 'fixed' THEN total_final_amount
+             ELSE (ROUND(((space_sqm * (CASE WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1 ELSE organizer_price_per_sqm END)) * (1 + $2 / 100))::numeric, 2))
+           END,
+           updated_at = NOW()
+         WHERE event_id = $3 AND status != 'cancelled'`,
+        [newPrice, newCut, eventId]
+      );
+    }
+
     await CacheService.delPattern(`exhibitors:public:${eventId}*`);
     await CacheService.delPattern('exhibitors:explore*');
     await CacheService.delPattern(`event:${eventId}*`);
     await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
     await CacheService.delPattern('*http:*/api/exhibitors/explore*');
+    await CacheService.delPattern('*http:*/api/exhibitors/*');
     await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
 
     return this.getExhibitorCall(eventId);
@@ -276,6 +334,8 @@ export class ExhibitorService {
       showcaseDescription: row.showcase_description,
       specialRequirements: row.special_requirements,
       pricingMode: row.pricing_mode || 'per_sqm',
+      isPaid: row.is_paid !== false && row.pricing_mode !== 'free',
+      is_paid: row.is_paid !== false && row.pricing_mode !== 'free',
       spaceSqm: parseFloat(row.space_sqm) || 0,
       organizerPricePerSqm: parseFloat(row.organizer_price_per_sqm) || 0,
       sheebaCutPercent: parseFloat(row.sheeba_cut_percent) || 0,
@@ -312,7 +372,15 @@ export class ExhibitorService {
     await this.verifyEventOwnership(organizerId, eventId, isAdmin);
 
     let sql = `
-      SELECT v.*, e.title as event_title, e.event_date, e.location as event_location,
+      SELECT v.*,
+        COALESCE(u.company_name, u.organization, v.business_name) as business_name,
+        COALESCE(u.industry_category, v.category) as category,
+        COALESCE(u.full_name, v.contact_name) as contact_name,
+        COALESCE(u.email, v.contact_email) as contact_email,
+        COALESCE(u.company_phone, u.phone, v.contact_phone) as contact_phone,
+        COALESCE(u.company_website, v.website_url) as website_url,
+        COALESCE(u.avatar_url, v.logo_url) as logo_url,
+        e.title as event_title, e.event_date, e.location as event_location,
         (
           SELECT json_build_object(
             'id', p.id,
@@ -333,6 +401,7 @@ export class ExhibitorService {
         ) as latest_receipt
       FROM event_vendors v
       JOIN events e ON e.id = v.event_id
+      LEFT JOIN users u ON u.id = v.user_id
       WHERE v.event_id = $1 AND v.deleted_at IS NULL
     `;
     const params: any[] = [eventId];
@@ -352,7 +421,12 @@ export class ExhibitorService {
 
     if (filters?.search && filters.search.trim().length > 0) {
       const q = `%${filters.search.trim()}%`;
-      sql += ` AND (v.business_name ILIKE $${paramIndex} OR v.contact_name ILIKE $${paramIndex} OR v.contact_email ILIKE $${paramIndex} OR v.booth_number ILIKE $${paramIndex})`;
+      sql += ` AND (
+        COALESCE(u.company_name, u.organization, v.business_name) ILIKE $${paramIndex}
+        OR COALESCE(u.full_name, v.contact_name) ILIKE $${paramIndex}
+        OR COALESCE(u.email, v.contact_email) ILIKE $${paramIndex}
+        OR v.booth_number ILIKE $${paramIndex}
+      )`;
       params.push(q);
       paramIndex++;
     }
@@ -396,6 +470,7 @@ export class ExhibitorService {
       showcaseDescription?: string | null;
       specialRequirements?: string | null;
       spaceSqm: number;
+      isPaid?: boolean;
       boothNumber?: string | null;
       source?: 'manual' | 'sponsorship';
       logoUrl?: string | null;
@@ -408,6 +483,7 @@ export class ExhibitorService {
     // Find exhibitor call id if exists
     const callRes = await query('SELECT id FROM exhibitor_calls WHERE event_id = $1', [eventId]);
     const callId = callRes.rows[0]?.id || null;
+    const isPaid = data.isPaid !== undefined ? Boolean(data.isPaid) : false;
 
     const insertSql = `
       INSERT INTO event_vendors (
@@ -416,7 +492,7 @@ export class ExhibitorService {
         special_requirements,
         space_sqm, organizer_price_per_sqm, sheeba_cut_percent,
         total_organizer_amount, total_cut_amount, total_final_amount,
-        booth_number, status, payment_status, logo_url, website_url,
+        booth_number, status, payment_status, is_paid, logo_url, website_url,
         paid_at
       ) VALUES (
         $1, $2, $3, $4, $5,
@@ -424,7 +500,7 @@ export class ExhibitorService {
         $10,
         $11, 0, 0,
         0, 0, 0,
-        $12, 'confirmed', 'paid', $13, $14,
+        $12, 'confirmed', 'paid', $13, $14, $15,
         NOW()
       )
       RETURNING *;
@@ -443,6 +519,7 @@ export class ExhibitorService {
       data.specialRequirements?.trim() || null,
       data.spaceSqm || 1,
       data.boothNumber?.trim() || null,
+      isPaid,
       data.logoUrl || null,
       data.websiteUrl || null,
     ]);
@@ -471,8 +548,12 @@ export class ExhibitorService {
       showcaseDescription: string;
       specialRequirements: string;
       spaceSqm: number;
+      isPaid: boolean;
+      pricePerSqm: number;
+      totalFinalAmount: number;
       boothNumber: string;
       status: string;
+      paymentStatus: string;
       rejectionReason: string;
       logoUrl: string;
       websiteUrl: string;
@@ -499,30 +580,13 @@ export class ExhibitorService {
       const finalAmount = parseFloat(current.total_final_amount) || 0;
       let targetStatus = data.status || current.status;
 
-      // Handle approval transition from 'pending'
-      if (current.status === 'pending' && (data.status === 'accepted_awaiting_payment' || data.status === 'confirmed')) {
-        if (current.source === 'applied') {
-          if (finalAmount <= 0) {
-            // Free application: Automatically confirm upon approval, no payment transaction required
-            targetStatus = 'confirmed';
-          } else {
-            // Paid application: Organizer approval moves it strictly to accepted_awaiting_payment
-            targetStatus = 'accepted_awaiting_payment';
-          }
-        } else {
-          // Manual or sponsorship vendors: Organizer can set confirmed directly
-          targetStatus = data.status;
-        }
-      }
-
-      // Prevent manual confirmation of paid applied applications
-      if (current.source === 'applied' && finalAmount > 0 && targetStatus === 'confirmed') {
-        const err: any = new Error(
-          'Paid exhibitor applications cannot be manually marked confirmed. Confirmation requires successful payment verification.'
-        );
-        err.statusCode = 400;
-        err.code = 'PAYMENT_VERIFICATION_REQUIRED';
-        throw err;
+      // Handle deal / approval transition
+      if (data.status === 'confirmed' || data.status === 'accepted_awaiting_payment') {
+        targetStatus = 'confirmed';
+      } else if (data.status === 'rejected') {
+        targetStatus = 'rejected';
+      } else if (data.status) {
+        targetStatus = data.status;
       }
 
       const newSpaceSqm = data.spaceSqm !== undefined ? Number(data.spaceSqm) : Number(current.space_sqm);
@@ -530,18 +594,12 @@ export class ExhibitorService {
       // Validate status transitions if status is changing
       if (targetStatus !== current.status) {
         const allowedTransitions: Record<string, string[]> = {
-          pending: ['accepted_awaiting_payment', 'rejected', 'cancelled'],
-          accepted_awaiting_payment: ['rejected', 'cancelled'],
-          confirmed: ['cancelled'],
-          rejected: ['pending', 'accepted_awaiting_payment'],
-          cancelled: ['pending'],
+          pending: ['confirmed', 'accepted_awaiting_payment', 'rejected', 'cancelled'],
+          accepted_awaiting_payment: ['confirmed', 'rejected', 'cancelled'],
+          confirmed: ['rejected', 'cancelled', 'pending'],
+          rejected: ['confirmed', 'pending', 'accepted_awaiting_payment'],
+          cancelled: ['confirmed', 'pending'],
         };
-
-        // Only manual or sponsorship entries or free applications can be marked confirmed via organizer update
-        if (current.source !== 'applied' || finalAmount <= 0) {
-          allowedTransitions.pending.push('confirmed');
-          allowedTransitions.accepted_awaiting_payment.push('confirmed');
-        }
 
         const validNext = allowedTransitions[current.status] || [];
         if (!validNext.includes(targetStatus)) {
@@ -612,19 +670,31 @@ export class ExhibitorService {
           showcase_description = COALESCE($6, showcase_description),
           special_requirements = COALESCE($7, special_requirements),
           space_sqm = COALESCE($8, space_sqm),
+          is_paid = COALESCE($18, is_paid),
+          pricing_mode = CASE
+            WHEN $18 = false THEN 'free'
+            ELSE pricing_mode
+          END,
+          organizer_price_per_sqm = CASE
+            WHEN $18 = false THEN 0
+            ELSE COALESCE($16, organizer_price_per_sqm)
+          END,
           total_organizer_amount = CASE
-            WHEN $8 IS NOT NULL AND pricing_mode = 'fixed' THEN total_organizer_amount
-            WHEN $8 IS NOT NULL THEN (ROUND(($8 * organizer_price_per_sqm)::numeric, 2))
+            WHEN $18 = false THEN 0
+            WHEN pricing_mode = 'fixed' THEN total_organizer_amount
+            WHEN ($8 IS NOT NULL OR $16 IS NOT NULL) THEN (ROUND((COALESCE($8, space_sqm) * COALESCE($16, organizer_price_per_sqm))::numeric, 2))
             ELSE total_organizer_amount
           END,
           total_cut_amount = CASE
-            WHEN $8 IS NOT NULL AND pricing_mode = 'fixed' THEN total_cut_amount
-            WHEN $8 IS NOT NULL THEN (ROUND((($8 * organizer_price_per_sqm) * (sheeba_cut_percent / 100))::numeric, 2))
+            WHEN $18 = false THEN 0
+            WHEN pricing_mode = 'fixed' THEN total_cut_amount
+            WHEN ($8 IS NOT NULL OR $16 IS NOT NULL) THEN (ROUND(((COALESCE($8, space_sqm) * COALESCE($16, organizer_price_per_sqm)) * (sheeba_cut_percent / 100))::numeric, 2))
             ELSE total_cut_amount
           END,
           total_final_amount = CASE
-            WHEN $8 IS NOT NULL AND pricing_mode = 'fixed' THEN total_final_amount
-            WHEN $8 IS NOT NULL THEN (ROUND((($8 * organizer_price_per_sqm) * (1 + sheeba_cut_percent / 100))::numeric, 2))
+            WHEN $18 = false THEN 0
+            WHEN pricing_mode = 'fixed' THEN total_final_amount
+            WHEN ($8 IS NOT NULL OR $16 IS NOT NULL) THEN (ROUND(((COALESCE($8, space_sqm) * COALESCE($16, organizer_price_per_sqm)) * (1 + sheeba_cut_percent / 100))::numeric, 2))
             ELSE total_final_amount
           END,
           booth_number = COALESCE($9, booth_number),
@@ -632,18 +702,17 @@ export class ExhibitorService {
           rejection_reason = COALESCE($11, rejection_reason),
           logo_url = COALESCE($12, logo_url),
           website_url = COALESCE($13, website_url),
-          payment_status = CASE
-            WHEN $10 = 'confirmed' AND (source != 'applied' OR total_final_amount <= 0) THEN 'paid'
+          payment_status = COALESCE($17, CASE
+            WHEN $10 = 'confirmed' THEN 'paid'
             WHEN $10 = 'accepted_awaiting_payment' THEN 'unpaid'
             ELSE payment_status
-          END,
+          END),
           payment_reference = CASE
-            WHEN $10 = 'confirmed' AND source = 'applied' AND total_final_amount <= 0 THEN COALESCE(payment_reference, 'FREE_EVENT')
-            WHEN $10 = 'confirmed' AND source != 'applied' THEN COALESCE(payment_reference, 'MANUAL_OR_SPONSOR')
+            WHEN $10 = 'confirmed' THEN COALESCE(payment_reference, 'DEAL_AGREED')
             ELSE payment_reference
           END,
           paid_at = CASE
-            WHEN $10 = 'confirmed' AND (source != 'applied' OR total_final_amount <= 0) THEN COALESCE(paid_at, NOW())
+            WHEN $10 = 'confirmed' THEN COALESCE(paid_at, NOW())
             ELSE paid_at
           END,
           updated_at = NOW()
@@ -659,7 +728,7 @@ export class ExhibitorService {
         data.contactPhone?.trim() ?? null,
         data.showcaseDescription ?? null,
         data.specialRequirements ?? null,
-        data.spaceSqm ?? null,
+        data.spaceSqm !== undefined ? Number(data.spaceSqm) : null,
         data.boothNumber?.trim() ?? null,
         targetStatus ?? null,
         data.rejectionReason ?? null,
@@ -667,6 +736,9 @@ export class ExhibitorService {
         data.websiteUrl ?? null,
         vendorId,
         eventId,
+        data.pricePerSqm !== undefined ? Number(data.pricePerSqm) : null,
+        data.paymentStatus ?? null,
+        data.isPaid !== undefined ? Boolean(data.isPaid) : null,
       ]);
 
       await client.query('COMMIT');
@@ -687,6 +759,7 @@ export class ExhibitorService {
       await CacheService.delPattern(`exhibitors:public:${eventId}*`);
       await CacheService.delPattern(`event:${eventId}*`);
       await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+      await CacheService.delPattern('*http:*/api/exhibitors/*');
       await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
       if (vendorRes.rows[0]?.user_id) {
         await CacheService.delPattern(`*http:*user:${vendorRes.rows[0].user_id}*`);
@@ -768,9 +841,19 @@ export class ExhibitorService {
     }
 
     const res = await query(
-      `SELECT id, business_name, category, showcase_description, space_sqm, booth_number, logo_url, website_url, source
-       FROM event_vendors
-       WHERE event_id = $1 AND status = 'confirmed' AND deleted_at IS NULL
+      `SELECT 
+         v.id,
+         COALESCE(u.company_name, u.organization, v.business_name) as business_name,
+         COALESCE(u.industry_category, v.category) as category,
+         v.showcase_description,
+         v.space_sqm,
+         v.booth_number,
+         COALESCE(u.avatar_url, v.logo_url) as logo_url,
+         COALESCE(u.company_website, v.website_url) as website_url,
+         v.source
+       FROM event_vendors v
+       LEFT JOIN users u ON u.id = v.user_id
+       WHERE v.event_id = $1 AND v.status = 'confirmed' AND v.deleted_at IS NULL
        ORDER BY business_name ASC`,
       [eventId]
     );
@@ -836,10 +919,10 @@ export class ExhibitorService {
       JOIN users u ON u.id = e.organizer_id
       LEFT JOIN event_vendors v ON v.event_id = e.id AND v.deleted_at IS NULL
       WHERE ec.is_enabled = TRUE
-        AND ec.status = 'open'
+        AND ec.status IN ('open', 'draft')
         AND (ec.application_deadline IS NULL OR ec.application_deadline >= NOW())
-        AND (COALESCE(e.end_date, e.event_date) >= CURRENT_DATE)
-        AND e.status NOT IN ('cancelled', 'canceled', 'completed', 'draft')
+        AND (COALESCE(e.end_date, e.event_date)::date >= CURRENT_DATE - INTERVAL '7 days' OR e.event_date IS NOT NULL)
+        AND e.status NOT IN ('cancelled', 'canceled')
         AND e.deleted_at IS NULL
     `;
     const params: any[] = [];
@@ -963,7 +1046,7 @@ export class ExhibitorService {
       const call = callRes.rows[0];
 
       // 2. Validate that the call is enabled and currently open
-      if (!call.is_enabled || call.status !== 'open') {
+      if (!call.is_enabled || (call.status !== 'open' && call.status !== 'draft')) {
         const err: any = new Error('Exhibitor applications are currently closed for this event.');
         err.statusCode = 400;
         throw err;
@@ -1089,23 +1172,33 @@ export class ExhibitorService {
         }
       }
 
-      // 8. Calculate pricing: per_sqm vs fixed
-      const pricingMode: ExhibitorPricingMode = (call.pricing_mode as ExhibitorPricingMode) || 'per_sqm';
-      const organizerPricePerSqm = parseFloat(call.price_per_sqm) || 0;
-      const fixedFee = parseFloat(call.fixed_fee) || 0;
+      // 8. Calculate pricing: per_sqm vs fixed vs free
+      const isCallPaid = call.is_paid !== false && call.pricing_mode !== 'free';
+      const pricingMode: ExhibitorPricingMode = isCallPaid ? ((call.pricing_mode as ExhibitorPricingMode) || 'per_sqm') : 'free';
+      const organizerPricePerSqm = isCallPaid ? (parseFloat(call.price_per_sqm) || 0) : 0;
+      const fixedFee = isCallPaid ? (parseFloat(call.fixed_fee) || 0) : 0;
       const sheebaCutPercent = parseFloat(call.sheeba_cut_percent) || 30.0;
 
       let totalOrganizerAmount = 0;
-      if (pricingMode === 'fixed') {
-        totalOrganizerAmount = Math.round(fixedFee * 100) / 100;
-      } else {
-        totalOrganizerAmount = Math.round(spaceSqm * organizerPricePerSqm * 100) / 100;
+      if (isCallPaid) {
+        if (pricingMode === 'fixed') {
+          totalOrganizerAmount = Math.round(fixedFee * 100) / 100;
+        } else {
+          totalOrganizerAmount = Math.round(spaceSqm * organizerPricePerSqm * 100) / 100;
+        }
       }
 
-      const totalCutAmount = Math.round(totalOrganizerAmount * (sheebaCutPercent / 100) * 100) / 100;
-      const totalFinalAmount = Math.round((totalOrganizerAmount + totalCutAmount) * 100) / 100;
+      const totalCutAmount = isCallPaid ? (Math.round(totalOrganizerAmount * (sheebaCutPercent / 100) * 100) / 100) : 0;
+      const totalFinalAmount = isCallPaid ? (Math.round((totalOrganizerAmount + totalCutAmount) * 100) / 100) : 0;
+      const initialPaymentStatus = isCallPaid ? 'unpaid' : 'paid';
 
-      // 9. Insert vendor application with source 'applied', status 'pending', payment_status 'unpaid'
+      let resolvedLogo = data.logoUrl?.trim() || null;
+      if (!resolvedLogo && userId) {
+        const uRes = await client.query('SELECT avatar_url FROM users WHERE id = $1', [userId]);
+        resolvedLogo = uRes.rows[0]?.avatar_url || null;
+      }
+
+      // 9. Insert vendor application with source 'applied', status 'pending'
       const insertSql = `
         INSERT INTO event_vendors (
           event_id, exhibitor_call_id, user_id, source,
@@ -1113,7 +1206,7 @@ export class ExhibitorService {
           contact_phone, showcase_description, special_requirements,
           pricing_mode, space_sqm, organizer_price_per_sqm, sheeba_cut_percent,
           total_organizer_amount, total_cut_amount, total_final_amount,
-          question_answers, booth_number, status, payment_status,
+          question_answers, booth_number, status, payment_status, is_paid,
           logo_url, website_url, created_at, updated_at
         ) VALUES (
           $1, $2, $3, 'applied',
@@ -1121,8 +1214,8 @@ export class ExhibitorService {
           $8, $9, $10,
           $11, $12, $13, $14,
           $15, $16, $17,
-          $18::jsonb, NULL, 'pending', 'unpaid',
-          $19, $20, NOW(), NOW()
+          $18::jsonb, NULL, 'pending', $19, $20,
+          $21, $22, NOW(), NOW()
         )
         RETURNING *;
       `;
@@ -1146,7 +1239,9 @@ export class ExhibitorService {
         totalCutAmount,
         totalFinalAmount,
         JSON.stringify(answers),
-        data.logoUrl?.trim() || null,
+        initialPaymentStatus,
+        isCallPaid,
+        resolvedLogo,
         data.websiteUrl?.trim() || null,
       ]);
 
@@ -1189,6 +1284,13 @@ export class ExhibitorService {
     const res = await query(
       `SELECT
          v.*,
+         COALESCE(u.company_name, u.organization, v.business_name) as business_name,
+         COALESCE(u.industry_category, v.category) as category,
+         COALESCE(u.full_name, v.contact_name) as contact_name,
+         COALESCE(u.email, v.contact_email) as contact_email,
+         COALESCE(u.company_phone, u.phone, v.contact_phone) as contact_phone,
+         COALESCE(u.company_website, v.website_url) as website_url,
+         COALESCE(u.avatar_url, v.logo_url) as logo_url,
          e.title as event_title,
          e.event_date,
          e.location as event_location,
@@ -1220,6 +1322,7 @@ export class ExhibitorService {
          (SELECT COUNT(*)::int FROM exhibitor_booth_visitors ebv WHERE ebv.vendor_id = v.id) as total_visitors_logged
        FROM event_vendors v
        JOIN events e ON e.id = v.event_id
+       LEFT JOIN users u ON u.id = v.user_id
        LEFT JOIN exhibitor_calls ec ON ec.event_id = v.event_id
        WHERE v.user_id = $1
        ORDER BY v.created_at DESC`,
@@ -2126,6 +2229,7 @@ export class ExhibitorService {
       await CacheService.delPattern(`exhibitors:public:${eventId}*`);
       await CacheService.delPattern(`event:${eventId}*`);
       await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+      await CacheService.delPattern('*http:*/api/exhibitors/*');
       await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
       if (vendor.user_id) {
         await CacheService.delPattern(`*http:*user:${vendor.user_id}*`);
@@ -2259,6 +2363,7 @@ export class ExhibitorService {
       await CacheService.delPattern(`exhibitors:public:${eventId}*`);
       await CacheService.delPattern(`event:${eventId}*`);
       await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
+      await CacheService.delPattern('*http:*/api/exhibitors/*');
       await CacheService.delPattern(`*http:*/api/events/${eventId}*`);
       if (vendor.user_id) {
         await CacheService.delPattern(`*http:*user:${vendor.user_id}*`);

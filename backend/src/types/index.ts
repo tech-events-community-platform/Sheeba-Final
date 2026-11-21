@@ -542,7 +542,7 @@ export interface IExhibitorRegistration {
 }
 
 export type ExhibitorCallStatus = 'draft' | 'open' | 'closed';
-export type ExhibitorPricingMode = 'per_sqm' | 'fixed';
+export type ExhibitorPricingMode = 'per_sqm' | 'fixed' | 'free';
 
 export interface IExhibitorPaymentConfig {
   destinations?: PaymentDestination[];
@@ -555,6 +555,7 @@ export interface IExhibitorCall {
   id: string;
   event_id: string;
   is_enabled: boolean;
+  is_paid?: boolean;
   status: ExhibitorCallStatus;
   description?: string;
   pricing_mode: ExhibitorPricingMode;
@@ -579,6 +580,7 @@ export interface IExhibitorCall {
   // Dual-key camelCase support
   eventId?: string;
   isEnabled?: boolean;
+  isPaid?: boolean;
   pricingMode?: ExhibitorPricingMode;
   totalSpaceSqm?: number;
   pricePerSqm?: number;
@@ -618,6 +620,8 @@ export interface IEventVendor {
   special_requirements?: string;
   pricing_mode?: ExhibitorPricingMode;
   space_sqm: number;
+  is_paid?: boolean;
+  isPaid?: boolean;
   organizer_price_per_sqm: number;
   sheeba_cut_percent: number;
   total_organizer_amount: number;

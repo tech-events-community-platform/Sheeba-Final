@@ -167,6 +167,7 @@ export const ExhibitorExplorePage: React.FC = () => {
         spaceSqm: spaceRequested,
         pricingMode: applyingCall.pricingMode || 'per_sqm',
         questionAnswers: Object.keys(questionAnswers).length > 0 ? questionAnswers : undefined,
+        logoUrl: user?.avatarUrl || undefined,
       });
 
       setSubmittedAppSummary({
@@ -407,12 +408,16 @@ export const ExhibitorExplorePage: React.FC = () => {
                   <div className="absolute bottom-3 left-3">
                     <span
                       className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase shadow-xs ${
-                        isFixed
-                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                          : 'bg-amber-100 text-amber-900 border border-amber-200'
+                        c.isPaid === false || c.pricingMode === 'free'
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                          : (isFixed
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : 'bg-amber-100 text-amber-900 border border-amber-200')
                       }`}
                     >
-                      {isFixed ? 'Fixed Fee' : 'Per m² Pricing'}
+                      {c.isPaid === false || c.pricingMode === 'free'
+                        ? 'Complimentary Space'
+                        : (isFixed ? 'Fixed Fee' : 'Per m² Pricing')}
                     </span>
                   </div>
                 </div>
@@ -460,7 +465,22 @@ export const ExhibitorExplorePage: React.FC = () => {
 
                     {/* Pricing Breakdown Box */}
                     <div className="p-3.5 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] space-y-2 mt-2">
-                      {isFixed ? (
+                      {c.isPaid === false || c.pricingMode === 'free' ? (
+                        <>
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-xs text-gray-500 font-medium">Exhibition Fee:</span>
+                            <strong className="text-emerald-700 font-serif text-base">
+                              Free / Complimentary
+                            </strong>
+                          </div>
+                          <div className="text-[10px] text-gray-500 flex items-center justify-between">
+                            <span>Available Floor Space:</span>
+                            <strong className="text-[#2D1F23]">
+                              {c.spaceRemaining} m² remaining
+                            </strong>
+                          </div>
+                        </>
+                      ) : isFixed ? (
                         <>
                           <div className="flex items-baseline justify-between">
                             <span className="text-xs text-gray-500 font-medium">Fixed Exhibitor Fee:</span>
@@ -569,25 +589,15 @@ export const ExhibitorExplorePage: React.FC = () => {
                     </span>
 
                     {userBooth ? (
-                      userBooth.status === 'accepted_awaiting_payment' ? (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => navigate(`/exhibitor/booths?payBoothId=${userBooth.id}`)}
-                          icon={<CreditCard className="w-3.5 h-3.5" />}
-                          className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
-                        >
-                          Continue to Payment
-                        </Button>
-                      ) : userBooth.status === 'confirmed' ? (
+                      userBooth.status === 'confirmed' || userBooth.status === 'accepted_awaiting_payment' ? (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => navigate('/exhibitor/booths')}
                           icon={<Check className="w-3.5 h-3.5 text-emerald-600" />}
-                          className="shrink-0 text-emerald-800 border-emerald-300 hover:bg-emerald-50"
+                          className="shrink-0 text-emerald-800 border-emerald-300 hover:bg-emerald-50 font-bold"
                         >
-                          View Confirmed Booth
+                          Dealt
                         </Button>
                       ) : userBooth.status === 'pending' ? (
                         <Button
@@ -595,18 +605,19 @@ export const ExhibitorExplorePage: React.FC = () => {
                           size="sm"
                           onClick={() => navigate('/exhibitor/booths')}
                           icon={<Clock className="w-3.5 h-3.5 text-amber-600" />}
-                          className="shrink-0 text-amber-800 border-amber-300 hover:bg-amber-50"
+                          className="shrink-0 text-amber-800 border-amber-300 hover:bg-amber-50 font-semibold"
                         >
-                          View in My Booths
+                          Requested (Awaiting Approval)
                         </Button>
                       ) : (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => navigate('/exhibitor/booths')}
-                          className="shrink-0 text-gray-600 border-gray-300"
+                          icon={<X className="w-3.5 h-3.5 text-red-600" />}
+                          className="shrink-0 text-red-700 border-red-300 hover:bg-red-50"
                         >
-                          View in My Booths
+                          Rejected
                         </Button>
                       )
                     ) : (
@@ -617,7 +628,7 @@ export const ExhibitorExplorePage: React.FC = () => {
                         icon={<ArrowRight className="w-3.5 h-3.5" />}
                         className="shrink-0"
                       >
-                        Apply for Booth
+                        Request to Exhibit
                       </Button>
                     )}
                   </div>
@@ -692,13 +703,15 @@ export const ExhibitorExplorePage: React.FC = () => {
             <div className="flex items-start justify-between pb-3 border-b border-gray-100">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
-                  Booth Application
+                  Request to Exhibit
                 </span>
                 <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
                   {applyingCall.eventTitle}
                 </h3>
                 <p className="text-xs text-gray-500">
-                  {isFixedPricing
+                  {applyingCall.isPaid === false || (applyingCall as any).is_paid === false || applyingCall.pricingMode === 'free'
+                    ? 'Complimentary exhibition space (No fees charged)'
+                    : isFixedPricing
                     ? `Fixed Fee: ${applyingCall.finalFixedFee.toLocaleString()} ETB (all-inclusive flat rate)`
                     : `Rate: ${applyingCall.finalPricePerSqm.toLocaleString()} ETB / m² (Sheeba platform fee included)`}
                 </p>
@@ -809,24 +822,43 @@ export const ExhibitorExplorePage: React.FC = () => {
               </div>
 
               {/* Real-time Pricing Summary */}
-              <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-1">
-                <span className="text-[10px] uppercase font-bold text-emerald-800">
-                  {isFixedPricing ? 'Fixed Exhibitor Fee' : 'Calculated Price'}
-                </span>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-emerald-900 font-medium">
-                    {isFixedPricing
-                      ? 'Flat Rate per Booth'
-                      : `${spaceRequested} m² × ${applyingCall.finalPricePerSqm.toLocaleString()} ETB`}
+              {applyingCall.isPaid === false || (applyingCall as any).is_paid === false || applyingCall.pricingMode === 'free' ? (
+                <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-emerald-800">
+                    Exhibition Fee
                   </span>
-                  <span className="font-serif font-extrabold text-lg text-emerald-950">
-                    {calculatedTotalAmount.toLocaleString()} ETB
-                  </span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-emerald-900 font-medium">
+                      Complimentary Space ({spaceRequested} m² requested)
+                    </span>
+                    <span className="font-serif font-extrabold text-lg text-emerald-950">
+                      Free (0 ETB)
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-emerald-700">
+                    Zero payment required. The organizer will review your showcase details and assign your booth.
+                  </p>
                 </div>
-                <p className="text-[10px] text-emerald-700">
-                  Zero upfront payment. Payment is only requested after the organizer reviews and accepts your application.
-                </p>
-              </div>
+              ) : (
+                <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-emerald-800">
+                    {isFixedPricing ? 'Fixed Exhibitor Fee' : 'Calculated Price'}
+                  </span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-emerald-900 font-medium">
+                      {isFixedPricing
+                        ? 'Flat Rate per Booth'
+                        : `${spaceRequested} m² × ${applyingCall.finalPricePerSqm.toLocaleString()} ETB`}
+                    </span>
+                    <span className="font-serif font-extrabold text-lg text-emerald-950">
+                      {calculatedTotalAmount.toLocaleString()} ETB
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-emerald-700">
+                    Zero upfront payment. Payment is only requested after the organizer reviews and accepts your application.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1">
@@ -922,7 +954,7 @@ export const ExhibitorExplorePage: React.FC = () => {
                   size="sm"
                   icon={<Check className="w-3.5 h-3.5" />}
                 >
-                  Submit Application
+                  Submit Request
                 </Button>
               </div>
             </form>
@@ -945,10 +977,10 @@ export const ExhibitorExplorePage: React.FC = () => {
 
             <div className="space-y-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
-                Application Received
+                Request Received
               </span>
               <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
-                Application Submitted Successfully!
+                Exhibition Request Sent!
               </h3>
               <p className="text-xs text-gray-500">
                 for <strong className="text-[#2D1F23]">{submittedAppSummary.eventTitle}</strong>
@@ -959,19 +991,15 @@ export const ExhibitorExplorePage: React.FC = () => {
             <div className="p-4 bg-amber-50/80 border border-amber-200/90 rounded-2xl text-left space-y-2 text-xs text-amber-950">
               <div className="flex items-center gap-1.5 font-bold text-amber-900">
                 <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Status: Under Organizer Review</span>
+                <span>Status: Awaiting Organizer Approval</span>
               </div>
               <p className="text-[11px] leading-relaxed text-amber-900">
-                The event organizer will review your business profile, requested floor space ({submittedAppSummary.spaceRequested} m²), showcase pitch, and custom answers.
+                The event organizer will review your business profile, requested floor space ({submittedAppSummary.spaceRequested} m²), and showcase description.
               </p>
               <div className="p-2.5 bg-white/80 rounded-xl border border-amber-200 text-[11px] text-amber-900 leading-normal font-medium">
-                <strong>Important:</strong> Your booth space is <u>not confirmed yet</u>, and <strong>no payment is due at this time</strong>.
+                <strong>Next:</strong> Track this request in <strong>My Booths & Applications</strong>. Once the organizer agrees to the deal, your status will update to <strong>Dealt</strong>.
               </div>
             </div>
-
-            <p className="text-[11px] text-gray-500 leading-relaxed text-left">
-              Once the organizer approves your application, your status will update to <strong>Application approved — payment required</strong>, and you will be provided with offline payment instructions and receipt submission.
-            </p>
 
             <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
               <button

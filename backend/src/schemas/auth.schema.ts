@@ -31,6 +31,11 @@ export const registerSchema = z
     website: z.string().trim().optional(),
     organization_logo: z.string().trim().optional(),
     organizationLogo: z.string().trim().optional(),
+    company_logo: z.string().trim().optional(),
+    companyLogo: z.string().trim().optional(),
+    logo_url: z.string().trim().optional(),
+    avatar_url: z.string().trim().optional(),
+    avatarUrl: z.string().trim().optional(),
     socials: z.record(z.string(), z.string()).optional(),
   })
   .transform((data) => {
@@ -56,7 +61,16 @@ export const registerSchema = z
     const position = (data.applicant_position || data.applicantPosition || data.position || '').trim();
     const orgDesc = (data.organization_description || data.organizationDescription || data.bio || '').trim();
     const orgWebsite = (data.organization_website || data.organizationWebsite || data.website || '').trim();
-    const orgLogo = (data.organization_logo || data.organizationLogo || '').trim();
+    const orgLogo = (
+      data.organization_logo ||
+      data.organizationLogo ||
+      data.company_logo ||
+      data.companyLogo ||
+      data.logo_url ||
+      data.avatar_url ||
+      data.avatarUrl ||
+      ''
+    ).trim();
 
     return {
       full_name: (data.full_name || data.fullName || '').trim(),
@@ -82,6 +96,10 @@ export const registerSchema = z
       organizationWebsite: orgWebsite || undefined,
       organization_logo: orgLogo || undefined,
       organizationLogo: orgLogo || undefined,
+      company_logo: orgLogo || undefined,
+      companyLogo: orgLogo || undefined,
+      avatar_url: orgLogo || undefined,
+      avatarUrl: orgLogo || undefined,
       socials: data.socials || (orgWebsite ? { website: orgWebsite } : {}),
     };
   })
@@ -277,6 +295,11 @@ export const applyOrganizerSchema = z
     website: z.string().trim().optional(),
     organization_logo: z.string().trim().optional(),
     organizationLogo: z.string().trim().optional(),
+    company_logo: z.string().trim().optional(),
+    companyLogo: z.string().trim().optional(),
+    logo_url: z.string().trim().optional(),
+    avatar_url: z.string().trim().optional(),
+    avatarUrl: z.string().trim().optional(),
     socials: z.record(z.string(), z.string()).optional(),
   })
   .transform((data) => {
@@ -621,6 +644,9 @@ export const addExhibitorRoleSchema = z.object({
     .optional(),
   exhibitorDescription: z.string().trim().optional(),
   password: z.string().optional(),
+  companyLogo: z.string().trim().optional(),
+  logoUrl: z.string().trim().optional(),
+  avatar_url: z.string().trim().optional(),
 });
 
 export type AddExhibitorRoleInput = z.infer<typeof addExhibitorRoleSchema>;

@@ -137,6 +137,7 @@ export class EventService {
       customQuestions = [],
       bannerUrl,
       posterImageUrl,
+      requestExhibitors = (data as any).requestExhibitors ?? (data as any).request_exhibitors ?? (data as any).enableExhibitors ?? false,
     } = data as any;
 
     const effectiveRequiresScanners = Boolean(requiresScanners ?? requires_scanners ?? false);
@@ -196,6 +197,23 @@ export class EventService {
       throw err;
     } finally {
       client.release();
+    }
+
+    // Automatically initialize open exhibitor call if organizer requested exhibitors
+    if (Boolean(requestExhibitors)) {
+      try {
+        await query(
+          `INSERT INTO exhibitor_calls (
+            event_id, is_enabled, status, total_space_sqm, price_per_sqm, max_exhibitors, updated_at
+          ) VALUES ($1, TRUE, 'open', 50, 0, 20, NOW())
+          ON CONFLICT (event_id) DO UPDATE SET is_enabled = TRUE, status = 'open', updated_at = NOW()`,
+          [insertedEvent.id]
+        );
+        await CacheService.delPattern('exhibitors:explore*');
+        await CacheService.delPattern('*http:*/api/exhibitors/explore*');
+      } catch (callErr) {
+        console.warn('Failed to auto-create exhibitor call for event:', callErr);
+      }
     }
 
     // Assign scanners if enabled and provided

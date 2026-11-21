@@ -38,7 +38,10 @@ interface AuthContextType {
     companyPhone?: string;
     companyWebsite?: string;
     exhibitorDescription?: string;
-    password: string;
+    password?: string;
+    companyLogo?: string;
+    logoUrl?: string;
+    avatar_url?: string;
   }) => Promise<{ user: User; message: string }>;
   register: (userData: {
     email: string;
@@ -185,7 +188,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     companyPhone?: string;
     companyWebsite?: string;
     exhibitorDescription?: string;
-    password: string;
+    password?: string;
+    companyLogo?: string;
+    logoUrl?: string;
+    avatar_url?: string;
   }): Promise<{ user: User; message: string }> => {
     setIsLoading(true);
     try {

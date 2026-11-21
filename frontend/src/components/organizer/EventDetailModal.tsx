@@ -7,6 +7,7 @@ import {
   Users,
   QrCode,
   Award,
+  Store,
   DollarSign,
   BarChart3,
   ExternalLink,
@@ -230,6 +231,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           >
             <QrCode className="w-3.5 h-3.5" />
             <span>Check-in</span>
+          </Link>
+          <Link
+            to={`/organizer/exhibitors/${currentEvent.id}`}
+            onClick={onClose}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl bg-white border border-gray-200 hover:border-[#63474D] text-[#63474D] text-xs font-semibold transition-colors shadow-2xs text-center"
+          >
+            <Store className="w-3.5 h-3.5" />
+            <span>Exhibitors</span>
           </Link>
           <Link
             to={`/organizer/events/${currentEvent.id}/attendees`}

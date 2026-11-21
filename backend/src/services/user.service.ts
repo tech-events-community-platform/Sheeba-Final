@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { BadgeService } from './badge.service';
 import { RecycleBinService } from './recycleBin.service';
 import { AuditService } from './audit.service';
+import { CacheService } from './cache.service';
 
 export class UserService {
   static async getUserProfile(userId: string) {
@@ -197,6 +198,53 @@ export class UserService {
     const rawUser = result.rows[0];
     const stats = await AuthService.computeUserStats(userId);
     const formatted = AuthService.formatUserResponse(rawUser, stats);
+
+    // Sync updated profile to active exhibitor vendor records (business name, category, contact, phone, website, logo)
+    try {
+      const vendorUpdates: string[] = [];
+      const vendorParams: any[] = [];
+      let vIndex = 1;
+
+      const compName = rawUser.company_name || rawUser.organization;
+      if (compName) {
+        vendorUpdates.push(`business_name = $${vIndex++}`);
+        vendorParams.push(compName);
+      }
+      if (rawUser.industry_category) {
+        vendorUpdates.push(`category = $${vIndex++}`);
+        vendorParams.push(rawUser.industry_category);
+      }
+      if (rawUser.full_name) {
+        vendorUpdates.push(`contact_name = $${vIndex++}`);
+        vendorParams.push(rawUser.full_name);
+      }
+      const phoneVal = rawUser.company_phone || rawUser.phone;
+      if (phoneVal) {
+        vendorUpdates.push(`contact_phone = $${vIndex++}`);
+        vendorParams.push(phoneVal);
+      }
+      if (rawUser.company_website) {
+        vendorUpdates.push(`website_url = $${vIndex++}`);
+        vendorParams.push(rawUser.company_website);
+      }
+      if (rawUser.avatar_url) {
+        vendorUpdates.push(`logo_url = $${vIndex++}`);
+        vendorParams.push(rawUser.avatar_url);
+      }
+
+      if (vendorUpdates.length > 0) {
+        vendorUpdates.push(`updated_at = NOW()`);
+        vendorParams.push(userId);
+        await query(
+          `UPDATE event_vendors SET ${vendorUpdates.join(', ')} WHERE user_id = $${vIndex}`,
+          vendorParams
+        );
+        await CacheService.delPattern('*http:*/api/exhibitors/*');
+        await CacheService.delPattern('exhibitors:*');
+      }
+    } catch (e) {
+      console.warn('Could not sync user profile to event_vendors:', e);
+    }
 
     // Audit log profile update
     const isOrg = rawUser.is_organizer || rawUser.role?.toLowerCase() === 'organizer';
