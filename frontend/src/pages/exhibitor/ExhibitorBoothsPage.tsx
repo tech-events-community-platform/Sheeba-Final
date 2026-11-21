@@ -34,15 +34,29 @@ import {
   Sparkles,
   UploadCloud,
   ShieldCheck,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import { uploadToCloudinary, fileToDataUrl } from '../../utils/cloudinary';
+
+// Helper to determine if an event is upcoming or past
+const isEventUpcoming = (dateStr?: string): boolean => {
+  if (!dateStr) return true;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d.getTime() >= today.getTime();
+};
 
 export const ExhibitorBoothsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [booths, setBooths] = useState<IExhibitorBooth[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterTab, setFilterTab] = useState<'all' | 'awaiting' | 'dealt' | 'rejected'>('all');
+  const [filterTab, setFilterTab] = useState<'dealt' | 'awaiting' | 'rejected'>('dealt');
+  const [timeFilter, setTimeFilter] = useState<'upcoming' | 'past'>('upcoming');
+  const [selectedBoothId, setSelectedBoothId] = useState<string | null>(null);
 
   // Modal states
   const [payingBooth, setPayingBooth] = useState<IExhibitorBooth | null>(null);
@@ -99,6 +113,63 @@ export const ExhibitorBoothsPage: React.FC = () => {
   const [isLoadingVisitors, setIsLoadingVisitors] = useState(false);
   const [deletingVisitorId, setDeletingVisitorId] = useState<string | null>(null);
 
+  // Inline visitors table states
+  const [inlineVisitors, setInlineVisitors] = useState<Record<string, IExhibitorBoothVisitor[]>>({});
+  const [loadingInlineVisitors, setLoadingInlineVisitors] = useState<Record<string, boolean>>({});
+
+  const loadInlineVisitors = useCallback(async (boothId: string) => {
+    setLoadingInlineVisitors((prev) => ({ ...prev, [boothId]: true }));
+    try {
+      const list = await api.exhibitors.getBoothVisitors(boothId);
+      setInlineVisitors((prev) => ({ ...prev, [boothId]: list }));
+    } catch {
+      setInlineVisitors((prev) => ({ ...prev, [boothId]: [] }));
+    } finally {
+      setLoadingInlineVisitors((prev) => ({ ...prev, [boothId]: false }));
+    }
+  }, []);
+
+  const handleDeleteInlineVisitor = async (boothId: string, visitorId: string) => {
+    setDeletingVisitorId(visitorId);
+    try {
+      await api.exhibitors.deleteBoothVisitor(boothId, visitorId);
+      setInlineVisitors((prev) => ({
+        ...prev,
+        [boothId]: (prev[boothId] || []).filter((v) => v.id !== visitorId),
+      }));
+      setVisitorsList((prev) => prev.filter((v) => v.id !== visitorId));
+      fetchBooths();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete visitor record.');
+    } finally {
+      setDeletingVisitorId(null);
+    }
+  };
+
+  const handleExportInlineCSV = (booth: IExhibitorBooth) => {
+    const list = inlineVisitors[booth.id] || visitorsList;
+    if (!list || list.length === 0) return;
+    const header = ['Visitor Name', 'Email', 'Phone', 'Notes', 'Date Logged'];
+    const rows = list.map((v) => [
+      `"${v.visitorName.replace(/"/g, '""')}"`,
+      `"${(v.visitorEmail || '').replace(/"/g, '""')}"`,
+      `"${(v.visitorPhone || '').replace(/"/g, '""')}"`,
+      `"${(v.notes || '').replace(/"/g, '""')}"`,
+      `"${new Date(v.createdAt).toLocaleString()}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [header.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute(
+      'download',
+      `booth_visitors_${(booth.businessName || 'export').toLowerCase().replace(/\s+/g, '_')}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const fetchBooths = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -116,6 +187,17 @@ export const ExhibitorBoothsPage: React.FC = () => {
     fetchBooths();
   }, [fetchBooths]);
 
+  // Auto-load visitors for confirmed booths
+  useEffect(() => {
+    if (booths.length > 0) {
+      booths.forEach((b) => {
+        if (b.status === 'confirmed' && (b.turnout?.totalVisitorsLogged || 0) > 0) {
+          loadInlineVisitors(b.id);
+        }
+      });
+    }
+  }, [booths, loadInlineVisitors]);
+
   // Auto-open payment modal if navigated with payBoothId
   useEffect(() => {
     if (!loading && booths.length > 0) {
@@ -124,6 +206,7 @@ export const ExhibitorBoothsPage: React.FC = () => {
         const target = booths.find((b) => b.id === payBoothId);
         if (target && target.status === 'accepted_awaiting_payment') {
           setPayingBooth(target);
+          setSelectedBoothId(target.id);
           setFilterTab('dealt');
         }
         const nextParams = new URLSearchParams(searchParams);
@@ -132,6 +215,16 @@ export const ExhibitorBoothsPage: React.FC = () => {
       }
     }
   }, [loading, booths, searchParams, setSearchParams]);
+
+  // Auto-load inline visitors when viewing a specific confirmed booth
+  useEffect(() => {
+    if (selectedBoothId) {
+      const target = booths.find((b) => b.id === selectedBoothId);
+      if (target && target.status === 'confirmed') {
+        loadInlineVisitors(target.id);
+      }
+    }
+  }, [selectedBoothId, booths, loadInlineVisitors]);
 
   // Fetch Receipt History for Active Booth
   const fetchReceipts = useCallback(async (vendorId: string) => {
@@ -352,8 +445,9 @@ export const ExhibitorBoothsPage: React.FC = () => {
       setVisitorEmail('');
       setVisitorPhone('');
       setVisitorNotes('');
-      // Refresh count
+      // Refresh count and inline table
       fetchBooths();
+      loadInlineVisitors(loggingVisitorBooth.id);
       setTimeout(() => {
         setLoggingVisitorBooth(null);
         setVisitorSuccess(null);
@@ -418,12 +512,26 @@ export const ExhibitorBoothsPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const filteredBooths = booths.filter((b) => {
-    if (filterTab === 'awaiting') return b.status === 'pending';
-    if (filterTab === 'dealt') return b.status === 'confirmed' || b.status === 'accepted_awaiting_payment';
-    if (filterTab === 'rejected') return b.status === 'rejected' || b.status === 'cancelled';
-    return true; // 'all' (On Booking)
+  const dealtBooths = booths.filter((b) => b.status === 'confirmed' || b.status === 'accepted_awaiting_payment');
+  const awaitingBooths = booths.filter((b) => b.status === 'pending');
+  const rejectedBooths = booths.filter((b) => b.status === 'rejected' || b.status === 'cancelled');
+
+  const currentCategoryBooths =
+    filterTab === 'dealt'
+      ? dealtBooths
+      : filterTab === 'awaiting'
+      ? awaitingBooths
+      : rejectedBooths;
+
+  const upcomingCount = currentCategoryBooths.filter((b) => isEventUpcoming(b.eventDate)).length;
+  const pastCount = currentCategoryBooths.filter((b) => !isEventUpcoming(b.eventDate)).length;
+
+  const displayedBooths = currentCategoryBooths.filter((b) => {
+    const isUpcoming = isEventUpcoming(b.eventDate);
+    return timeFilter === 'upcoming' ? isUpcoming : !isUpcoming;
   });
+
+  const selectedBooth = selectedBoothId ? booths.find((b) => b.id === selectedBoothId) || null : null;
 
   return (
     <div className="space-y-6 animate-fade-in pb-16">
@@ -466,73 +574,58 @@ export const ExhibitorBoothsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-2">
-        {[
-          { id: 'all', label: 'On Booking', count: booths.length },
-          { id: 'awaiting', label: 'Awaiting Organizer Approval', count: booths.filter((b) => b.status === 'pending').length },
-          { id: 'dealt', label: 'Dealt Events', count: booths.filter((b) => b.status === 'confirmed' || b.status === 'accepted_awaiting_payment').length },
-          { id: 'rejected', label: 'Rejected Events', count: booths.filter((b) => b.status === 'rejected' || b.status === 'cancelled').length },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setFilterTab(tab.id as any)}
-            className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              filterTab === tab.id
-                ? 'bg-[#63474D] text-white shadow-2xs'
-                : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <span>{tab.label}</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                filterTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              {tab.count}
-            </span>
-          </button>
-        ))}
-      </div>
+      {/* VIEW 1: Detail View (when an event is selected) */}
+      {selectedBooth ? (
+        <div className="space-y-4 animate-fade-in">
+          {/* Breadcrumb / Back Navigation Strip */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-[#E8DDD7] rounded-3xl p-4 sm:p-5 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedBoothId(null)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold text-[#63474D] bg-[#FAF7F5] hover:bg-[#F3ECE8] border border-[#E8DDD7] shadow-2xs transition-all cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to My Booths & Applications</span>
+              </button>
 
-      {/* Loading Skeleton */}
-      {loading && booths.length === 0 && (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-40 bg-gray-100 animate-pulse rounded-3xl border border-gray-200" />
-          ))}
-        </div>
-      )}
+              <div className="hidden sm:block w-px h-5 bg-gray-200" />
 
-      {/* Empty State */}
-      {!loading && filteredBooths.length === 0 && (
-        <div className="bg-white border border-[#E8DDD7] rounded-3xl p-12 text-center space-y-4 shadow-2xs">
-          <div className="w-12 h-12 rounded-2xl bg-[#FAF7F5] flex items-center justify-center mx-auto text-[#63474D]">
-            <Store className="w-6 h-6" />
+              <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500 font-medium">
+                <span className="text-[#63474D] font-bold">
+                  {filterTab === 'dealt'
+                    ? 'Dealt Events'
+                    : filterTab === 'awaiting'
+                    ? 'Awaiting Organizer Approval'
+                    : 'Rejected Events'}
+                </span>
+                <span>/</span>
+                <span className="font-semibold text-[#2D1F23] truncate max-w-xs">
+                  {selectedBooth.eventTitle || 'Exhibition Space'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span
+                className={`px-3 py-1 rounded-full text-[11px] font-bold ${
+                  isEventUpcoming(selectedBooth.eventDate)
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    : 'bg-gray-100 text-gray-700 border border-gray-200'
+                }`}
+              >
+                {isEventUpcoming(selectedBooth.eventDate) ? 'Upcoming Event' : 'Past Event'}
+              </span>
+            </div>
           </div>
-          <div className="space-y-1">
-            <h3 className="font-serif font-bold text-lg text-[#2D1F23]">No booth bookings found</h3>
-            <p className="text-xs text-gray-500 max-w-sm mx-auto">
-              {filterTab === 'all'
-                ? "You haven't submitted any exhibitor booth applications yet. Browse open events and apply to showcase your products."
-                : `No booth records matching filter "${filterTab}".`}
-            </p>
-          </div>
-          <Link to="/exhibitor/explore">
-            <Button variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />}>
-              Explore Open Events
-            </Button>
-          </Link>
-        </div>
-      )}
 
-      {/* Booth Cards */}
-      <div className="space-y-4">
-        {filteredBooths.map((booth) => (
-          <div
-            key={booth.id}
-            className="bg-white border border-[#E8DDD7] rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4 hover:shadow-md transition-all"
+          {/* Current Detailed Booth Card Content */}
+          {(() => {
+            const booth = selectedBooth;
+            return (
+              <div
+                key={booth.id}
+                className="bg-white border border-[#E8DDD7] rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4 hover:shadow-md transition-all"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
               <div className="space-y-1">
@@ -578,13 +671,17 @@ export const ExhibitorBoothsPage: React.FC = () => {
                   <span className="text-[10px] uppercase font-bold text-gray-400 block">Space</span>
                   <strong className="text-xs text-[#2D1F23]">{booth.spaceSqm} m²</strong>
                 </div>
-                <div className="w-px h-6 bg-gray-200" />
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-gray-400 block">Total</span>
-                  <strong className="text-xs text-emerald-700 font-bold">
-                    {(booth.totalFinalAmount || 0).toLocaleString()} ETB
-                  </strong>
-                </div>
+                {booth.isPaid !== false && booth.pricingMode !== 'free' && (
+                  <>
+                    <div className="w-px h-6 bg-gray-200" />
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-gray-400 block">Total</span>
+                      <strong className="text-xs text-emerald-700 font-bold">
+                        {(booth.totalFinalAmount || 0).toLocaleString()} ETB
+                      </strong>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -678,9 +775,15 @@ export const ExhibitorBoothsPage: React.FC = () => {
                       )}
                     </div>
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-gray-400 block">Space & Pricing Tier</span>
+                      <span className="text-[10px] uppercase font-bold text-gray-400 block">
+                        {booth.isPaid !== false && booth.pricingMode !== 'free' ? 'Space & Pricing Tier' : 'Allocated Space'}
+                      </span>
                       <strong className="text-[#2D1F23] block">{booth.spaceSqm} m² floor space</strong>
-                      <span className="text-gray-500 text-[11px] block capitalize">Mode: {booth.pricingMode?.replace('_', ' ') || 'per sqm'}</span>
+                      {booth.isPaid !== false && booth.pricingMode !== 'free' ? (
+                        <span className="text-gray-500 text-[11px] block capitalize">Mode: {booth.pricingMode?.replace('_', ' ') || 'per sqm'}</span>
+                      ) : (
+                        <span className="text-emerald-700 text-[11px] font-semibold block">Complimentary Exhibition</span>
+                      )}
                     </div>
                   </div>
 
@@ -764,6 +867,102 @@ export const ExhibitorBoothsPage: React.FC = () => {
                     </strong>
                   </div>
                 </div>
+
+                {/* Embedded Logged Booth Visitors Table */}
+                {(booth.turnout?.totalVisitorsLogged || 0) > 0 && (
+                  <div className="pt-3 border-t border-[#E8DDD7]/70 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-[#63474D]" />
+                        <h4 className="text-xs font-bold text-[#2D1F23]">
+                          Logged Booth Visitors ({inlineVisitors[booth.id]?.length ?? booth.turnout?.totalVisitorsLogged ?? 0})
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleExportInlineCSV(booth)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5" />
+                          Export CSV
+                        </button>
+                      </div>
+                    </div>
+
+                    {loadingInlineVisitors[booth.id] && !inlineVisitors[booth.id] ? (
+                      <div className="py-4 text-center text-xs text-gray-400">
+                        <RefreshCw className="w-4 h-4 animate-spin mx-auto text-[#63474D] mb-1" />
+                        Loading visitors table...
+                      </div>
+                    ) : inlineVisitors[booth.id] && inlineVisitors[booth.id].length > 0 ? (
+                      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-2xs">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-[#FAF7F5] border-b border-gray-200 text-[#63474D] text-[11px] font-bold uppercase tracking-wider">
+                              <th className="py-2.5 px-3">Visitor Name</th>
+                              <th className="py-2.5 px-3">Contact Email</th>
+                              <th className="py-2.5 px-3">Contact Phone</th>
+                              <th className="py-2.5 px-3">Logged Date</th>
+                              <th className="py-2.5 px-3">Notes</th>
+                              <th className="py-2.5 px-3 text-right">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {inlineVisitors[booth.id].map((v) => (
+                              <tr key={v.id} className="hover:bg-[#FAF7F5]/50 transition-colors">
+                                <td className="py-2.5 px-3 font-semibold text-[#2D1F23]">
+                                  {v.visitorName}
+                                </td>
+                                <td className="py-2.5 px-3 text-gray-600">
+                                  {v.visitorEmail ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span>📧</span> {v.visitorEmail}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-gray-600">
+                                  {v.visitorPhone ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span>📞</span> {v.visitorPhone}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400">—</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-gray-500 whitespace-nowrap text-[11px]">
+                                  {new Date(v.createdAt).toLocaleDateString()} {new Date(v.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td className="py-2.5 px-3 text-gray-700 max-w-xs break-words" title={v.notes || undefined}>
+                                  {v.notes ? (
+                                    <span className="bg-[#FAF7F5] px-2 py-1 rounded-md border border-gray-100 inline-block">
+                                      {v.notes}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-400 italic">No notes</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteInlineVisitor(booth.id, v.id)}
+                                    disabled={deletingVisitorId === v.id}
+                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Delete visitor"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
               </div>
             )}
 
@@ -771,11 +970,11 @@ export const ExhibitorBoothsPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
               <span className="text-[11px] text-gray-400">
                 Applied on {new Date(booth.createdAt).toLocaleDateString()}
-                {booth.paidAt && ` • Paid on ${new Date(booth.paidAt).toLocaleDateString()}`}
+                {booth.isPaid !== false && booth.pricingMode !== 'free' && booth.paidAt && ` • Paid on ${new Date(booth.paidAt).toLocaleDateString()}`}
               </span>
 
               <div className="flex items-center gap-2 shrink-0">
-                {booth.status === 'accepted_awaiting_payment' && (
+                {booth.status === 'accepted_awaiting_payment' && booth.isPaid !== false && booth.pricingMode !== 'free' && (
                   <Button
                     variant={booth.latestReceipt?.status === 'PENDING' ? 'outline' : 'primary'}
                     size="sm"
@@ -826,8 +1025,260 @@ export const ExhibitorBoothsPage: React.FC = () => {
               </div>
             </div>
           </div>
+        );
+      })()}
+    </div>
+  ) : (
+    /* VIEW 2: CARDS LIST VIEW */
+    <div className="space-y-5 animate-fade-in">
+      {/* Main Filter Tabs (Removed 'On Booking') */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-2">
+        {[
+          { id: 'dealt' as const, label: 'Dealt Events', count: dealtBooths.length },
+          { id: 'awaiting' as const, label: 'Awaiting Organizer Approval', count: awaitingBooths.length },
+          { id: 'rejected' as const, label: 'Rejected Events', count: rejectedBooths.length },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => {
+              setFilterTab(tab.id);
+              setTimeFilter('upcoming');
+            }}
+            className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              filterTab === tab.id
+                ? 'bg-[#63474D] text-white shadow-2xs'
+                : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <span>{tab.label}</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                filterTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {tab.count}
+            </span>
+          </button>
         ))}
       </div>
+
+      {/* Sub-Filters: Upcoming and Past */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 p-1 bg-white border border-[#E8DDD7] rounded-2xl w-fit shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setTimeFilter('upcoming')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              timeFilter === 'upcoming'
+                ? 'bg-[#63474D] text-white shadow-xs'
+                : 'text-gray-500 hover:text-[#2D1F23] hover:bg-gray-50'
+            }`}
+          >
+            <Calendar className={`w-3.5 h-3.5 ${timeFilter === 'upcoming' ? 'text-emerald-300' : 'text-gray-400'}`} />
+            <span>Upcoming</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                timeFilter === 'upcoming' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {upcomingCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTimeFilter('past')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              timeFilter === 'past'
+                ? 'bg-[#63474D] text-white shadow-xs'
+                : 'text-gray-500 hover:text-[#2D1F23] hover:bg-gray-50'
+            }`}
+          >
+            <Clock className={`w-3.5 h-3.5 ${timeFilter === 'past' ? 'text-amber-200' : 'text-gray-400'}`} />
+            <span>Past</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                timeFilter === 'past' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {pastCount}
+            </span>
+          </button>
+        </div>
+
+        <span className="text-xs text-gray-400">
+          Showing {displayedBooths.length} {timeFilter} {filterTab === 'dealt' ? 'dealt event(s)' : filterTab === 'awaiting' ? 'application(s)' : 'rejected event(s)'}
+        </span>
+      </div>
+
+      {/* Loading Skeleton */}
+      {loading && booths.length === 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-64 bg-gray-100 animate-pulse rounded-3xl border border-gray-200" />
+          ))}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && displayedBooths.length === 0 && (
+        <div className="bg-white border border-[#E8DDD7] rounded-3xl p-12 text-center space-y-4 shadow-2xs">
+          <div className="w-12 h-12 rounded-2xl bg-[#FAF7F5] flex items-center justify-center mx-auto text-[#63474D]">
+            <Store className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="font-serif font-bold text-lg text-[#2D1F23]">
+              {filterTab === 'dealt'
+                ? (timeFilter === 'upcoming' ? 'No Upcoming Dealt Events' : 'No Past Dealt Events')
+                : filterTab === 'awaiting'
+                ? (timeFilter === 'upcoming' ? 'No Upcoming Applications Awaiting Approval' : 'No Past Applications Awaiting Approval')
+                : (timeFilter === 'upcoming' ? 'No Upcoming Rejected Applications' : 'No Past Rejected Applications')}
+            </h3>
+            <p className="text-xs text-gray-500 max-w-sm mx-auto">
+              {filterTab === 'dealt' && timeFilter === 'upcoming'
+                ? "You don't have any upcoming confirmed booth deals. Browse open events and apply to showcase your products."
+                : `No records found in this category.`}
+            </p>
+          </div>
+          <Link to="/exhibitor/explore">
+            <Button variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />}>
+              Explore Open Events
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {/* Grid of Event Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {displayedBooths.map((booth) => {
+          const isUpcoming = isEventUpcoming(booth.eventDate);
+          return (
+            <div
+              key={booth.id}
+              onClick={() => setSelectedBoothId(booth.id)}
+              className="bg-white border border-[#E8DDD7] rounded-3xl p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between group cursor-pointer space-y-4"
+            >
+              <div className="space-y-3.5">
+                {/* Event Banner / Poster Header */}
+                <div className="relative h-32 rounded-2xl overflow-hidden bg-gray-100">
+                  {booth.bannerUrl ? (
+                    <img
+                      src={booth.bannerUrl}
+                      alt={booth.eventTitle || 'Event banner'}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-[#63474D]/15 via-[#AA767C]/10 to-[#FAF7F5] flex items-center justify-center">
+                      <Store className="w-9 h-9 text-[#63474D]/40" />
+                    </div>
+                  )}
+
+                  {/* Time status badge (Upcoming / Past) */}
+                  <div className="absolute top-2.5 left-2.5">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold backdrop-blur-xs shadow-xs ${
+                        isUpcoming
+                          ? 'bg-emerald-600/90 text-white'
+                          : 'bg-gray-700/85 text-gray-100'
+                      }`}
+                    >
+                      {isUpcoming ? 'Upcoming' : 'Past Event'}
+                    </span>
+                  </div>
+
+                  {/* Application status badge */}
+                  <div className="absolute top-2.5 right-2.5">
+                    {booth.status === 'confirmed' || booth.status === 'accepted_awaiting_payment' ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white text-emerald-800 shadow-xs flex items-center gap-1">
+                        <Check className="w-3 h-3 text-emerald-600" /> Dealt
+                      </span>
+                    ) : booth.status === 'pending' ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white text-amber-800 shadow-xs flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-amber-600" /> Awaiting Approval
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white text-red-800 shadow-xs flex items-center gap-1">
+                        <X className="w-3 h-3 text-red-600" /> {booth.status === 'rejected' ? 'Rejected' : 'Cancelled'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Title & Metadata */}
+                <div className="space-y-1.5">
+                  <h3 className="font-serif font-bold text-base text-[#2D1F23] group-hover:text-[#63474D] transition-colors line-clamp-1">
+                    {booth.eventTitle || 'Event Exhibition Space'}
+                  </h3>
+                  <div className="space-y-1 text-xs text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#AA767C] shrink-0" />
+                      <span className="truncate">
+                        {booth.eventDate ? new Date(booth.eventDate).toLocaleDateString() : 'Date TBD'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#AA767C] shrink-0" />
+                      <span className="truncate">
+                        {booth.eventLocation || booth.venueName || 'Venue TBD'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Booth Quick Meta Pill */}
+                <div className="bg-[#FAF7F5] rounded-2xl p-2.5 border border-[#E8DDD7]/70 grid grid-cols-3 gap-1.5 text-center text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 block">Space</span>
+                    <strong className="text-xs text-[#2D1F23] font-semibold">{booth.spaceSqm} m²</strong>
+                  </div>
+                  <div className="border-x border-gray-200">
+                    <span className="text-[10px] uppercase font-bold text-gray-400 block">Booth</span>
+                    <strong className="text-xs text-[#2D1F23] font-mono">{booth.boothNumber || 'Pending'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 block">Fee</span>
+                    <strong className="text-xs text-emerald-700 font-bold">
+                      {booth.isPaid === false || booth.pricingMode === 'free'
+                        ? 'Free'
+                        : `${(booth.totalFinalAmount || 0).toLocaleString()} ETB`}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Showcase Pitch snippet if any */}
+                {booth.showcaseDescription && (
+                  <p className="text-[11px] text-gray-500 line-clamp-1 italic">
+                    "{booth.showcaseDescription}"
+                  </p>
+                )}
+              </div>
+
+              {/* Card Footer: Applied date + View Details Button */}
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs">
+                <span className="text-[10px] text-gray-400">
+                  Applied: {new Date(booth.createdAt).toLocaleDateString()}
+                </span>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBoothId(booth.id);
+                  }}
+                  icon={<Eye className="w-3.5 h-3.5" />}
+                  className="text-xs group-hover:bg-[#63474D] group-hover:text-white transition-colors"
+                >
+                  View Details
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  )}
 
       {/* MODAL 1: Payment Modal */}
       {payingBooth && (
@@ -1383,38 +1834,69 @@ export const ExhibitorBoothsPage: React.FC = () => {
                 <p>Click "Log Booth Visitor" to record attendees who stop by.</p>
               </div>
             ) : (
-              <div className="overflow-y-auto space-y-2.5 pr-1 divide-y divide-gray-100 flex-1">
-                {visitorsList.map((v) => (
-                  <div key={v.id} className="pt-2.5 flex items-start justify-between gap-3 text-xs">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <strong className="text-[#2D1F23] font-bold">{v.visitorName}</strong>
-                        <span className="text-[10px] text-gray-400">
-                          {new Date(v.createdAt).toLocaleDateString()} at {new Date(v.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <div className="text-gray-500 text-[11px] flex flex-wrap gap-2">
-                        {v.visitorEmail && <span>📧 {v.visitorEmail}</span>}
-                        {v.visitorPhone && <span>📞 {v.visitorPhone}</span>}
-                      </div>
-                      {v.notes && (
-                        <p className="text-gray-700 text-[11px] bg-[#FAF7F5] p-2 rounded-xl border border-gray-100 mt-1">
-                          {v.notes}
-                        </p>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteVisitor(v.id)}
-                      disabled={deletingVisitorId === v.id}
-                      className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-all cursor-pointer shrink-0"
-                      title="Delete visitor"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-2xs">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-[#FAF7F5] border-b border-gray-200 text-[#63474D] text-[11px] font-bold uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Visitor Name</th>
+                      <th className="py-2.5 px-3">Contact Email</th>
+                      <th className="py-2.5 px-3">Contact Phone</th>
+                      <th className="py-2.5 px-3">Logged Date</th>
+                      <th className="py-2.5 px-3">Notes</th>
+                      <th className="py-2.5 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {visitorsList.map((v) => (
+                      <tr key={v.id} className="hover:bg-[#FAF7F5]/50 transition-colors">
+                        <td className="py-2.5 px-3 font-semibold text-[#2D1F23]">
+                          {v.visitorName}
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-600">
+                          {v.visitorEmail ? (
+                            <span className="inline-flex items-center gap-1">
+                              <span>📧</span> {v.visitorEmail}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-600">
+                          {v.visitorPhone ? (
+                            <span className="inline-flex items-center gap-1">
+                              <span>📞</span> {v.visitorPhone}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-500 whitespace-nowrap text-[11px]">
+                          {new Date(v.createdAt).toLocaleDateString()} {new Date(v.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="py-2.5 px-3 text-gray-700 max-w-xs break-words" title={v.notes || undefined}>
+                          {v.notes ? (
+                            <span className="bg-[#FAF7F5] px-2 py-1 rounded-md border border-gray-100 inline-block">
+                              {v.notes}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">No notes</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteVisitor(v.id)}
+                            disabled={deletingVisitorId === v.id}
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete visitor"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
 

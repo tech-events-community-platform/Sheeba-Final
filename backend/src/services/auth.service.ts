@@ -306,6 +306,7 @@ export class AuthService {
           industry_category: (data as any).industry_category ? (data as any).industry_category.trim() : null,
           is_exhibitor_registration: normalizedRole === 'exhibitor',
           company_name: organization ? organization.trim() : null,
+          avatar_url: (data as any).avatar_url || (data as any).companyLogo || (data as any).company_logo || (data as any).organization_logo || (data as any).logo_url || null,
         }),
       ]
     );
@@ -385,7 +386,8 @@ export class AuthService {
       throw err;
     }
 
-    const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(meta.full_name || 'Attendee')}&background=63474D&color=fff`;
+    const customAvatar = meta.avatar_url || meta.company_logo || meta.companyLogo || meta.organization_logo || meta.logo_url;
+    const avatarUrl = customAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(meta.full_name || 'Attendee')}&background=63474D&color=fff`;
 
     const userRole = (meta.role || 'attendee').toLowerCase();
 
@@ -971,10 +973,14 @@ export class AuthService {
       companyPhone?: string;
       companyWebsite?: string;
       exhibitorDescription?: string;
-      password: string;
+      password?: string;
+      companyLogo?: string;
+      logoUrl?: string;
+      avatar_url?: string;
     }
   ): Promise<{ user: any; message: string }> {
     const { companyName, industryCategory, companyPhone, companyWebsite, exhibitorDescription, password } = data;
+    const logo = (data.companyLogo || data.logoUrl || data.avatar_url || '').trim() || null;
 
     if (!companyName || !companyName.trim()) {
       const err: any = new Error('Company / Organization name is required.');
@@ -1024,8 +1030,9 @@ export class AuthService {
            company_website = COALESCE($4, company_website),
            bio = COALESCE($5, bio),
            organization = COALESCE(organization, $1),
+           avatar_url = COALESCE($6, avatar_url),
            updated_at = NOW()
-       WHERE id = $6
+       WHERE id = $7
        RETURNING id, email, full_name, role, phone, bio, organization, company_name, industry_category, company_phone, company_website, avatar_url, visibility, member_since, is_active, approval_status, is_organizer, organizer_approval_status, is_exhibitor, created_at, updated_at`,
       [
         companyName.trim(),
@@ -1033,9 +1040,18 @@ export class AuthService {
         companyPhone ? companyPhone.trim() : null,
         companyWebsite ? companyWebsite.trim() : null,
         exhibitorDescription ? exhibitorDescription.trim() : null,
+        logo,
         userId,
       ]
     );
+
+    if (logo) {
+      try {
+        await query('UPDATE event_vendors SET logo_url = $1 WHERE user_id = $2', [logo, userId]);
+      } catch (e) {
+        // Non-blocking
+      }
+    }
 
     const updatedUser = updated.rows[0];
     const stats = await this.computeUserStats(updatedUser.id);

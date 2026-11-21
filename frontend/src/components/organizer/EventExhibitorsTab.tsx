@@ -60,6 +60,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
 
   // Call Settings Form State
   const [isEnabled, setIsEnabled] = useState(false);
+  const [isPaid, setIsPaid] = useState(true);
   const [callStatus, setCallStatus] = useState<'draft' | 'open' | 'closed'>('draft');
   const [pricingMode, setPricingMode] = useState<ExhibitorPricingMode>('per_sqm');
   const [totalSpaceSqm, setTotalSpaceSqm] = useState<number>(0);
@@ -156,6 +157,8 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
       setCall(callData);
       const isCallEnabled = Boolean(callData.isEnabled ?? (callData as any).is_enabled);
       setIsEnabled(isCallEnabled);
+      const callIsPaid = callData.isPaid !== false && (callData as any).is_paid !== false && callData.pricingMode !== 'free';
+      setIsPaid(callIsPaid);
       setCallStatus(callData.status || 'draft');
       setPricingMode(callData.pricingMode || (callData as any).pricing_mode || 'per_sqm');
       setTotalSpaceSqm(Number(callData.totalSpaceSqm ?? (callData as any).total_space_sqm) || 0);
@@ -201,11 +204,12 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
     try {
       await api.exhibitors.saveCall(eventId, {
         isEnabled: enableState,
+        isPaid,
         status: enableState ? 'open' : 'closed',
-        pricingMode,
+        pricingMode: isPaid ? pricingMode : 'free',
         totalSpaceSqm: Number(totalSpaceSqm) || 0,
-        pricePerSqm: Number(pricePerSqm) || 0,
-        fixedFee: Number(fixedFee) || 0,
+        pricePerSqm: isPaid ? (Number(pricePerSqm) || 0) : 0,
+        fixedFee: isPaid ? (Number(fixedFee) || 0) : 0,
         maxExhibitors: Number(maxExhibitors) || 10,
         description: description.trim() || undefined,
         specifications: specifications.trim() || undefined,
@@ -213,7 +217,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
         hasBoothNumbers,
         hasVendorCheckin,
         customQuestions,
-        paymentConfig,
+        paymentConfig: isPaid ? paymentConfig : {},
       });
       await fetchData();
       showNotification('success', enableState ? 'Exhibitors turned ON for this event.' : 'Exhibitors turned OFF for this event.');
@@ -231,11 +235,12 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
     try {
       const payload: IExhibitorCallUpsertPayload = {
         isEnabled: true,
+        isPaid,
         status: callStatus,
-        pricingMode,
+        pricingMode: isPaid ? pricingMode : 'free',
         totalSpaceSqm: Number(totalSpaceSqm) || 0,
-        pricePerSqm: Number(pricePerSqm) || 0,
-        fixedFee: Number(fixedFee) || 0,
+        pricePerSqm: isPaid ? (Number(pricePerSqm) || 0) : 0,
+        fixedFee: isPaid ? (Number(fixedFee) || 0) : 0,
         maxExhibitors: Number(maxExhibitors) || 10,
         description: description.trim() || undefined,
         specifications: specifications.trim() || undefined,
@@ -243,7 +248,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
         hasBoothNumbers,
         hasVendorCheckin,
         customQuestions,
-        paymentConfig,
+        paymentConfig: isPaid ? paymentConfig : {},
       };
 
       await api.exhibitors.saveCall(eventId, payload);
@@ -323,6 +328,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
     if (!editingVendor) return;
     setIsUpdatingVendor(true);
     try {
+      const vendorIsPaid = editingVendor.isPaid !== false && isPaid;
       await api.exhibitors.updateVendor(eventId, editingVendor.id, {
         businessName: editingVendor.businessName,
         category: editingVendor.category || undefined,
@@ -332,6 +338,9 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
         showcaseDescription: editingVendor.showcaseDescription || undefined,
         specialRequirements: editingVendor.specialRequirements || undefined,
         spaceSqm: editingVendor.spaceSqm,
+        isPaid: vendorIsPaid,
+        pricePerSqm: vendorIsPaid ? (editingVendor.organizerPricePerSqm !== undefined ? Number(editingVendor.organizerPricePerSqm) : undefined) : 0,
+        paymentStatus: vendorIsPaid ? editingVendor.paymentStatus : 'paid',
         boothNumber: editingVendor.boothNumber || undefined,
         status: editingVendor.status,
       });
@@ -585,644 +594,83 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
         </div>
       )}
 
-      {/* Top Banner: Enable / Disable Toggle & Overview */}
-      <div className="bg-white border border-[#E8DDD7] rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className={`p-3 rounded-2xl shrink-0 ${isEnabled ? 'bg-[#63474D]/10 text-[#63474D]' : 'bg-gray-100 text-gray-400'}`}>
-              <Store className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-serif font-bold text-lg text-[#2D1F23]">Event Exhibitors & Booths</h3>
-                {isEnabled && (
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      callStatus === 'open'
-                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        : callStatus === 'closed'
-                        ? 'bg-red-100 text-red-800 border border-red-200'
-                        : 'bg-amber-100 text-amber-800 border border-amber-200'
-                    }`}
-                  >
-                    Call {callStatus.toUpperCase()}
+        {/* Main Exhibitors Workspace (Only when enabled) */}
+        {isEnabled && (
+          <>
+            {/* Key Metrics Bar */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4">
+              <div className="bg-white border border-[#E8DDD7] rounded-2xl p-4 shadow-2xs space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total Booth Space</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-serif font-bold text-2xl text-[#2D1F23]">{totalSpaceSqm}</span>
+                  <span className="text-xs text-gray-500 font-semibold">m²</span>
+                </div>
+                <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-2">
+                  <div className="bg-[#63474D] h-full transition-all" style={{ width: `${spaceUtilPercent}%` }} />
+                </div>
+                <div className="flex justify-between text-[10px] text-gray-400 font-medium pt-1">
+                  <span>{allocatedSpace} m² taken</span>
+                  <span>{remainingSpace} m² free</span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-[#E8DDD7] rounded-2xl p-4 shadow-2xs space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Confirmed Vendors</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-serif font-bold text-2xl text-emerald-700">
+                    {vendors.filter((v) => v.status === 'confirmed').length}
                   </span>
-                )}
+                  <span className="text-xs text-gray-400 font-medium">/ {maxExhibitors} max</span>
+                </div>
+                <p className="text-[10px] text-gray-400 pt-1">Shown publicly on event page</p>
               </div>
-              <p className="text-xs text-gray-500 mt-0.5 max-w-xl">
-                Offer physical booth space to vendors and businesses. Review applications, collect payments via Sheeba, and showcase confirmed vendors on your public event page.
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-3 self-end sm:self-center">
-            <span className="text-xs font-semibold text-[#2D1F23]">
-              {isEnabled ? 'Exhibitors Enabled' : 'Exhibitors Disabled'}
-            </span>
-            <button
-              type="button"
-              disabled={isTogglingEnable}
-              onClick={() => handleToggleEnable(!isEnabled)}
-              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                isTogglingEnable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-              } ${
-                isEnabled ? 'bg-emerald-600' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  isEnabled ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* If Exhibitors Disabled: Friendly Guidance */}
-        {!isEnabled && (
-          <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-gray-500 bg-[#FAF7F5] p-4 rounded-2xl">
-            <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 text-[#63474D] shrink-0" />
-              <span>
-                Exhibitors are currently turned off. No exhibitor call is published, and nothing exhibitor-related appears on your public registration page.
-              </span>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={isTogglingEnable}
-              isLoading={isTogglingEnable}
-              onClick={() => handleToggleEnable(true)}
-              icon={<Store className="w-3.5 h-3.5" />}
-              className="shrink-0"
-            >
-              Turn On Exhibitors
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Main Exhibitors Workspace (Only when enabled) */}
-      {isEnabled && (
-        <>
-          {/* Key Metrics Bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4">
-            <div className="bg-white border border-[#E8DDD7] rounded-2xl p-4 shadow-2xs space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total Booth Space</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-serif font-bold text-2xl text-[#2D1F23]">{totalSpaceSqm}</span>
-                <span className="text-xs text-gray-500 font-semibold">m²</span>
+              <div className="bg-white border border-[#E8DDD7] rounded-2xl p-4 shadow-2xs space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pending Review</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-serif font-bold text-2xl text-amber-700">
+                    {vendors.filter((v) => v.status === 'pending').length}
+                  </span>
+                  <span className="text-xs text-gray-400 font-medium">applications</span>
+                </div>
+                <p className="text-[10px] text-gray-400 pt-1">Awaiting organizer approval</p>
               </div>
-              <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-2">
-                <div className="bg-[#63474D] h-full transition-all" style={{ width: `${spaceUtilPercent}%` }} />
-              </div>
-              <div className="flex justify-between text-[10px] text-gray-400 font-medium pt-1">
-                <span>{allocatedSpace} m² taken</span>
-                <span>{remainingSpace} m² free</span>
-              </div>
-            </div>
 
-            <div className="bg-white border border-[#E8DDD7] rounded-2xl p-4 shadow-2xs space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Confirmed Vendors</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-serif font-bold text-2xl text-emerald-700">
-                  {vendors.filter((v) => v.status === 'confirmed').length}
+              <div className="bg-white border border-[#E8DDD7] rounded-2xl p-4 shadow-2xs space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  {!isPaid ? 'Exhibition Fee' : (pricingMode === 'fixed' ? 'Organizer Fixed Fee' : 'Base Price per m²')}
                 </span>
-                <span className="text-xs text-gray-400 font-medium">/ {maxExhibitors} max</span>
-              </div>
-              <p className="text-[10px] text-gray-400 pt-1">Shown publicly on event page</p>
-            </div>
-
-            <div className="bg-white border border-[#E8DDD7] rounded-2xl p-4 shadow-2xs space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Pending Review</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-serif font-bold text-2xl text-amber-700">
-                  {vendors.filter((v) => v.status === 'pending').length}
-                </span>
-                <span className="text-xs text-gray-400 font-medium">applications</span>
-              </div>
-              <p className="text-[10px] text-gray-400 pt-1">Awaiting organizer approval</p>
-            </div>
-
-            <div className="bg-white border border-[#E8DDD7] rounded-2xl p-4 shadow-2xs space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                {pricingMode === 'fixed' ? 'Organizer Fixed Fee' : 'Base Price per m²'}
-              </span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-serif font-bold text-2xl text-[#2D1F23]">
-                  {pricingMode === 'fixed' ? fixedFee.toLocaleString() : pricePerSqm.toLocaleString()}
-                </span>
-                <span className="text-xs text-gray-500 font-semibold">ETB</span>
-              </div>
-              <p className="text-[10px] text-gray-400 pt-1">
-                {pricingMode === 'fixed'
-                  ? `Exhibitors pay ${Math.round(finalFixedFee).toLocaleString()} ETB (+30% cut)`
-                  : `Exhibitors pay ${Math.round(finalPricePerSqm).toLocaleString()} ETB (+30% cut)`}
-              </p>
-            </div>
-          </div>
-
-          {/* Call Specifications & Configuration (Accordion / Collapsible Card) */}
-          <div className="bg-white border border-[#E8DDD7] rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-              <div>
-                <h4 className="font-serif font-bold text-base text-[#2D1F23]">Exhibitor Call Configuration</h4>
-                <p className="text-xs text-gray-500">
-                  Define your booth space parameters, pricing, and guidelines for exhibitors.
+                <div className="flex items-baseline gap-1.5">
+                  {!isPaid ? (
+                    <span className="font-serif font-bold text-xl text-emerald-700">
+                      Free / Complimentary
+                    </span>
+                  ) : (
+                    <>
+                      <span className="font-serif font-bold text-2xl text-[#2D1F23]">
+                        {pricingMode === 'fixed' ? fixedFee.toLocaleString() : pricePerSqm.toLocaleString()}
+                      </span>
+                      <span className="text-xs text-gray-500 font-semibold">ETB</span>
+                    </>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-400 pt-1">
+                  {!isPaid
+                    ? 'No booth fees charged to exhibitors'
+                    : (pricingMode === 'fixed'
+                        ? `Exhibitors pay ${Math.round(finalFixedFee).toLocaleString()} ETB (+30% cut)`
+                        : `Exhibitors pay ${Math.round(finalPricePerSqm).toLocaleString()} ETB (+30% cut)`)}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                  icon={<Edit2 className="w-3.5 h-3.5" />}
-                >
-                  {isSettingsOpen ? 'Hide Form' : 'Edit Specifications'}
-                </Button>
-              </div>
             </div>
 
-            {/* Quick summary view when form is collapsed */}
-            {!isSettingsOpen ? (
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-                <div className="p-3.5 bg-[#FAF7F5] rounded-2xl space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-gray-400">Call Status</span>
-                  <p className="font-bold text-[#2D1F23] capitalize flex items-center gap-1.5">
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        callStatus === 'open' ? 'bg-emerald-500' : callStatus === 'closed' ? 'bg-red-500' : 'bg-amber-500'
-                      }`}
-                    />
-                    {callStatus} ({callStatus === 'open' ? 'Visible to exhibitors' : 'Hidden from explore marketplace'})
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-[#FAF7F5] rounded-2xl space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-gray-400">Pricing Model</span>
-                  <p className="font-bold text-[#2D1F23]">
-                    {pricingMode === 'fixed'
-                      ? `Fixed Fee: ${fixedFee.toLocaleString()} ETB`
-                      : `Per m²: ${pricePerSqm.toLocaleString()} ETB/m²`}
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-[#FAF7F5] rounded-2xl space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-gray-400">Application Deadline</span>
-                  <p className="font-bold text-[#2D1F23]">
-                    {applicationDeadline ? new Date(applicationDeadline).toLocaleDateString() : 'No deadline set'}
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-[#FAF7F5] rounded-2xl space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-gray-400">Questions Configured</span>
-                  <p className="font-bold text-[#2D1F23] flex items-center justify-between">
-                    <span>{customQuestions.length} Questions</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsQuestionsModalOpen(true)}
-                      className="text-[11px] text-[#63474D] underline font-semibold hover:text-[#2D1F23] cursor-pointer"
-                    >
-                      View
-                    </button>
-                  </p>
-                </div>
-              </div>
-            ) : (
-              /* Edit Call Settings Form */
-              <form onSubmit={handleSaveCall} className="space-y-6 animate-fade-in pt-2">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Call Status *
-                    </label>
-                    <select
-                      value={callStatus}
-                      onChange={(e) => setCallStatus(e.target.value as any)}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs font-semibold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    >
-                      <option value="draft">Draft (Hidden from exhibitors)</option>
-                      <option value="open">Open (Publicly open to applications)</option>
-                      <option value="closed">Closed (No new applications accepted)</option>
-                    </select>
-                    <p className="text-[10px] text-gray-400 mt-1">Only "Open" calls appear in the exhibitor marketplace.</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Total Space Available (m²) *
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.5"
-                      required
-                      value={totalSpaceSqm}
-                      onChange={(e) => setTotalSpaceSqm(Number(e.target.value))}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    />
-                    <p className="text-[10px] text-gray-400 mt-1">Floor area in square meters for all booths.</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Pricing Mode *
-                    </label>
-                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => setPricingMode('per_sqm')}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          pricingMode === 'per_sqm'
-                            ? 'bg-[#63474D] text-white shadow-xs'
-                            : 'text-gray-600 hover:text-[#2D1F23]'
-                        }`}
-                      >
-                        Per m²
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPricingMode('fixed')}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          pricingMode === 'fixed'
-                            ? 'bg-[#63474D] text-white shadow-xs'
-                            : 'text-gray-600 hover:text-[#2D1F23]'
-                        }`}
-                      >
-                        Fixed Fee
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      {pricingMode === 'per_sqm' ? 'Rate scales with requested m²' : 'Flat rate for any booth'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Pricing Fields - Only display the relevant field based on pricingMode */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {pricingMode === 'per_sqm' ? (
-                    <div>
-                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                        Organizer Price per m² (ETB) *
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        step="10"
-                        required
-                        value={pricePerSqm}
-                        onChange={(e) => setPricePerSqm(Number(e.target.value))}
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                      />
-                      <p className="text-[10px] text-gray-400 mt-1">Base rate you receive per m² before platform fee.</p>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                        Organizer Flat Exhibitor Fee (ETB) *
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        step="100"
-                        required
-                        value={fixedFee}
-                        onChange={(e) => setFixedFee(Number(e.target.value))}
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                      />
-                      <p className="text-[10px] text-gray-400 mt-1">Flat base rate you receive per booth booking.</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Maximum Exhibitors Wanted
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={maxExhibitors}
-                      onChange={(e) => setMaxExhibitors(Number(e.target.value))}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    />
-                    <p className="text-[10px] text-gray-400 mt-1">Cap on total accepted and confirmed exhibitors.</p>
-                  </div>
-                </div>
-
-                {/* Adaptive Pricing & Platform Cut Breakdown Helper Card */}
-                {pricingMode === 'per_sqm' ? (
-                  <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
-                      <DollarSign className="w-4 h-4 text-emerald-700" />
-                      <span>Per-m² Pricing Breakdown (with Sheeba 30% Platform Cut)</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-emerald-800">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Organizer Receives</span>
-                        <strong className="text-sm">{pricePerSqm.toLocaleString()} ETB</strong> / m²
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Sheeba Cut (+30%)</span>
-                        <strong className="text-sm">{Math.round(cutAmountPerSqm).toLocaleString()} ETB</strong> / m²
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Exhibitor Pays (Final)</span>
-                        <strong className="text-sm text-emerald-950 font-serif">{Math.round(finalPricePerSqm).toLocaleString()} ETB</strong> / m²
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
-                      <DollarSign className="w-4 h-4 text-emerald-700" />
-                      <span>Fixed Fee Pricing Breakdown (with Sheeba 30% Platform Cut)</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-emerald-800">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Organizer Receives</span>
-                        <strong className="text-sm">{fixedFee.toLocaleString()} ETB</strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Sheeba Cut (+30%)</span>
-                        <strong className="text-sm">{Math.round(cutAmountFixed).toLocaleString()} ETB</strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Exhibitor Pays (Final)</span>
-                        <strong className="text-sm text-emerald-950 font-serif">{Math.round(finalFixedFee).toLocaleString()} ETB</strong>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Application Deadline (Optional)
-                    </label>
-                    <input
-                      type="date"
-                      value={applicationDeadline}
-                      onChange={(e) => setApplicationDeadline(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
-                    />
-                  </div>
-
-                  <div className="flex flex-col justify-end">
-                    <div className="flex flex-wrap items-center gap-4 pt-1">
-                      <label className="flex items-center gap-2 text-xs font-semibold text-[#2D1F23] cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={hasBoothNumbers}
-                          onChange={(e) => setHasBoothNumbers(e.target.checked)}
-                          className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D]"
-                        />
-                        <span>Enable Booth Numbering</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 text-xs font-semibold text-[#2D1F23] cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={hasVendorCheckin}
-                          onChange={(e) => setHasVendorCheckin(e.target.checked)}
-                          className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D]"
-                        />
-                        <span>Enable Vendor Check-in</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                    Space & Venue Layout Description
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. Ground floor main hall perimeter, high foot-traffic zone right next to the registration area..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] resize-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                    Exhibitor Specifications & Guidelines
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. 220V power outlet provided per booth. Tech and education companies preferred. Set-up begins 2 hours before kickoff."
-                    value={specifications}
-                    onChange={(e) => setSpecifications(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] resize-none"
-                  />
-                </div>
-
-                {/* Section: Application Questionnaire Quick Summary & Trigger */}
-                <div className="p-4 bg-[#FAF7F5] border border-[#E8DDD7] rounded-2xl space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 text-xs font-bold text-[#2D1F23]">
-                        <HelpCircle className="w-4 h-4 text-[#63474D]" />
-                        <span>Exhibitor Application Questionnaire</span>
-                      </div>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        Includes standard default questions (Showcase Description, Power Requirements, Retail Sales Intent) and custom questions.
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsQuestionsModalOpen(true)}
-                      icon={<Edit2 className="w-3.5 h-3.5" />}
-                    >
-                      Configure Questions ({customQuestions.length})
-                    </Button>
-                  </div>
-
-                  {customQuestions.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-200/60">
-                      {customQuestions.map((q, idx) => (
-                        <span
-                          key={q.id || idx}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#E8DDD7] rounded-lg text-[11px] text-[#2D1F23] font-medium"
-                        >
-                          <span className="font-bold text-[#63474D]">{idx + 1}.</span>
-                          <span className="max-w-[200px] truncate">{q.questionText}</span>
-                          <span className="text-[9px] uppercase px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 font-semibold">
-                            {q.type}
-                          </span>
-                          {q.isRequired && (
-                            <span className="text-[9px] text-red-500 font-bold">*</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Section: Payment Configuration & Settlement Accounts */}
-                <div className="p-4 bg-white border border-[#E8DDD7] rounded-2xl space-y-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-[#2D1F23]">
-                    <Wallet className="w-4 h-4 text-[#63474D]" />
-                    <span>Exhibitor Payment Methods & Bank Settlement Accounts</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label className="flex items-center gap-2 text-xs font-semibold text-[#2D1F23] cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={paymentConfig.allowChapa ?? true}
-                        onChange={(e) =>
-                          setPaymentConfig((prev) => ({ ...prev, allowChapa: e.target.checked }))
-                        }
-                        className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D]"
-                      />
-                      <span>Enable Chapa Online Checkout</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 text-xs font-semibold text-[#2D1F23] cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={paymentConfig.allowManual ?? false}
-                        onChange={(e) =>
-                          setPaymentConfig((prev) => ({ ...prev, allowManual: e.target.checked }))
-                        }
-                        className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D]"
-                      />
-                      <span>Allow Offline / Manual Payment (Direct Bank Transfer)</span>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
-                      Payment Instructions for Exhibitors (Optional)
-                    </label>
-                    <textarea
-                      rows={2}
-                      placeholder="e.g. Please transfer the total amount within 3 business days of application approval and send reference slip."
-                      value={paymentConfig.instructions || ''}
-                      onChange={(e) =>
-                        setPaymentConfig((prev) => ({ ...prev, instructions: e.target.value }))
-                      }
-                      className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] resize-none"
-                    />
-                  </div>
-
-                  {/* Payment Destinations list */}
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-bold text-[#2D1F23]">
-                        Receiving Bank & Mobile Money Accounts
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleAddDestination}
-                        className="text-xs text-[#63474D] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Account</span>
-                      </button>
-                    </div>
-
-                    {(paymentConfig.destinations || []).length === 0 ? (
-                      <p className="text-[11px] text-gray-400">
-                        No direct receiving bank accounts added.
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {(paymentConfig.destinations || []).map((dest, dIdx) => (
-                          <div
-                            key={dIdx}
-                            className="p-3 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl grid grid-cols-1 sm:grid-cols-4 gap-2 items-center text-xs"
-                          >
-                            <input
-                              type="text"
-                              placeholder="Provider (e.g. telebirr, CBE)"
-                              value={dest.provider}
-                              onChange={(e) =>
-                                handleUpdateDestination(dIdx, 'provider', e.target.value)
-                              }
-                              className="px-2.5 py-1.5 bg-white border border-[#E8DDD7] rounded-lg text-xs"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Account / Phone Number"
-                              value={dest.accountNumber}
-                              onChange={(e) =>
-                                handleUpdateDestination(dIdx, 'accountNumber', e.target.value)
-                              }
-                              className="px-2.5 py-1.5 bg-white border border-[#E8DDD7] rounded-lg text-xs"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Account Holder Name"
-                              value={dest.accountHolder || ''}
-                              onChange={(e) =>
-                                handleUpdateDestination(dIdx, 'accountHolder', e.target.value)
-                              }
-                              className="px-2.5 py-1.5 bg-white border border-[#E8DDD7] rounded-lg text-xs"
-                            />
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                placeholder="Label (e.g. Primary)"
-                                value={dest.label || ''}
-                                onChange={(e) =>
-                                  handleUpdateDestination(dIdx, 'label', e.target.value)
-                                }
-                                className="flex-1 px-2.5 py-1.5 bg-white border border-[#E8DDD7] rounded-lg text-xs"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveDestination(dIdx)}
-                                className="p-1 text-red-500 hover:text-red-700 cursor-pointer shrink-0"
-                                title="Remove Destination"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsSettingsOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    isLoading={isSavingCall}
-                    icon={<Check className="w-3.5 h-3.5" />}
-                  >
-                    Save Specifications
-                  </Button>
-                </div>
-              </form>
-            )}
-          </div>
-
-          {/* Vendors Management Section */}
-          <div className="space-y-4 pt-4 border-t border-gray-100">
+            {/* Vendors Management Section */}
+            <div className="space-y-4 pt-4 border-t border-gray-100">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
               <div>
                 <h3 className="font-serif font-bold text-xl text-[#2D1F23]">
                   Event Vendors ({vendors.length})
                 </h3>
-                <p className="text-xs text-gray-500">
-                  Manage vendors who applied on Sheeba, entered via sponsorship, or were added manually.
-                </p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -1244,7 +692,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                   <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Search vendors by business name, contact, or booth #..."
+                    placeholder="Search vendors"
                     value={vendorSearch}
                     onChange={(e) => setVendorSearch(e.target.value)}
                     className="w-full pl-9 pr-3.5 py-2 bg-white border border-gray-200 rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
@@ -1343,7 +791,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                         <th className="py-3 px-4">Business & Contact</th>
                         <th className="py-3 px-4">Category</th>
                         <th className="py-3 px-4">Space (m²)</th>
-                        <th className="py-3 px-4">Price & Payment</th>
+                        <th className="py-3 px-4">{isPaid ? 'Price & Payment' : 'Exhibition Type'}</th>
                         <th className="py-3 px-4">Special Reqs</th>
                         <th className="py-3 px-4">Booth #</th>
                         <th className="py-3 px-4">Source</th>
@@ -1381,20 +829,28 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                             {vendor.spaceSqm} m²
                           </td>
                           <td className="py-3.5 px-4">
-                            <div className="space-y-0.5">
-                              <span className="font-semibold text-[#2D1F23] block">
-                                {vendor.totalFinalAmount ? `${Number(vendor.totalFinalAmount).toLocaleString()} ETB` : '—'}
+                            {vendor.isPaid === false || !isPaid || vendor.pricingMode === 'free' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-gray-100 text-gray-700">
+                                Complimentary
                               </span>
-                              <span
-                                className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold capitalize ${
-                                  vendor.paymentStatus === 'paid'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-amber-100 text-amber-800'
-                                }`}
-                              >
-                                {vendor.paymentStatus || 'unpaid'}
-                              </span>
-                            </div>
+                            ) : (
+                              <div className="space-y-0.5">
+                                <span className="font-semibold text-[#2D1F23] block">
+                                  {Number(vendor.totalFinalAmount) > 0
+                                    ? `${Number(vendor.totalFinalAmount).toLocaleString()} ETB`
+                                    : '—'}
+                                </span>
+                                <span
+                                  className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold capitalize ${
+                                    vendor.paymentStatus === 'paid'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}
+                                >
+                                  {vendor.paymentStatus || 'unpaid'}
+                                </span>
+                              </div>
+                            )}
                           </td>
                           <td className="py-3.5 px-4">
                             {vendor.specialRequirements?.trim() ? (
@@ -1569,6 +1025,623 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
         </>
       )}
 
+      {/* Exhibitor Call Configuration Card (with Exhibitor Enable Toggle) */}
+      <div className="bg-white border border-[#E8DDD7] rounded-3xl p-5 sm:p-6 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-serif font-bold text-base text-[#2D1F23]">Exhibitor Call Configuration</h4>
+              {isEnabled && (
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    callStatus === 'open'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : callStatus === 'closed'
+                      ? 'bg-red-100 text-red-800 border border-red-200'
+                      : 'bg-amber-100 text-amber-800 border border-amber-200'
+                  }`}
+                >
+                  Call {callStatus.toUpperCase()}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 self-end sm:self-center">
+            {isEnabled && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                icon={<Edit2 className="w-3.5 h-3.5" />}
+              >
+                {isSettingsOpen ? 'Hide Form' : 'Edit Specifications'}
+              </Button>
+            )}
+
+            <div className={`flex items-center gap-2.5 ${isEnabled ? 'pl-3 border-l border-gray-200' : ''}`}>
+              <span className="text-xs font-semibold text-[#2D1F23]">
+                {isEnabled ? 'Exhibitors Enabled' : 'Exhibitors Disabled'}
+              </span>
+              <button
+                type="button"
+                disabled={isTogglingEnable}
+                onClick={() => handleToggleEnable(!isEnabled)}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isTogglingEnable ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                } ${
+                  isEnabled ? 'bg-emerald-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                    isEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* If Exhibitors Disabled: Friendly Guidance */}
+        {!isEnabled ? (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-gray-500 bg-[#FAF7F5] p-4 rounded-2xl">
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-[#63474D] shrink-0" />
+              <span>
+                Exhibitors are currently turned off. Turn on the toggle above to configure booth space, pricing, and open the exhibitor call.
+              </span>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={isTogglingEnable}
+              isLoading={isTogglingEnable}
+              onClick={() => handleToggleEnable(true)}
+              icon={<Store className="w-3.5 h-3.5" />}
+              className="shrink-0"
+            >
+              Turn On Exhibitors
+            </Button>
+          </div>
+        ) : (
+          /* Quick summary view when form is collapsed */
+          !isSettingsOpen ? (
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+                <div className="p-3.5 bg-[#FAF7F5] rounded-2xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-gray-400">Call Status</span>
+                  <p className="font-bold text-[#2D1F23] capitalize flex items-center gap-1.5">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        callStatus === 'open' ? 'bg-emerald-500' : callStatus === 'closed' ? 'bg-red-500' : 'bg-amber-500'
+                      }`}
+                    />
+                    {callStatus} ({callStatus === 'open' ? 'Visible to exhibitors' : 'Hidden from explore marketplace'})
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-[#FAF7F5] rounded-2xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-gray-400">Pricing Model</span>
+                  <p className="font-bold text-[#2D1F23]">
+                    {!isPaid
+                      ? 'Free / Unpaid (No Fee Charged)'
+                      : (pricingMode === 'fixed'
+                          ? `Fixed Fee: ${fixedFee.toLocaleString()} ETB`
+                          : `Per m²: ${pricePerSqm.toLocaleString()} ETB/m²`)}
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-[#FAF7F5] rounded-2xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-gray-400">Application Deadline</span>
+                  <p className="font-bold text-[#2D1F23]">
+                    {applicationDeadline ? new Date(applicationDeadline).toLocaleDateString() : 'No deadline set'}
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-[#FAF7F5] rounded-2xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-gray-400">Questions Configured</span>
+                  <p className="font-bold text-[#2D1F23] flex items-center justify-between">
+                    <span>{customQuestions.length} Questions</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsQuestionsModalOpen(true)}
+                      className="text-[11px] text-[#63474D] underline font-semibold hover:text-[#2D1F23] cursor-pointer"
+                    >
+                      View
+                    </button>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* Edit Call Settings Form */
+              <form onSubmit={handleSaveCall} className="space-y-6 animate-fade-in pt-2">
+                {/* 1. Paid vs Unpaid Toggle */}
+                <div className="bg-[#FAF7F5] border border-[#E8DDD7] p-4 rounded-2xl space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-[#2D1F23]">
+                        Exhibitor Fee Type *
+                      </label>
+                      <p className="text-[11px] text-gray-500">
+                        {isPaid
+                          ? 'Paid Exhibition: Exhibitors pay for their booth space. Pricing and payment collection are enabled.'
+                          : 'Unpaid / Free Exhibition: Booth space is complimentary. Pricing, fees, and payments are completely disabled.'}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 p-1 bg-white border border-[#E8DDD7] rounded-xl shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsPaid(true)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          isPaid
+                            ? 'bg-[#63474D] text-white shadow-xs'
+                            : 'text-gray-600 hover:text-[#2D1F23]'
+                        }`}
+                      >
+                        <DollarSign className="w-3.5 h-3.5" />
+                        <span>Paid Exhibitor</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsPaid(false)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          !isPaid
+                            ? 'bg-[#63474D] text-white shadow-xs'
+                            : 'text-gray-600 hover:text-[#2D1F23]'
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Unpaid / Free</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`grid grid-cols-1 ${isPaid ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4`}>
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                      Call Status *
+                    </label>
+                    <select
+                      value={callStatus}
+                      onChange={(e) => setCallStatus(e.target.value as any)}
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs font-semibold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    >
+                      <option value="draft">Draft (Hidden from exhibitors)</option>
+                      <option value="open">Open (Publicly open to applications)</option>
+                      <option value="closed">Closed (No new applications accepted)</option>
+                    </select>
+                    <p className="text-[10px] text-gray-400 mt-1">Only "Open" calls appear in the exhibitor marketplace.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                      Total Space Available (m²) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.5"
+                      required
+                      value={totalSpaceSqm}
+                      onChange={(e) => setTotalSpaceSqm(Number(e.target.value))}
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Floor area in square meters for all booths.</p>
+                  </div>
+
+                  {isPaid && (
+                    <div>
+                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                        Pricing Mode *
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => setPricingMode('per_sqm')}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            pricingMode === 'per_sqm'
+                              ? 'bg-[#63474D] text-white shadow-xs'
+                              : 'text-gray-600 hover:text-[#2D1F23]'
+                          }`}
+                        >
+                          Per m²
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPricingMode('fixed')}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            pricingMode === 'fixed'
+                              ? 'bg-[#63474D] text-white shadow-xs'
+                              : 'text-gray-600 hover:text-[#2D1F23]'
+                          }`}
+                        >
+                          Fixed Fee
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        {pricingMode === 'per_sqm' ? 'Rate scales with requested m²' : 'Flat rate for any booth'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* If UNPAID: informative banner */}
+                {!isPaid && (
+                  <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl shrink-0">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-bold text-emerald-950">Free / Complimentary Exhibition Active</h5>
+                      <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        Booth spaces are free of charge. Pricing options, fees, payments, and bank accounts are completely disabled and hidden from exhibitors.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pricing Fields - Only display when isPaid */}
+                {isPaid && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {pricingMode === 'per_sqm' ? (
+                      <div>
+                        <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                          Organizer Price per m² (ETB) *
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="10"
+                          required
+                          value={pricePerSqm}
+                          onChange={(e) => setPricePerSqm(Number(e.target.value))}
+                          className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">Base rate you receive per m² before platform fee.</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                          Organizer Flat Exhibitor Fee (ETB) *
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="100"
+                          required
+                          value={fixedFee}
+                          onChange={(e) => setFixedFee(Number(e.target.value))}
+                          className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">Flat base rate you receive per booth booking.</p>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                        Maximum Exhibitors Wanted
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={maxExhibitors}
+                        onChange={(e) => setMaxExhibitors(Number(e.target.value))}
+                        className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">Cap on total accepted and confirmed exhibitors.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Adaptive Pricing & Platform Cut Breakdown Helper Card - Only display when isPaid */}
+                {isPaid && (pricingMode === 'per_sqm' ? (
+                  <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
+                      <DollarSign className="w-4 h-4 text-emerald-700" />
+                      <span>Per-m² Pricing Breakdown (with Sheeba 30% Platform Cut)</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-emerald-800">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Organizer Receives</span>
+                        <strong className="text-sm">{pricePerSqm.toLocaleString()} ETB</strong> / m²
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Sheeba Cut (+30%)</span>
+                        <strong className="text-sm">{Math.round(cutAmountPerSqm).toLocaleString()} ETB</strong> / m²
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Exhibitor Pays (Final)</span>
+                        <strong className="text-sm text-emerald-950 font-serif">{Math.round(finalPricePerSqm).toLocaleString()} ETB</strong> / m²
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
+                      <DollarSign className="w-4 h-4 text-emerald-700" />
+                      <span>Fixed Fee Pricing Breakdown (with Sheeba 30% Platform Cut)</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-emerald-800">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Organizer Receives</span>
+                        <strong className="text-sm">{fixedFee.toLocaleString()} ETB</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Sheeba Cut (+30%)</span>
+                        <strong className="text-sm">{Math.round(cutAmountFixed).toLocaleString()} ETB</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Exhibitor Pays (Final)</span>
+                        <strong className="text-sm text-emerald-950 font-serif">{Math.round(finalFixedFee).toLocaleString()} ETB</strong>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                      Application Deadline (Optional)
+                    </label>
+                    <input
+                      type="date"
+                      value={applicationDeadline}
+                      onChange={(e) => setApplicationDeadline(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                  </div>
+
+                  <div className="flex flex-col justify-end">
+                    <div className="flex flex-wrap items-center gap-4 pt-1">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-[#2D1F23] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={hasBoothNumbers}
+                          onChange={(e) => setHasBoothNumbers(e.target.checked)}
+                          className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D]"
+                        />
+                        <span>Enable Booth Numbering</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 text-xs font-semibold text-[#2D1F23] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={hasVendorCheckin}
+                          onChange={(e) => setHasVendorCheckin(e.target.checked)}
+                          className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D]"
+                        />
+                        <span>Enable Vendor Check-in</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                    Space & Venue Layout Description
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Ground floor main hall perimeter, high foot-traffic zone right next to the registration area..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                    Exhibitor Specifications & Guidelines
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. 220V power outlet provided per booth. Tech and education companies preferred. Set-up begins 2 hours before kickoff."
+                    value={specifications}
+                    onChange={(e) => setSpecifications(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] resize-none"
+                  />
+                </div>
+
+                {/* Section: Application Questionnaire Quick Summary & Trigger */}
+                <div className="p-4 bg-[#FAF7F5] border border-[#E8DDD7] rounded-2xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#2D1F23]">
+                        <HelpCircle className="w-4 h-4 text-[#63474D]" />
+                        <span>Exhibitor Application Questionnaire</span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Includes standard default questions (Showcase Description, Power Requirements, Retail Sales Intent) and custom questions.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsQuestionsModalOpen(true)}
+                      icon={<Edit2 className="w-3.5 h-3.5" />}
+                    >
+                      Configure Questions ({customQuestions.length})
+                    </Button>
+                  </div>
+
+                  {customQuestions.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1 border-t border-gray-200/60">
+                      {customQuestions.map((q, idx) => (
+                        <span
+                          key={q.id || idx}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#E8DDD7] rounded-lg text-[11px] text-[#2D1F23] font-medium"
+                        >
+                          <span className="font-bold text-[#63474D]">{idx + 1}.</span>
+                          <span className="max-w-[200px] truncate">{q.questionText}</span>
+                          <span className="text-[9px] uppercase px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 font-semibold">
+                            {q.type}
+                          </span>
+                          {q.isRequired && (
+                            <span className="text-[9px] text-red-500 font-bold">*</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section: Payment Configuration & Settlement Accounts */}
+                {isPaid && (
+                  <div className="p-4 bg-white border border-[#E8DDD7] rounded-2xl space-y-4">
+                    <div className="flex items-center gap-2 text-xs font-bold text-[#2D1F23]">
+                      <Wallet className="w-4 h-4 text-[#63474D]" />
+                      <span>Exhibitor Payment Methods & Bank Settlement Accounts</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-[#2D1F23] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={paymentConfig.allowChapa ?? true}
+                          onChange={(e) =>
+                            setPaymentConfig((prev) => ({ ...prev, allowChapa: e.target.checked }))
+                          }
+                          className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D]"
+                        />
+                        <span>Enable Chapa Online Checkout</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 text-xs font-semibold text-[#2D1F23] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={paymentConfig.allowManual ?? false}
+                          onChange={(e) =>
+                            setPaymentConfig((prev) => ({ ...prev, allowManual: e.target.checked }))
+                          }
+                          className="w-4 h-4 rounded text-[#63474D] focus:ring-[#63474D]"
+                        />
+                        <span>Allow Offline / Manual Payment (Direct Bank Transfer)</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                        Payment Instructions for Exhibitors (Optional)
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="e.g. Please transfer the total amount within 3 business days of application approval and send reference slip."
+                        value={paymentConfig.instructions || ''}
+                        onChange={(e) =>
+                          setPaymentConfig((prev) => ({ ...prev, instructions: e.target.value }))
+                        }
+                        className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] resize-none"
+                      />
+                    </div>
+
+                    {/* Payment Destinations list */}
+                    <div className="space-y-2 pt-2 border-t border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold text-[#2D1F23]">
+                          Receiving Bank & Mobile Money Accounts
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleAddDestination}
+                          className="text-xs text-[#63474D] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Account</span>
+                        </button>
+                      </div>
+
+                      {(paymentConfig.destinations || []).length === 0 ? (
+                        <p className="text-[11px] text-gray-400">
+                          No direct receiving bank accounts added.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {(paymentConfig.destinations || []).map((dest, dIdx) => (
+                            <div
+                              key={dIdx}
+                              className="p-3 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl grid grid-cols-1 sm:grid-cols-4 gap-2 items-center text-xs"
+                            >
+                              <input
+                                type="text"
+                                placeholder="Provider (e.g. telebirr, CBE)"
+                                value={dest.provider}
+                                onChange={(e) =>
+                                  handleUpdateDestination(dIdx, 'provider', e.target.value)
+                                }
+                                className="px-2.5 py-1.5 bg-white border border-[#E8DDD7] rounded-lg text-xs"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Account / Phone Number"
+                                value={dest.accountNumber}
+                                onChange={(e) =>
+                                  handleUpdateDestination(dIdx, 'accountNumber', e.target.value)
+                                }
+                                className="px-2.5 py-1.5 bg-white border border-[#E8DDD7] rounded-lg text-xs"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Account Holder Name"
+                                value={dest.accountHolder || ''}
+                                onChange={(e) =>
+                                  handleUpdateDestination(dIdx, 'accountHolder', e.target.value)
+                                }
+                                className="px-2.5 py-1.5 bg-white border border-[#E8DDD7] rounded-lg text-xs"
+                              />
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Label (e.g. Primary)"
+                                  value={dest.label || ''}
+                                  onChange={(e) =>
+                                    handleUpdateDestination(dIdx, 'label', e.target.value)
+                                  }
+                                  className="flex-1 px-2.5 py-1.5 bg-white border border-[#E8DDD7] rounded-lg text-xs"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDestination(dIdx)}
+                                  className="p-1 text-red-500 hover:text-red-700 cursor-pointer shrink-0"
+                                  title="Remove Destination"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsSettingsOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    isLoading={isSavingCall}
+                    icon={<Check className="w-3.5 h-3.5" />}
+                  >
+                    Save Specifications
+                  </Button>
+                </div>
+              </form>
+            )
+        )}
+      </div>
+
       {/* Add Manual Vendor Modal */}
       {isAddVendorModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
@@ -1708,6 +1781,43 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                     className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Exhibitor Fee Type *
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setManualForm({ ...manualForm, isPaid: true })}
+                    className={`p-3 rounded-2xl border text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-2 ${
+                      manualForm.isPaid !== false
+                        ? 'border-[#63474D] bg-[#63474D]/10 text-[#63474D] ring-2 ring-[#63474D]/20'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    <DollarSign className="w-4 h-4" />
+                    <span>Paid Exhibitor</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualForm({ ...manualForm, isPaid: false })}
+                    className={`p-3 rounded-2xl border text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-2 ${
+                      manualForm.isPaid === false
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Unpaid / Complimentary</span>
+                  </button>
+                </div>
+                {manualForm.isPaid === false && (
+                  <p className="text-[11px] text-emerald-700 bg-emerald-50/70 border border-emerald-200 p-2.5 rounded-xl mt-2 leading-relaxed">
+                    ✨ <strong>Complimentary Exhibitor:</strong> All pricing and payment collection will be completely omitted for this exhibitor.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1883,6 +1993,79 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                   />
                 </div>
               </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Exhibitor Fee Type *
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingVendor({ ...editingVendor, isPaid: true })}
+                    className={`p-3 rounded-2xl border text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-2 ${
+                      editingVendor.isPaid !== false
+                        ? 'border-[#63474D] bg-[#63474D]/10 text-[#63474D] ring-2 ring-[#63474D]/20'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    <DollarSign className="w-4 h-4" />
+                    <span>Paid Exhibitor</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingVendor({ ...editingVendor, isPaid: false })}
+                    className={`p-3 rounded-2xl border text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-2 ${
+                      editingVendor.isPaid === false
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Unpaid / Complimentary</span>
+                  </button>
+                </div>
+              </div>
+
+              {editingVendor.isPaid !== false && isPaid ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                      Base Rate per m² (ETB)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={50}
+                      value={editingVendor.organizerPricePerSqm ?? (call?.pricePerSqm || 0)}
+                      onChange={(e) => setEditingVendor({ ...editingVendor, organizerPricePerSqm: Number(e.target.value) })}
+                      className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Exhibitor pays: {Math.round((editingVendor.organizerPricePerSqm ?? (call?.pricePerSqm || 0)) * (1 + (editingVendor.sheebaCutPercent || call?.sheebaCutPercent || 30) / 100)).toLocaleString()} ETB/m² (+30% fee)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                      Payment Status
+                    </label>
+                    <select
+                      value={editingVendor.paymentStatus || 'unpaid'}
+                      onChange={(e) => setEditingVendor({ ...editingVendor, paymentStatus: e.target.value as any })}
+                      className="w-full px-3.5 py-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl text-xs text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D]"
+                    >
+                      <option value="unpaid">Unpaid (Awaiting Payment)</option>
+                      <option value="paid">Paid (Confirmed / Settled)</option>
+                      <option value="refunded">Refunded</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Complimentary Exhibitor: No payment is charged to or collected from this vendor.</span>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1">
@@ -2169,46 +2352,48 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
             </div>
 
             {/* Financial Breakdown */}
-            <div className="p-4 bg-white rounded-2xl border border-gray-200 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-gray-500 text-[10px] font-bold uppercase tracking-wider">
-                  <DollarSign className="w-3.5 h-3.5 text-[#63474D]" />
-                  <span>Pricing & Payment Status</span>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
-                    reviewingVendor.paymentStatus === 'paid'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}
-                >
-                  Payment: {reviewingVendor.paymentStatus || 'unpaid'}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-gray-100 text-xs">
-                <div>
-                  <span className="text-[10px] text-gray-400 block">Organizer Amount</span>
-                  <strong className="text-[#2D1F23] font-bold text-xs block">
-                    {Number(reviewingVendor.totalOrganizerAmount || 0).toLocaleString()} ETB
-                  </strong>
-                </div>
-                <div>
-                  <span className="text-[10px] text-gray-400 block">
-                    Sheeba Cut ({reviewingVendor.sheebaCutPercent || 30}%)
+            {reviewingVendor.isPaid !== false && isPaid && reviewingVendor.pricingMode !== 'free' && (
+              <div className="p-4 bg-white rounded-2xl border border-gray-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-gray-500 text-[10px] font-bold uppercase tracking-wider">
+                    <DollarSign className="w-3.5 h-3.5 text-[#63474D]" />
+                    <span>Pricing & Payment Status</span>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                      reviewingVendor.paymentStatus === 'paid'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    Payment: {reviewingVendor.paymentStatus || 'unpaid'}
                   </span>
-                  <strong className="text-gray-600 font-bold text-xs block">
-                    {Number(reviewingVendor.totalCutAmount || 0).toLocaleString()} ETB
-                  </strong>
                 </div>
-                <div>
-                  <span className="text-[10px] text-gray-400 block">Total Final Price</span>
-                  <strong className="text-[#63474D] font-bold text-sm block">
-                    {Number(reviewingVendor.totalFinalAmount || 0).toLocaleString()} ETB
-                  </strong>
+
+                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-gray-100 text-xs">
+                  <div>
+                    <span className="text-[10px] text-gray-400 block">Organizer Amount</span>
+                    <strong className="text-[#2D1F23] font-bold text-xs block">
+                      {Number(reviewingVendor.totalOrganizerAmount || 0).toLocaleString()} ETB
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 block">
+                      Sheeba Cut ({reviewingVendor.sheebaCutPercent || 30}%)
+                    </span>
+                    <strong className="text-gray-600 font-bold text-xs block">
+                      {Number(reviewingVendor.totalCutAmount || 0).toLocaleString()} ETB
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gray-400 block">Total Final Price</span>
+                    <strong className="text-[#63474D] font-bold text-sm block">
+                      {Number(reviewingVendor.totalFinalAmount || 0).toLocaleString()} ETB
+                    </strong>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Showcase Pitch */}
             <div className="space-y-1.5">
@@ -2403,7 +2588,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
               )}
 
               {/* Receipt / Payment Verification Section in Application Review Modal */}
-              {(reviewingVendor.status === 'accepted_awaiting_payment' || reviewingVendor.status === 'confirmed' || reviewingVendor.latestReceipt) && (
+              {reviewingVendor.isPaid !== false && isPaid && reviewingVendor.pricingMode !== 'free' && (reviewingVendor.status === 'accepted_awaiting_payment' || reviewingVendor.status === 'confirmed' || reviewingVendor.latestReceipt) && (
                 <div className="p-4 bg-indigo-50/70 rounded-2xl border border-indigo-200 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-indigo-950 font-bold text-xs">
@@ -2519,11 +2704,13 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                 <span className="font-bold text-[#2D1F23]">{confirmingVendor.spaceSqm} m²</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-500 font-medium">Total Booth Fee:</span>
+                <span className="text-gray-500 font-medium">
+                  {confirmingVendor.isPaid === false || !isPaid || confirmingVendor.pricingMode === 'free' ? 'Exhibition Fee:' : 'Total Booth Fee:'}
+                </span>
                 <span className="font-bold text-[#2D1F23]">
-                  {(confirmingVendor.totalFinalAmount || 0) <= 0
-                    ? 'Free (0 ETB)'
-                    : `${Number(confirmingVendor.totalFinalAmount).toLocaleString()} ETB`}
+                  {confirmingVendor.isPaid === false || !isPaid || confirmingVendor.pricingMode === 'free'
+                    ? 'Free / Complimentary'
+                    : `${Number(confirmingVendor.totalFinalAmount || 0).toLocaleString()} ETB`}
                 </span>
               </div>
               <div className="flex items-center justify-between">

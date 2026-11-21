@@ -379,7 +379,8 @@ CREATE TABLE IF NOT EXISTS exhibitor_calls (
     is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     status VARCHAR(50) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'open', 'closed', 'DRAFT', 'OPEN', 'CLOSED')),
     description TEXT,
-    pricing_mode VARCHAR(20) NOT NULL DEFAULT 'per_sqm' CHECK (pricing_mode IN ('per_sqm', 'fixed')),
+    pricing_mode VARCHAR(20) NOT NULL DEFAULT 'per_sqm' CHECK (pricing_mode IN ('per_sqm', 'fixed', 'free')),
+    is_paid BOOLEAN NOT NULL DEFAULT TRUE,
     total_space_sqm NUMERIC(10, 2) NOT NULL DEFAULT 0,
     price_per_sqm NUMERIC(10, 2) NOT NULL DEFAULT 0,
     fixed_fee NUMERIC(10, 2) NOT NULL DEFAULT 0,
@@ -401,6 +402,8 @@ ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS fixed_fee NUMERIC(10, 2) NO
 ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS custom_questions JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS payment_config JSONB DEFAULT '{}'::jsonb;
 
+ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS is_paid BOOLEAN NOT NULL DEFAULT TRUE;
+
 CREATE INDEX IF NOT EXISTS idx_exhibitor_calls_event_id ON exhibitor_calls(event_id);
 CREATE INDEX IF NOT EXISTS idx_exhibitor_calls_status ON exhibitor_calls(status);
 
@@ -418,7 +421,8 @@ CREATE TABLE IF NOT EXISTS event_vendors (
     contact_phone VARCHAR(50),
     showcase_description TEXT,
     special_requirements TEXT,
-    pricing_mode VARCHAR(20) NOT NULL DEFAULT 'per_sqm' CHECK (pricing_mode IN ('per_sqm', 'fixed')),
+    pricing_mode VARCHAR(20) NOT NULL DEFAULT 'per_sqm' CHECK (pricing_mode IN ('per_sqm', 'fixed', 'free')),
+    is_paid BOOLEAN NOT NULL DEFAULT TRUE,
     space_sqm NUMERIC(10, 2) NOT NULL DEFAULT 1,
     organizer_price_per_sqm NUMERIC(10, 2) NOT NULL DEFAULT 0,
     sheeba_cut_percent NUMERIC(5, 2) NOT NULL DEFAULT 30.00,

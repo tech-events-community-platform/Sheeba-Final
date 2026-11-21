@@ -1,7 +1,7 @@
 import type { RegistrationQuestion, PaymentDestination } from './event';
 
 export type ExhibitorCallStatus = 'draft' | 'open' | 'closed';
-export type ExhibitorPricingMode = 'per_sqm' | 'fixed';
+export type ExhibitorPricingMode = 'per_sqm' | 'fixed' | 'free';
 
 export interface IExhibitorPaymentConfig {
   destinations?: PaymentDestination[];
@@ -14,6 +14,7 @@ export interface IExhibitorCall {
   id: string;
   eventId: string;
   isEnabled: boolean;
+  isPaid?: boolean;
   status: ExhibitorCallStatus;
   description?: string;
   pricingMode: ExhibitorPricingMode;
@@ -40,6 +41,7 @@ export interface IExhibitorCall {
   // Dual-key snake_case support for network payload tolerance
   event_id?: string;
   is_enabled?: boolean;
+  is_paid?: boolean;
   pricing_mode?: ExhibitorPricingMode;
   total_space_sqm?: number;
   price_per_sqm?: number;
@@ -73,6 +75,8 @@ export interface IEventVendor {
   showcaseDescription?: string;
   specialRequirements?: string;
   pricingMode?: ExhibitorPricingMode;
+  isPaid?: boolean;
+  is_paid?: boolean;
   spaceSqm: number;
   organizerPricePerSqm: number;
   sheebaCutPercent: number;
@@ -143,6 +147,7 @@ export interface IExhibitorBoothVisitor {
 
 export interface IExhibitorCallUpsertPayload {
   isEnabled: boolean;
+  isPaid?: boolean;
   status: ExhibitorCallStatus;
   description?: string;
   pricingMode?: ExhibitorPricingMode;
@@ -167,6 +172,7 @@ export interface IManualVendorPayload {
   showcaseDescription?: string;
   specialRequirements?: string;
   spaceSqm: number;
+  isPaid?: boolean;
   boothNumber?: string;
   source: 'manual' | 'sponsorship';
   logoUrl?: string;

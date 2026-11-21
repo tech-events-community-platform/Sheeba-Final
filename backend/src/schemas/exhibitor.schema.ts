@@ -5,8 +5,8 @@ export const exhibitorCallStatusEnum = z.enum(['draft', 'open', 'closed'], {
   message: "Status must be 'draft', 'open', or 'closed'.",
 });
 
-export const exhibitorPricingModeEnum = z.enum(['per_sqm', 'fixed'], {
-  message: "Pricing mode must be 'per_sqm' or 'fixed'.",
+export const exhibitorPricingModeEnum = z.enum(['per_sqm', 'fixed', 'free'], {
+  message: "Pricing mode must be 'per_sqm', 'fixed', or 'free'.",
 });
 
 export const exhibitorPaymentConfigSchema = z
@@ -27,6 +27,8 @@ export const upsertExhibitorCallSchema = z
   .object({
     isEnabled: z.boolean({ message: 'isEnabled must be a boolean.' }).optional(),
     is_enabled: z.boolean().optional(),
+    isPaid: z.boolean().optional(),
+    is_paid: z.boolean().optional(),
     status: exhibitorCallStatusEnum.default('draft'),
     description: z.string().optional().nullable(),
     pricingMode: exhibitorPricingModeEnum.optional().default('per_sqm'),
@@ -64,17 +66,18 @@ export const upsertExhibitorCallSchema = z
   })
   .transform((data) => {
     const isEnabled = data.isEnabled ?? data.is_enabled ?? false;
-    const pricingMode = data.pricingMode || data.pricing_mode || 'per_sqm';
+    const isPaid = data.isPaid ?? data.is_paid ?? (data.pricingMode !== 'free' && data.pricing_mode !== 'free');
+    const pricingMode = isPaid ? (data.pricingMode || data.pricing_mode || 'per_sqm') : 'free';
     const totalSpaceSqm = data.totalSpaceSqm ?? data.total_space_sqm ?? 0;
-    const pricePerSqm = data.pricePerSqm ?? data.price_per_sqm ?? 0;
-    const fixedFee = data.fixedFee ?? data.fixed_fee ?? 0;
+    const pricePerSqm = isPaid ? (data.pricePerSqm ?? data.price_per_sqm ?? 0) : 0;
+    const fixedFee = isPaid ? (data.fixedFee ?? data.fixed_fee ?? 0) : 0;
     const sheebaCutPercent = data.sheebaCutPercent ?? data.sheeba_cut_percent ?? 30;
     const maxExhibitors = data.maxExhibitors ?? data.max_exhibitors ?? 10;
     const customQuestions =
       data.customQuestions && data.customQuestions.length > 0
         ? data.customQuestions
         : data.custom_questions || [];
-    const paymentConfig = data.paymentConfig || data.payment_config || {};
+    const paymentConfig = isPaid ? (data.paymentConfig || data.payment_config || {}) : {};
     const applicationDeadline = data.applicationDeadline || data.application_deadline || null;
     const hasBoothNumbers = data.hasBoothNumbers ?? data.has_booth_numbers ?? false;
     const hasVendorCheckin = data.hasVendorCheckin ?? data.has_vendor_checkin ?? false;
@@ -82,6 +85,7 @@ export const upsertExhibitorCallSchema = z
     return {
       ...data,
       isEnabled,
+      isPaid,
       pricingMode,
       totalSpaceSqm,
       pricePerSqm,
@@ -105,6 +109,8 @@ export const addManualVendorSchema = z.object({
   showcaseDescription: z.string().optional().nullable(),
   specialRequirements: z.string().optional().nullable(),
   spaceSqm: z.coerce.number().min(0.5, { message: 'Space must be at least 0.5 sqm.' }).default(1),
+  isPaid: z.boolean().optional(),
+  is_paid: z.boolean().optional(),
   boothNumber: z.string().trim().optional().nullable(),
   source: z.enum(['manual', 'sponsorship']).default('manual'),
   logoUrl: z.string().optional().nullable(),
@@ -114,6 +120,11 @@ export const addManualVendorSchema = z.object({
 export const updateVendorSchema = addManualVendorSchema.partial().extend({
   status: z.enum(['pending', 'accepted_awaiting_payment', 'confirmed', 'rejected', 'cancelled']).optional(),
   rejectionReason: z.string().optional().nullable(),
+  isPaid: z.boolean().optional(),
+  is_paid: z.boolean().optional(),
+  pricePerSqm: z.coerce.number().min(0).optional().nullable(),
+  totalFinalAmount: z.coerce.number().min(0).optional().nullable(),
+  paymentStatus: z.enum(['unpaid', 'paid', 'refunded']).optional(),
 });
 
 export const vendorQuerySchema = z.object({

@@ -167,6 +167,7 @@ export const ExhibitorExplorePage: React.FC = () => {
         spaceSqm: spaceRequested,
         pricingMode: applyingCall.pricingMode || 'per_sqm',
         questionAnswers: Object.keys(questionAnswers).length > 0 ? questionAnswers : undefined,
+        logoUrl: user?.avatarUrl || undefined,
       });
 
       setSubmittedAppSummary({
@@ -407,12 +408,16 @@ export const ExhibitorExplorePage: React.FC = () => {
                   <div className="absolute bottom-3 left-3">
                     <span
                       className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase shadow-xs ${
-                        isFixed
-                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                          : 'bg-amber-100 text-amber-900 border border-amber-200'
+                        c.isPaid === false || c.pricingMode === 'free'
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                          : (isFixed
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : 'bg-amber-100 text-amber-900 border border-amber-200')
                       }`}
                     >
-                      {isFixed ? 'Fixed Fee' : 'Per m² Pricing'}
+                      {c.isPaid === false || c.pricingMode === 'free'
+                        ? 'Complimentary Space'
+                        : (isFixed ? 'Fixed Fee' : 'Per m² Pricing')}
                     </span>
                   </div>
                 </div>
@@ -460,7 +465,22 @@ export const ExhibitorExplorePage: React.FC = () => {
 
                     {/* Pricing Breakdown Box */}
                     <div className="p-3.5 bg-[#FAF7F5] rounded-2xl border border-[#E8DDD7] space-y-2 mt-2">
-                      {isFixed ? (
+                      {c.isPaid === false || c.pricingMode === 'free' ? (
+                        <>
+                          <div className="flex items-baseline justify-between">
+                            <span className="text-xs text-gray-500 font-medium">Exhibition Fee:</span>
+                            <strong className="text-emerald-700 font-serif text-base">
+                              Free / Complimentary
+                            </strong>
+                          </div>
+                          <div className="text-[10px] text-gray-500 flex items-center justify-between">
+                            <span>Available Floor Space:</span>
+                            <strong className="text-[#2D1F23]">
+                              {c.spaceRemaining} m² remaining
+                            </strong>
+                          </div>
+                        </>
+                      ) : isFixed ? (
                         <>
                           <div className="flex items-baseline justify-between">
                             <span className="text-xs text-gray-500 font-medium">Fixed Exhibitor Fee:</span>
@@ -689,7 +709,9 @@ export const ExhibitorExplorePage: React.FC = () => {
                   {applyingCall.eventTitle}
                 </h3>
                 <p className="text-xs text-gray-500">
-                  {isFixedPricing
+                  {applyingCall.isPaid === false || (applyingCall as any).is_paid === false || applyingCall.pricingMode === 'free'
+                    ? 'Complimentary exhibition space (No fees charged)'
+                    : isFixedPricing
                     ? `Fixed Fee: ${applyingCall.finalFixedFee.toLocaleString()} ETB (all-inclusive flat rate)`
                     : `Rate: ${applyingCall.finalPricePerSqm.toLocaleString()} ETB / m² (Sheeba platform fee included)`}
                 </p>
@@ -800,24 +822,43 @@ export const ExhibitorExplorePage: React.FC = () => {
               </div>
 
               {/* Real-time Pricing Summary */}
-              <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-1">
-                <span className="text-[10px] uppercase font-bold text-emerald-800">
-                  {isFixedPricing ? 'Fixed Exhibitor Fee' : 'Calculated Price'}
-                </span>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-emerald-900 font-medium">
-                    {isFixedPricing
-                      ? 'Flat Rate per Booth'
-                      : `${spaceRequested} m² × ${applyingCall.finalPricePerSqm.toLocaleString()} ETB`}
+              {applyingCall.isPaid === false || (applyingCall as any).is_paid === false || applyingCall.pricingMode === 'free' ? (
+                <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-emerald-800">
+                    Exhibition Fee
                   </span>
-                  <span className="font-serif font-extrabold text-lg text-emerald-950">
-                    {calculatedTotalAmount.toLocaleString()} ETB
-                  </span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-emerald-900 font-medium">
+                      Complimentary Space ({spaceRequested} m² requested)
+                    </span>
+                    <span className="font-serif font-extrabold text-lg text-emerald-950">
+                      Free (0 ETB)
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-emerald-700">
+                    Zero payment required. The organizer will review your showcase details and assign your booth.
+                  </p>
                 </div>
-                <p className="text-[10px] text-emerald-700">
-                  Zero upfront payment. Payment is only requested after the organizer reviews and accepts your application.
-                </p>
-              </div>
+              ) : (
+                <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-emerald-800">
+                    {isFixedPricing ? 'Fixed Exhibitor Fee' : 'Calculated Price'}
+                  </span>
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-xs text-emerald-900 font-medium">
+                      {isFixedPricing
+                        ? 'Flat Rate per Booth'
+                        : `${spaceRequested} m² × ${applyingCall.finalPricePerSqm.toLocaleString()} ETB`}
+                    </span>
+                    <span className="font-serif font-extrabold text-lg text-emerald-950">
+                      {calculatedTotalAmount.toLocaleString()} ETB
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-emerald-700">
+                    Zero upfront payment. Payment is only requested after the organizer reviews and accepts your application.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-[#2D1F23] mb-1">
