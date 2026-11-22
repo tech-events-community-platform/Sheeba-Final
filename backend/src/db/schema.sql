@@ -403,6 +403,8 @@ ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS custom_questions JSONB DEFA
 ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS payment_config JSONB DEFAULT '{}'::jsonb;
 
 ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS is_paid BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE exhibitor_calls DROP CONSTRAINT IF EXISTS exhibitor_calls_pricing_mode_check;
+ALTER TABLE exhibitor_calls ADD CONSTRAINT exhibitor_calls_pricing_mode_check CHECK (pricing_mode IN ('per_sqm', 'fixed', 'free'));
 
 CREATE INDEX IF NOT EXISTS idx_exhibitor_calls_event_id ON exhibitor_calls(event_id);
 CREATE INDEX IF NOT EXISTS idx_exhibitor_calls_status ON exhibitor_calls(status);
@@ -443,14 +445,21 @@ CREATE TABLE IF NOT EXISTS event_vendors (
 );
 
 ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS pricing_mode VARCHAR(20) NOT NULL DEFAULT 'per_sqm';
+ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS is_paid BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS deleted_by UUID DEFAULT NULL;
 ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS question_answers JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE event_vendors DROP CONSTRAINT IF EXISTS event_vendors_pricing_mode_check;
+ALTER TABLE event_vendors ADD CONSTRAINT event_vendors_pricing_mode_check CHECK (pricing_mode IN ('per_sqm', 'fixed', 'free'));
 
 CREATE INDEX IF NOT EXISTS idx_event_vendors_event_id ON event_vendors(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_vendors_user_id ON event_vendors(user_id);
 CREATE INDEX IF NOT EXISTS idx_event_vendors_status ON event_vendors(status);
 CREATE INDEX IF NOT EXISTS idx_event_vendors_source ON event_vendors(source);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_event_vendors_active_user ON event_vendors (event_id, user_id) WHERE user_id IS NOT NULL AND status NOT IN ('rejected', 'cancelled');
-CREATE UNIQUE INDEX IF NOT EXISTS idx_event_vendors_active_email ON event_vendors (event_id, LOWER(contact_email)) WHERE status NOT IN ('rejected', 'cancelled');
+DROP INDEX IF EXISTS idx_event_vendors_active_user;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_vendors_active_user ON event_vendors (event_id, user_id) WHERE user_id IS NOT NULL AND status NOT IN ('rejected', 'cancelled') AND deleted_at IS NULL;
+DROP INDEX IF EXISTS idx_event_vendors_active_email;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_vendors_active_email ON event_vendors (event_id, LOWER(contact_email)) WHERE status NOT IN ('rejected', 'cancelled') AND deleted_at IS NULL;
 
 -- Segregated exhibitor booth payment reference constraint
 DO $$
