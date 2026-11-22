@@ -187,7 +187,6 @@ export const ExhibitorSettingsPage: React.FC = () => {
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span>Company Logo Attached</span>
                 </p>
-                <p className="text-[11px] text-gray-500 truncate mt-0.5">{companyLogo}</p>
                 <div className="mt-2 flex items-center gap-2">
                   <label className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#63474D] bg-white border border-[#E8DDD7] rounded-lg hover:bg-stone-50 cursor-pointer transition-colors shadow-2xs">
                     {isUploadingLogo ? (

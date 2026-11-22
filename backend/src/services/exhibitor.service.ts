@@ -410,7 +410,7 @@ export class ExhibitorService {
         COALESCE(u.email, v.contact_email) as contact_email,
         COALESCE(u.company_phone, u.phone, v.contact_phone) as contact_phone,
         COALESCE(u.company_website, v.website_url) as website_url,
-        COALESCE(u.avatar_url, v.logo_url) as logo_url,
+        COALESCE(v.logo_url, u.avatar_url) as logo_url,
         e.title as event_title, e.event_date, e.location as event_location,
         (
           SELECT json_build_object(
@@ -881,7 +881,7 @@ export class ExhibitorService {
          v.showcase_description,
          v.space_sqm,
          v.booth_number,
-         COALESCE(u.avatar_url, v.logo_url) as logo_url,
+         COALESCE(v.logo_url, u.avatar_url) as logo_url,
          COALESCE(u.company_website, v.website_url) as website_url,
          v.source
        FROM event_vendors v
@@ -1330,7 +1330,7 @@ export class ExhibitorService {
          COALESCE(u.email, v.contact_email) as contact_email,
          COALESCE(u.company_phone, u.phone, v.contact_phone) as contact_phone,
          COALESCE(u.company_website, v.website_url) as website_url,
-         COALESCE(u.avatar_url, v.logo_url) as logo_url,
+         COALESCE(v.logo_url, u.avatar_url) as logo_url,
          e.title as event_title,
          e.event_date,
          e.location as event_location,
@@ -1357,7 +1357,7 @@ export class ExhibitorService {
            ORDER BY p.created_at DESC
            LIMIT 1
          ) as latest_receipt,
-         (SELECT COUNT(*)::int FROM registrations r WHERE r.event_id = v.event_id) as total_registered,
+         (SELECT COUNT(*)::int FROM registrations r WHERE r.event_id = v.event_id AND r.status = 'registered' AND r.deleted_at IS NULL) as total_registered,
          (SELECT COUNT(*)::int FROM check_ins ci WHERE ci.event_id = v.event_id AND ci.voided_at IS NULL) as total_checked_in,
          (SELECT COUNT(*)::int FROM exhibitor_booth_visitors ebv WHERE ebv.vendor_id = v.id) as total_visitors_logged
        FROM event_vendors v

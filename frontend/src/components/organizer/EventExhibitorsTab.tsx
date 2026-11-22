@@ -788,6 +788,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                   <table className="w-full text-left text-xs">
                     <thead>
                       <tr className="border-b border-gray-100 bg-[#FAF7F5] text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="py-3 px-4 w-14">Logo</th>
                         <th className="py-3 px-4">Business & Contact</th>
                         <th className="py-3 px-4">Category</th>
                         <th className="py-3 px-4">Space (m²)</th>
@@ -800,28 +801,50 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filteredVendors.map((vendor) => (
-                        <tr key={vendor.id} className="hover:bg-gray-50/70 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <div>
-                              <button
-                                type="button"
-                                onClick={() => setReviewingVendor(vendor)}
-                                className="font-bold text-[#2D1F23] hover:text-[#63474D] hover:underline text-left block text-xs cursor-pointer"
-                                title="Click to view full application details"
+                      {filteredVendors.map((vendor) => {
+                        const logo = vendor.logoUrl || (vendor as any).logo_url;
+                        return (
+                          <tr key={vendor.id} className="hover:bg-gray-50/70 transition-colors">
+                            <td className="py-3.5 px-4 w-14">
+                              {logo ? (
+                                <img
+                                  src={logo}
+                                  alt={vendor.businessName}
+                                  className="w-9 h-9 rounded-xl object-cover border border-gray-200 bg-white shadow-2xs"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className={`w-9 h-9 rounded-xl bg-[#FAF7F5] border border-gray-200 flex items-center justify-center text-[#63474D] font-bold text-xs uppercase shadow-2xs ${
+                                  logo ? 'hidden' : ''
+                                }`}
                               >
-                                {vendor.businessName}
-                              </button>
-                              <span className="text-[11px] text-gray-400 block">
-                                {vendor.contactName} • {vendor.contactEmail}
-                              </span>
-                              {vendor.contactPhone && (
-                                <span className="text-[10px] text-gray-400 block">
-                                  {vendor.contactPhone}
+                                {vendor.businessName ? vendor.businessName.charAt(0) : <Store className="w-4 h-4 text-gray-400" />}
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div>
+                                <button
+                                  type="button"
+                                  onClick={() => setReviewingVendor(vendor)}
+                                  className="font-bold text-[#2D1F23] hover:text-[#63474D] hover:underline text-left block text-xs cursor-pointer"
+                                  title="Click to view full application details"
+                                >
+                                  {vendor.businessName}
+                                </button>
+                                <span className="text-[11px] text-gray-400 block">
+                                  {vendor.contactName} • {vendor.contactEmail}
                                 </span>
-                              )}
-                            </div>
-                          </td>
+                                {vendor.contactPhone && (
+                                  <span className="text-[10px] text-gray-400 block">
+                                    {vendor.contactPhone}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                           <td className="py-3.5 px-4 text-gray-600">
                             {vendor.category || '—'}
                           </td>
@@ -1015,7 +1038,8 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2197,34 +2221,56 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
           <div className="relative bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-gray-100 z-10 space-y-5 animate-fade-in max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-start justify-between pb-3 border-b border-gray-100">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
-                    Exhibitor Application Review
-                  </span>
-                  {reviewingVendor.source === 'applied' ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                      <Sparkles className="w-2.5 h-2.5" />
-                      <span>Applied via Sheeba</span>
+              <div className="flex items-start gap-3.5">
+                {/* Exhibitor Logo */}
+                {reviewingVendor.logoUrl || (reviewingVendor as any).logo_url ? (
+                  <img
+                    src={reviewingVendor.logoUrl || (reviewingVendor as any).logo_url}
+                    alt={reviewingVendor.businessName}
+                    className="w-14 h-14 rounded-2xl object-cover border border-gray-200 shrink-0 bg-white shadow-2xs"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`w-14 h-14 rounded-2xl bg-[#FAF7F5] border border-gray-200 flex items-center justify-center text-[#63474D] font-bold text-xl uppercase shrink-0 shadow-2xs ${
+                    reviewingVendor.logoUrl || (reviewingVendor as any).logo_url ? 'hidden' : ''
+                  }`}
+                >
+                  {reviewingVendor.businessName ? reviewingVendor.businessName.charAt(0) : <Store className="w-6 h-6 text-gray-400" />}
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D]">
+                      Exhibitor Application Review
                     </span>
-                  ) : reviewingVendor.source === 'sponsorship' ? (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                      Via Sponsorship
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                      Added Manually
+                    {reviewingVendor.source === 'applied' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        <span>Applied via Sheeba</span>
+                      </span>
+                    ) : reviewingVendor.source === 'sponsorship' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                        Via Sponsorship
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                        Added Manually
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-serif font-bold text-2xl text-[#2D1F23]">
+                    {reviewingVendor.businessName}
+                  </h3>
+                  {reviewingVendor.category && (
+                    <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-[#FAF7F5] text-gray-600 text-[11px] font-medium border border-[#E8DDD7]">
+                      {reviewingVendor.category}
                     </span>
                   )}
                 </div>
-                <h3 className="font-serif font-bold text-2xl text-[#2D1F23]">
-                  {reviewingVendor.businessName}
-                </h3>
-                {reviewingVendor.category && (
-                  <span className="inline-block mt-0.5 px-2 py-0.5 rounded-md bg-[#FAF7F5] text-gray-600 text-[11px] font-medium border border-[#E8DDD7]">
-                    {reviewingVendor.category}
-                  </span>
-                )}
               </div>
               <button
                 type="button"
