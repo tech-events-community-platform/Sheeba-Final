@@ -8,6 +8,30 @@ import { AuditService } from './audit.service';
 
 
 export class ExhibitorService {
+  private static schemaEnsured = false;
+  public static async ensureSchema(): Promise<void> {
+    if (this.schemaEnsured) return;
+    try {
+      await query(`
+        ALTER TABLE exhibitor_calls ADD COLUMN IF NOT EXISTS is_paid BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS is_paid BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL;
+        ALTER TABLE event_vendors ADD COLUMN IF NOT EXISTS deleted_by UUID DEFAULT NULL;
+        ALTER TABLE exhibitor_calls DROP CONSTRAINT IF EXISTS exhibitor_calls_pricing_mode_check;
+        ALTER TABLE exhibitor_calls ADD CONSTRAINT exhibitor_calls_pricing_mode_check CHECK (pricing_mode IN ('per_sqm', 'fixed', 'free'));
+        ALTER TABLE event_vendors DROP CONSTRAINT IF EXISTS event_vendors_pricing_mode_check;
+        ALTER TABLE event_vendors ADD CONSTRAINT event_vendors_pricing_mode_check CHECK (pricing_mode IN ('per_sqm', 'fixed', 'free'));
+        DROP INDEX IF EXISTS idx_event_vendors_active_user;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_event_vendors_active_user ON event_vendors (event_id, user_id) WHERE user_id IS NOT NULL AND status NOT IN ('rejected', 'cancelled') AND deleted_at IS NULL;
+        DROP INDEX IF EXISTS idx_event_vendors_active_email;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_event_vendors_active_email ON event_vendors (event_id, LOWER(contact_email)) WHERE status NOT IN ('rejected', 'cancelled') AND deleted_at IS NULL;
+      `);
+      this.schemaEnsured = true;
+    } catch (e) {
+      console.warn('[ExhibitorService] Schema auto-ensure warning:', e);
+    }
+  }
+
   /**
    * Helper to verify if an event belongs to an organizer (or user is admin)
    */
@@ -31,6 +55,7 @@ export class ExhibitorService {
    * Get exhibitor call configuration & stats for an event
    */
   static async getExhibitorCall(eventId: string): Promise<IExhibitorCall & { stats: { confirmedCount: number; totalSpaceAllocated: number; totalSpaceRemaining: number } }> {
+    await this.ensureSchema();
     const res = await query(
       `SELECT ec.*, e.title as event_title, e.event_date, e.location as event_location, e.event_type
        FROM exhibitor_calls ec
@@ -45,7 +70,7 @@ export class ExhibitorService {
          COUNT(*) FILTER (WHERE status = 'confirmed')::int as confirmed_count,
          COALESCE(SUM(space_sqm) FILTER (WHERE status = 'confirmed'), 0)::float as space_allocated
        FROM event_vendors 
-       WHERE event_id = $1`,
+       WHERE event_id = $1 AND deleted_at IS NULL`,
       [eventId]
     );
 
@@ -191,6 +216,7 @@ export class ExhibitorService {
     },
     isAdmin: boolean = false
   ): Promise<IExhibitorCall & { stats: { confirmedCount: number; totalSpaceAllocated: number; totalSpaceRemaining: number } }> {
+    await this.ensureSchema();
     await this.verifyEventOwnership(organizerId, eventId, isAdmin);
 
     const isEnabled = Boolean(data.isEnabled);
@@ -260,46 +286,50 @@ export class ExhibitorService {
     ]);
 
     // Automatically synchronize pricing for event vendors when call specifications update
-    if (!isPaid) {
-      await query(
-        `UPDATE event_vendors SET
-           is_paid = false,
-           pricing_mode = 'free',
-           organizer_price_per_sqm = 0,
-           total_organizer_amount = 0,
-           total_cut_amount = 0,
-           total_final_amount = 0,
-           updated_at = NOW()
-         WHERE event_id = $1 AND status != 'cancelled'`,
-        [eventId]
-      );
-    } else if (data.pricePerSqm !== undefined || sheebaCutPercent !== undefined) {
-      const newPrice = Number(data.pricePerSqm) || 0;
-      const newCut = Number(sheebaCutPercent) || 30.0;
-      await query(
-        `UPDATE event_vendors SET
-           is_paid = true,
-           organizer_price_per_sqm = CASE
-             WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1
-             ELSE organizer_price_per_sqm
-           END,
-           sheeba_cut_percent = $2,
-           total_organizer_amount = CASE
-             WHEN pricing_mode = 'fixed' THEN total_organizer_amount
-             ELSE (ROUND((space_sqm * (CASE WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1 ELSE organizer_price_per_sqm END))::numeric, 2))
-           END,
-           total_cut_amount = CASE
-             WHEN pricing_mode = 'fixed' THEN total_cut_amount
-             ELSE (ROUND(((space_sqm * (CASE WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1 ELSE organizer_price_per_sqm END)) * ($2 / 100))::numeric, 2))
-           END,
-           total_final_amount = CASE
-             WHEN pricing_mode = 'fixed' THEN total_final_amount
-             ELSE (ROUND(((space_sqm * (CASE WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1 ELSE organizer_price_per_sqm END)) * (1 + $2 / 100))::numeric, 2))
-           END,
-           updated_at = NOW()
-         WHERE event_id = $3 AND status != 'cancelled'`,
-        [newPrice, newCut, eventId]
-      );
+    try {
+      if (!isPaid) {
+        await query(
+          `UPDATE event_vendors SET
+             is_paid = false,
+             pricing_mode = 'free',
+             organizer_price_per_sqm = 0,
+             total_organizer_amount = 0,
+             total_cut_amount = 0,
+             total_final_amount = 0,
+             updated_at = NOW()
+           WHERE event_id = $1 AND status != 'cancelled'`,
+          [eventId]
+        );
+      } else if (data.pricePerSqm !== undefined || sheebaCutPercent !== undefined) {
+        const newPrice = Number(data.pricePerSqm) || 0;
+        const newCut = Number(sheebaCutPercent) || 30.0;
+        await query(
+          `UPDATE event_vendors SET
+             is_paid = true,
+             organizer_price_per_sqm = CASE
+               WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1
+               ELSE organizer_price_per_sqm
+             END,
+             sheeba_cut_percent = $2,
+             total_organizer_amount = CASE
+               WHEN pricing_mode = 'fixed' THEN total_organizer_amount
+               ELSE (ROUND((space_sqm * (CASE WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1 ELSE organizer_price_per_sqm END))::numeric, 2))
+             END,
+             total_cut_amount = CASE
+               WHEN pricing_mode = 'fixed' THEN total_cut_amount
+               ELSE (ROUND(((space_sqm * (CASE WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1 ELSE organizer_price_per_sqm END)) * ($2::numeric / 100.0))::numeric, 2))
+             END,
+             total_final_amount = CASE
+               WHEN pricing_mode = 'fixed' THEN total_final_amount
+               ELSE (ROUND(((space_sqm * (CASE WHEN organizer_price_per_sqm = 0 OR pricing_mode = 'per_sqm' THEN $1 ELSE organizer_price_per_sqm END)) * (1 + $2::numeric / 100.0))::numeric, 2))
+             END,
+             updated_at = NOW()
+           WHERE event_id = $3 AND status != 'cancelled'`,
+          [newPrice, newCut, eventId]
+        );
+      }
+    } catch (syncErr) {
+      console.warn('[ExhibitorService] Vendor pricing sync warning:', syncErr);
     }
 
     await CacheService.delPattern(`exhibitors:public:${eventId}*`);
@@ -369,6 +399,7 @@ export class ExhibitorService {
     filters?: { search?: string; source?: string; status?: string },
     isAdmin: boolean = false
   ): Promise<{ vendors: IEventVendor[]; totalCount: number; confirmedCount: number; pendingCount: number }> {
+    await this.ensureSchema();
     await this.verifyEventOwnership(organizerId, eventId, isAdmin);
 
     let sql = `
@@ -478,6 +509,7 @@ export class ExhibitorService {
     },
     isAdmin: boolean = false
   ): Promise<IEventVendor> {
+    await this.ensureSchema();
     await this.verifyEventOwnership(organizerId, eventId, isAdmin);
 
     // Find exhibitor call id if exists
@@ -560,6 +592,7 @@ export class ExhibitorService {
     }>,
     isAdmin: boolean = false
   ): Promise<IEventVendor> {
+    await this.ensureSchema();
     await this.verifyEventOwnership(organizerId, eventId, isAdmin);
 
     const client = await getClient();
@@ -790,7 +823,7 @@ export class ExhibitorService {
     const businessName = vendorRes.rows[0].business_name;
 
     await query(
-      'UPDATE event_vendors SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2 AND event_id = $3',
+      'UPDATE event_vendors SET deleted_at = NOW(), deleted_by = $1, status = \'cancelled\' WHERE id = $2 AND event_id = $3',
       [organizerId, vendorId, eventId]
     );
 
@@ -1023,6 +1056,7 @@ export class ExhibitorService {
       questionAnswers?: Record<string, any>;
     }
   ): Promise<IEventVendor> {
+    await this.ensureSchema();
     const client = await getClient();
     try {
       await client.query('BEGIN');
@@ -1033,7 +1067,7 @@ export class ExhibitorService {
          FROM exhibitor_calls ec
          JOIN events e ON e.id = ec.event_id
          WHERE ec.event_id = $1
-         FOR UPDATE`,
+         FOR UPDATE OF ec`,
         [eventId]
       );
 
@@ -1074,7 +1108,7 @@ export class ExhibitorService {
            COALESCE(SUM(space_sqm) FILTER (WHERE status IN ('confirmed', 'accepted_awaiting_payment')), 0)::float as committed_space,
            COUNT(*) FILTER (WHERE status = 'confirmed')::int as confirmed_count
          FROM event_vendors
-         WHERE event_id = $1`,
+         WHERE event_id = $1 AND deleted_at IS NULL`,
         [eventId]
       );
 
@@ -1105,7 +1139,8 @@ export class ExhibitorService {
         `SELECT id, status FROM event_vendors
          WHERE event_id = $1
            AND (user_id = $2 OR LOWER(contact_email) = $3)
-           AND status NOT IN ('rejected', 'cancelled')`,
+           AND status NOT IN ('rejected', 'cancelled')
+           AND deleted_at IS NULL`,
         [eventId, userId, data.contactEmail.trim().toLowerCase()]
       );
 
@@ -1250,18 +1285,22 @@ export class ExhibitorService {
       await CacheService.delPattern(`*http:*/api/exhibitors/events/${eventId}*`);
       await CacheService.delPattern(`*http:*user:${userId}*`);
 
-      await AuditService.logAction({
-        action: 'EXHIBITOR_APPLICATION_SUBMITTED',
-        category: 'ORGANIZER_SPONSOR',
-        entityType: 'event_vendor',
-        entityId: res.rows[0].id,
-        entityTitle: data.businessName,
-        performedBy: userId,
-        performedByName: data.contactName,
-        performedByEmail: data.contactEmail,
-        details: `Exhibitor booth application submitted for "${call.event_title}" (${data.spaceSqm} sqm)`,
-        metadata: { eventId, businessName: data.businessName, spaceSqm: data.spaceSqm },
-      });
+      try {
+        await AuditService.logAction({
+          action: 'EXHIBITOR_APPLICATION_SUBMITTED',
+          category: 'ORGANIZER_SPONSOR',
+          entityType: 'event_vendor',
+          entityId: res.rows[0].id,
+          entityTitle: data.businessName,
+          performedBy: userId,
+          performedByName: data.contactName,
+          performedByEmail: data.contactEmail,
+          details: `Exhibitor booth application submitted for "${call.event_title}" (${data.spaceSqm} sqm)`,
+          metadata: { eventId, businessName: data.businessName, spaceSqm: data.spaceSqm },
+        });
+      } catch (auditErr) {
+        console.warn('[ExhibitorService] Audit log warning on booth application:', auditErr);
+      }
 
       return this.mapVendorRow(res.rows[0]);
     } catch (error: any) {
@@ -1281,6 +1320,7 @@ export class ExhibitorService {
    * Exhibitor: Retrieve all booth applications & confirmed booths for authenticated exhibitor
    */
   static async getMyBooths(userId: string): Promise<any[]> {
+    await this.ensureSchema();
     const res = await query(
       `SELECT
          v.*,
@@ -1324,7 +1364,7 @@ export class ExhibitorService {
        JOIN events e ON e.id = v.event_id
        LEFT JOIN users u ON u.id = v.user_id
        LEFT JOIN exhibitor_calls ec ON ec.event_id = v.event_id
-       WHERE v.user_id = $1
+       WHERE v.user_id = $1 AND v.deleted_at IS NULL
        ORDER BY v.created_at DESC`,
       [userId]
     );
