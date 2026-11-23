@@ -13,6 +13,7 @@ import type {
 import type { RegistrationQuestion, PaymentDestination } from '../../types/event';
 import { EditExhibitorQuestionsModal } from './EditExhibitorQuestionsModal';
 import { formatPhoneInput } from '../../utils/phone';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 import { Button } from '../ui/Button';
 import {
   Store,
@@ -43,6 +44,8 @@ import {
   Wallet,
   ShieldCheck,
   File,
+  Upload,
+  Loader2,
 } from 'lucide-react';
 
 interface EventExhibitorsTabProps {
@@ -107,6 +110,66 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
   // Edit Vendor State
   const [editingVendor, setEditingVendor] = useState<IEventVendor | null>(null);
   const [isUpdatingVendor, setIsUpdatingVendor] = useState(false);
+
+  // Vendor Logo Upload State (Manual & Edit)
+  const [isUploadingManualLogo, setIsUploadingManualLogo] = useState(false);
+  const [manualLogoError, setManualLogoError] = useState<string | null>(null);
+  const [isUploadingEditLogo, setIsUploadingEditLogo] = useState(false);
+  const [editLogoError, setEditLogoError] = useState<string | null>(null);
+
+  const handleManualLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setManualLogoError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setManualLogoError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingManualLogo(true);
+    setManualLogoError(null);
+    try {
+      const url = await uploadToCloudinary(file, { folder: 'sheeba_exhibitor_logos' });
+      setManualForm((prev) => ({ ...prev, logoUrl: url }));
+    } catch (err: any) {
+      setManualLogoError(err.message || 'Failed to upload vendor logo.');
+    } finally {
+      setIsUploadingManualLogo(false);
+    }
+  };
+
+  const handleEditLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingVendor) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setEditLogoError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setEditLogoError('Logo file size must not exceed 5MB.');
+      return;
+    }
+
+    setIsUploadingEditLogo(true);
+    setEditLogoError(null);
+    try {
+      const url = await uploadToCloudinary(file, { folder: 'sheeba_exhibitor_logos' });
+      setEditingVendor((prev) => prev ? ({ ...prev, logoUrl: url, logo_url: url } as any) : null);
+    } catch (err: any) {
+      setEditLogoError(err.message || 'Failed to upload vendor logo.');
+    } finally {
+      setIsUploadingEditLogo(false);
+    }
+  };
 
   // Delete Vendor State
   const [deletingVendor, setDeletingVendor] = useState<IEventVendor | null>(null);
@@ -343,6 +406,7 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
         paymentStatus: vendorIsPaid ? editingVendor.paymentStatus : 'paid',
         boothNumber: editingVendor.boothNumber || undefined,
         status: editingVendor.status,
+        logoUrl: editingVendor.logoUrl !== undefined ? editingVendor.logoUrl : ((editingVendor as any).logo_url || undefined),
       });
       showNotification('success', `Vendor "${editingVendor.businessName}" updated successfully.`);
       setEditingVendor(null);
@@ -1704,6 +1768,59 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
             )}
 
             <form onSubmit={handleAddManualVendor} className="space-y-4">
+              {/* Company / Vendor Logo Upload */}
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Company / Vendor Logo <span className="text-gray-400 font-normal">(PNG, JPG, WebP up to 5MB)</span>
+                </label>
+                {manualForm.logoUrl ? (
+                  <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                    <img
+                      src={manualForm.logoUrl}
+                      alt="Vendor Logo"
+                      className="w-10 h-10 rounded-xl object-contain bg-white border border-[#E8DDD7] p-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-semibold text-[#2D1F23] flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span className="truncate">Logo uploaded to Cloudinary</span>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setManualForm((prev) => ({ ...prev, logoUrl: '' }))}
+                      className="p-1 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
+                      title="Remove logo"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="flex items-center justify-center gap-2 p-2.5 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
+                      {isUploadingManualLogo ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
+                      ) : (
+                        <Upload className="w-4 h-4 text-[#756366]" />
+                      )}
+                      <span className="text-xs font-medium text-[#756366]">
+                        {isUploadingManualLogo ? 'Uploading logo to Cloudinary...' : 'Upload Vendor Logo'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        className="hidden"
+                        disabled={isUploadingManualLogo}
+                        onChange={handleManualLogoUpload}
+                      />
+                    </label>
+                    {manualLogoError && (
+                      <p className="text-[11px] text-red-600">{manualLogoError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-bold text-[#2D1F23] mb-1">
@@ -1963,6 +2080,73 @@ export const EventExhibitorsTab: React.FC<EventExhibitorsTabProps> = ({ eventId,
             </div>
 
             <form onSubmit={handleUpdateVendor} className="space-y-4">
+              {/* Vendor Logo in Edit Modal */}
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1">
+                  Company / Vendor Logo <span className="text-gray-400 font-normal">(PNG, JPG, WebP up to 5MB)</span>
+                </label>
+                {(editingVendor.logoUrl || (editingVendor as any).logo_url) ? (
+                  <div className="flex items-center gap-3 p-2 bg-[#FAF7F5] border border-[#E8DDD7] rounded-xl">
+                    <img
+                      src={editingVendor.logoUrl || (editingVendor as any).logo_url}
+                      alt="Vendor Logo"
+                      className="w-10 h-10 rounded-xl object-contain bg-white border border-[#E8DDD7] p-0.5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-semibold text-[#2D1F23] flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span className="truncate">Logo saved to Cloudinary</span>
+                      </p>
+                    </div>
+                    <label className="text-[11px] text-[#63474D] font-bold hover:underline cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-black/5 transition-colors">
+                      {isUploadingEditLogo ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#63474D]" />
+                      ) : (
+                        <span>Change</span>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        className="hidden"
+                        disabled={isUploadingEditLogo}
+                        onChange={handleEditLogoUpload}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setEditingVendor({ ...editingVendor, logoUrl: '', logo_url: '' } as any)}
+                      className="p-1 text-[#756366] hover:text-red-600 transition-colors cursor-pointer"
+                      title="Remove logo"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="flex items-center justify-center gap-2 p-2.5 bg-[#FAF7F5] hover:bg-[#F2ECE9] border border-dashed border-[#E8DDD7] rounded-xl cursor-pointer transition-all">
+                      {isUploadingEditLogo ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-[#63474D]" />
+                      ) : (
+                        <Upload className="w-4 h-4 text-[#756366]" />
+                      )}
+                      <span className="text-xs font-medium text-[#756366]">
+                        {isUploadingEditLogo ? 'Uploading logo to Cloudinary...' : 'Upload Vendor Logo'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        className="hidden"
+                        disabled={isUploadingEditLogo}
+                        onChange={handleEditLogoUpload}
+                      />
+                    </label>
+                    {editLogoError && (
+                      <p className="text-[11px] text-red-600">{editLogoError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-bold text-[#2D1F23] mb-1">
