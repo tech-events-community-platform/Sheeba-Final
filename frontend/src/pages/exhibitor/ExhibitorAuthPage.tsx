@@ -26,10 +26,11 @@ export const ExhibitorAuthPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { login, register, user, addExhibitorRole } = useAuth();
+  const { login, register, user, addExhibitorRole, logout } = useAuth();
   const initialMode = searchParams.get('mode');
   const [isLogin, setIsLogin] = useState(initialMode !== 'register' && initialMode !== 'signup');
   const [showPassword, setShowPassword] = useState(false);
+  const [wantsNewAccount, setWantsNewAccount] = useState(false);
 
   /**
    * Safely compute the post-auth return destination, preventing open redirects.
@@ -65,8 +66,11 @@ export const ExhibitorAuthPage: React.FC = () => {
     const mode = searchParams.get('mode');
     if (mode === 'register' || mode === 'signup') {
       setIsLogin(false);
+      setShowAddRoleFlow(false);
+      setWantsNewAccount(true);
     } else if (mode === 'login') {
       setIsLogin(true);
+      setShowAddRoleFlow(false);
     }
   }, [searchParams]);
 
@@ -133,7 +137,14 @@ export const ExhibitorAuthPage: React.FC = () => {
       }
       // If user is not authenticated, log in with attendee/existing role first
       if (!user) {
-        await login(email.trim().toLowerCase(), password, 'attendee');
+        try {
+          await login(email.trim().toLowerCase(), password, 'attendee');
+        } catch (loginErr: any) {
+          setError(
+            'Incorrect email or password for existing account. If you are creating a brand new account, please click "Create New Exhibitor Account" below.'
+          );
+          return;
+        }
       }
 
       await addExhibitorRole({
@@ -242,18 +253,26 @@ export const ExhibitorAuthPage: React.FC = () => {
     }
   };
 
+  const isExistingUserWithoutExhibitor = !!user && !user.isExhibitor && !user.roles?.includes('EXHIBITOR');
+  const showRoleUpgrade = showAddRoleFlow || (isExistingUserWithoutExhibitor && !wantsNewAccount);
+
   // Render: add-exhibitor-role flow for existing users
-  if (showAddRoleFlow || (user && !user.isExhibitor && !user.roles?.includes('EXHIBITOR'))) {
+  if (showRoleUpgrade) {
     return (
       <div className="min-h-screen bg-[#FAF7F5] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md space-y-4">
           <button
             type="button"
-            onClick={() => { setShowAddRoleFlow(false); setError(null); }}
+            onClick={() => {
+              setShowAddRoleFlow(false);
+              setWantsNewAccount(true);
+              setIsLogin(false);
+              setError(null);
+            }}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#63474D] hover:underline cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back</span>
+            <span>Back to Registration</span>
           </button>
 
           <div className="text-center space-y-1">
@@ -264,7 +283,25 @@ export const ExhibitorAuthPage: React.FC = () => {
               Add Exhibitor Role
             </h2>
             <p className="text-xs text-gray-500">
-              An account with this email already exists. Confirm your password below to add the Exhibitor role without losing your existing permissions.
+              {user ? (
+                <>You are currently signed in as <span className="font-semibold text-[#2D1F23]">{user.email}</span>. Confirm your password below to add the Exhibitor role without losing your existing permissions.</>
+              ) : (
+                <>An account with this email already exists on Sheeba. Confirm your password below to add the Exhibitor role, or{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddRoleFlow(false);
+                      setWantsNewAccount(true);
+                      setIsLogin(false);
+                      setError(null);
+                    }}
+                    className="text-[#63474D] font-bold underline hover:text-black cursor-pointer"
+                  >
+                    create a new account
+                  </button>
+                  .
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -449,6 +486,25 @@ export const ExhibitorAuthPage: React.FC = () => {
               >
                 Add Exhibitor Role to My Account
               </Button>
+
+              <div className="pt-3 text-center text-xs text-gray-500 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-center gap-1.5">
+                <span>Want to create a brand new exhibitor account instead?</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (user) {
+                      await logout();
+                    }
+                    setShowAddRoleFlow(false);
+                    setWantsNewAccount(true);
+                    setIsLogin(false);
+                    setError(null);
+                  }}
+                  className="text-[#63474D] font-bold hover:underline cursor-pointer"
+                >
+                  Create New Account →
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -490,7 +546,7 @@ export const ExhibitorAuthPage: React.FC = () => {
           <div className="grid grid-cols-2 p-1 bg-[#FAF7F5] rounded-2xl border border-gray-100">
             <button
               type="button"
-              onClick={() => { setIsLogin(true); setError(null); }}
+              onClick={() => { setIsLogin(true); setShowAddRoleFlow(false); setError(null); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                 isLogin ? 'bg-[#63474D] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
               }`}
@@ -499,7 +555,7 @@ export const ExhibitorAuthPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => { setShowAddRoleFlow(true); setError(null); }}
+              onClick={() => { setIsLogin(false); setShowAddRoleFlow(false); setWantsNewAccount(true); setError(null); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                 !isLogin ? 'bg-[#63474D] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
               }`}
@@ -517,7 +573,7 @@ export const ExhibitorAuthPage: React.FC = () => {
                   <div className="mt-2">
                     <button
                       type="button"
-                      onClick={() => { setIsLogin(false); setError(null); }}
+                      onClick={() => { setShowAddRoleFlow(true); setError(null); }}
                       className="text-[#63474D] font-bold hover:underline cursor-pointer"
                     >
                       Add Exhibitor Role to this Account →
