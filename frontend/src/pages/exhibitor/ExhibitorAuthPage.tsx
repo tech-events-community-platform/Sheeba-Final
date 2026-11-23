@@ -490,7 +490,7 @@ export const ExhibitorAuthPage: React.FC = () => {
           <div className="grid grid-cols-2 p-1 bg-[#FAF7F5] rounded-2xl border border-gray-100">
             <button
               type="button"
-              onClick={() => { setIsLogin(true); setError(null); }}
+              onClick={() => { setIsLogin(true); setShowAddRoleFlow(false); setError(null); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                 isLogin ? 'bg-[#63474D] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
               }`}
@@ -499,7 +499,7 @@ export const ExhibitorAuthPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => { setShowAddRoleFlow(true); setError(null); }}
+              onClick={() => { setIsLogin(false); setShowAddRoleFlow(false); setError(null); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
                 !isLogin ? 'bg-[#63474D] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
               }`}
@@ -517,7 +517,7 @@ export const ExhibitorAuthPage: React.FC = () => {
                   <div className="mt-2">
                     <button
                       type="button"
-                      onClick={() => { setIsLogin(false); setError(null); }}
+                      onClick={() => { setShowAddRoleFlow(true); setError(null); }}
                       className="text-[#63474D] font-bold hover:underline cursor-pointer"
                     >
                       Add Exhibitor Role to this Account →

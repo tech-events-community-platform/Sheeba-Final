@@ -11,6 +11,8 @@ export const registerSchema = z
     role: z.string().trim().optional(),
     phone: z.string().trim().optional(),
     bio: z.string().trim().optional(),
+    industry_category: z.string().trim().optional(),
+    industryCategory: z.string().trim().optional(),
     // Formalization fields
     applicant_type: z.string().trim().optional(),
     applicantType: z.string().trim().optional(),
@@ -100,6 +102,8 @@ export const registerSchema = z
       companyLogo: orgLogo || undefined,
       avatar_url: orgLogo || undefined,
       avatarUrl: orgLogo || undefined,
+      industry_category: (data.industry_category || data.industryCategory || '').trim() || undefined,
+      industryCategory: (data.industry_category || data.industryCategory || '').trim() || undefined,
       socials: data.socials || (orgWebsite ? { website: orgWebsite } : {}),
     };
   })
