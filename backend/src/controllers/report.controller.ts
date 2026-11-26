@@ -72,11 +72,11 @@ export class ReportController {
       const eventId = req.params.id as string;
       const userId = req.user!.userId;
       const userRole = req.user!.role;
-      const { aiNarrative, customNotes } = req.body;
+      const { aiNarrative, customNotes, customSections } = req.body;
 
       const report = await ReportService.updateEventReport(
         eventId,
-        { aiNarrative, customNotes },
+        { aiNarrative, customNotes, customSections },
         userId,
         userRole
       );

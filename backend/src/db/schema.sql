@@ -345,11 +345,14 @@ CREATE TABLE IF NOT EXISTS event_reports (
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     ai_narrative JSONB NOT NULL DEFAULT '{}'::jsonb,
     custom_notes TEXT,
+    custom_sections JSONB DEFAULT '[]'::jsonb,
     updated_by UUID REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT unique_event_report UNIQUE (event_id)
 );
+
+ALTER TABLE event_reports ADD COLUMN IF NOT EXISTS custom_sections JSONB DEFAULT '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_event_reports_event_id ON event_reports(event_id);
 
