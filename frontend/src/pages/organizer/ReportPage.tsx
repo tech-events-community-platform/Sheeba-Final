@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import type { Event } from '../../types/event';
-import type { SponsorReportData } from '../../types/attendance';
+import type { SponsorReportData, IReportSectionItem } from '../../types/attendance';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { ReviewsSection } from '../../components/reviews/ReviewsSection';
@@ -27,6 +27,10 @@ import {
   RotateCcw,
   Save,
   Sparkles,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  Plus,
 } from 'lucide-react';
 
 
@@ -94,6 +98,24 @@ const renderFormattedNotes = (text: string) => {
     );
   });
 };
+
+const DEFAULT_STANDARD_SECTIONS: IReportSectionItem[] = [
+  { id: 'sec-exec-summary', key: 'sec-exec-summary', title: 'Executive Summary & Impact Overview', type: 'standard' },
+  { id: 'sec-about-event', key: 'sec-about-event', title: 'Event Context & Strategic Objectives', type: 'standard' },
+  { id: 'sec-delivery', key: 'sec-delivery', title: 'Program Delivery & Check-in Fidelity', type: 'standard' },
+  { id: 'sec-audience', key: 'sec-audience', title: 'Who the Event Reached', type: 'standard' },
+  { id: 'sec-orgs', key: 'sec-orgs', title: 'Organizations and Community Reach', type: 'standard' },
+  { id: 'sec-interests', key: 'sec-interests', title: 'Areas of Interest', type: 'standard' },
+  { id: 'sec-motivations', key: 'sec-motivations', title: 'Attendee Motivation', type: 'standard' },
+  { id: 'sec-engagement', key: 'sec-engagement', title: 'Engagement & Participation', type: 'standard' },
+  { id: 'sec-voice', key: 'sec-voice', title: 'Attendee Voice', type: 'standard' },
+  { id: 'sec-ai-analysis', key: 'sec-ai-analysis', title: 'AI-Generated Audience Analysis', type: 'standard' },
+  { id: 'sec-findings', key: 'sec-findings', title: 'Key Empirical Findings', type: 'standard' },
+  { id: 'sec-recommendations', key: 'sec-recommendations', title: 'Opportunities & Recommendations', type: 'standard' },
+  { id: 'sec-partner-impact', key: 'sec-partner-impact', title: 'Sponsor & Partner Impact', type: 'standard' },
+  { id: 'sec-conclusion', key: 'sec-conclusion', title: 'Strategic Conclusion & Executive Summary', type: 'standard' },
+  { id: 'sec-ledger', key: 'sec-ledger', title: 'Verified Attendee Register', type: 'standard' },
+];
 
 const DEMO_EVENT: Event = {
   id: 'demo-impact-event-2026',
@@ -303,6 +325,141 @@ export const ReportPage: React.FC = () => {
   const [isResettingReport, setIsResettingReport] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
+  // Section Management State (Dynamic ordering, Add Above/Below, Delete, Custom sections)
+  const [sections, setSections] = useState<IReportSectionItem[]>(DEFAULT_STANDARD_SECTIONS);
+  const [isAddSectionModalOpen, setIsAddSectionModalOpen] = useState(false);
+  const [addSectionPosition, setAddSectionPosition] = useState<{ index: number; placement: 'above' | 'below' } | null>(null);
+  const [newSectionForm, setNewSectionForm] = useState({ title: '', content: '' });
+  const [isEditCustomModalOpen, setIsEditCustomModalOpen] = useState(false);
+  const [editingCustomSection, setEditingCustomSection] = useState<IReportSectionItem | null>(null);
+  const [isSavingSections, setIsSavingSections] = useState(false);
+  const [sectionNotification, setSectionNotification] = useState<string | null>(null);
+
+  // Sync sections from report when loaded
+  useEffect(() => {
+    if (report) {
+      if (report.customSections && Array.isArray(report.customSections) && report.customSections.length > 0) {
+        setSections(report.customSections);
+      } else {
+        setSections(DEFAULT_STANDARD_SECTIONS);
+      }
+    }
+  }, [report]);
+
+  // Persist sections permanently to backend database
+  const persistSections = async (updatedSections: IReportSectionItem[]) => {
+    if (!selectedEventId) return;
+    setIsSavingSections(true);
+    try {
+      const updated = await api.reports.updateEventReport(selectedEventId, {
+        customSections: updatedSections,
+      });
+      if (updated) {
+        setReport(updated);
+      }
+      setSectionNotification('Report sections updated and saved permanently!');
+      setTimeout(() => setSectionNotification(null), 3000);
+    } catch (err: any) {
+      console.error('Failed to save sections:', err);
+      alert(err.message || 'Failed to save sections permanently.');
+    } finally {
+      setIsSavingSections(false);
+    }
+  };
+
+  const handleOpenAddModal = (index: number, placement: 'above' | 'below') => {
+    setAddSectionPosition({ index, placement });
+    setNewSectionForm({ title: '', content: '' });
+    setIsAddSectionModalOpen(true);
+  };
+
+  const handleSaveNewSection = async () => {
+    if (!addSectionPosition || !newSectionForm.title.trim()) return;
+
+    const newSec: IReportSectionItem = {
+      id: `sec-custom-${Date.now()}`,
+      key: `sec-custom-${Date.now()}`,
+      title: newSectionForm.title.trim(),
+      content: newSectionForm.content.trim(),
+      type: 'custom',
+    };
+
+    const insertIdx =
+      addSectionPosition.placement === 'above'
+        ? addSectionPosition.index
+        : addSectionPosition.index + 1;
+
+    const updatedSections = [...sections];
+    updatedSections.splice(insertIdx, 0, newSec);
+    setSections(updatedSections);
+    setIsAddSectionModalOpen(false);
+    await persistSections(updatedSections);
+  };
+
+  const handleDeleteSection = async (sectionId: string, sectionTitle: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete section "${sectionTitle}"? This will remove it from the report.`
+    );
+    if (!confirmed) return;
+
+    const updatedSections = sections.filter((s) => s.id !== sectionId);
+    setSections(updatedSections);
+    await persistSections(updatedSections);
+  };
+
+  const handleOpenEditCustomModal = (section: IReportSectionItem) => {
+    setEditingCustomSection({ ...section });
+    setIsEditCustomModalOpen(true);
+  };
+
+  const handleSaveEditedCustomSection = async () => {
+    if (!editingCustomSection || !editingCustomSection.title.trim()) return;
+
+    const updatedSections = sections.map((s) =>
+      s.id === editingCustomSection.id ? { ...editingCustomSection } : s
+    );
+    setSections(updatedSections);
+    setIsEditCustomModalOpen(false);
+    await persistSections(updatedSections);
+  };
+
+  const renderSectionHeaderActions = (
+    section: IReportSectionItem,
+    index: number,
+    customButtons?: React.ReactNode
+  ) => (
+    <div className="flex items-center gap-1.5 print:hidden">
+      <button
+        type="button"
+        onClick={() => handleOpenAddModal(index, 'above')}
+        className="p-1.5 text-gray-500 hover:text-[#2D1F23] hover:bg-gray-100 rounded-lg transition-colors cursor-pointer flex items-center justify-center border border-gray-200/60"
+        title="Add Section Above"
+        aria-label="Add Section Above"
+      >
+        <ArrowUp className="w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={() => handleOpenAddModal(index, 'below')}
+        className="p-1.5 text-gray-500 hover:text-[#2D1F23] hover:bg-gray-100 rounded-lg transition-colors cursor-pointer flex items-center justify-center border border-gray-200/60"
+        title="Add Section Below"
+        aria-label="Add Section Below"
+      >
+        <ArrowDown className="w-3.5 h-3.5" />
+      </button>
+      {customButtons}
+      <button
+        type="button"
+        onClick={() => handleDeleteSection(section.id, section.title)}
+        className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer flex items-center justify-center border border-red-100"
+        title="Delete Section"
+        aria-label="Delete Section"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+
   const handleOpenEditModal = (targetTab: 'summary' | 'background' | 'delivery' | 'conclusion' | 'notes' = 'summary') => {
     if (!report) return;
     setEditForm({
@@ -344,6 +501,7 @@ export const ReportPage: React.FC = () => {
           strategicConclusion: editForm.strategicConclusion,
         },
         customNotes: editForm.customNotes,
+        customSections: sections,
       });
       setReport(updated);
       setSaveFeedback('Report saved successfully!');
@@ -369,6 +527,7 @@ export const ReportPage: React.FC = () => {
     try {
       const freshReport = await api.reports.resetEventReport(selectedEventId);
       setReport(freshReport);
+      setSections(DEFAULT_STANDARD_SECTIONS);
       setEditForm({
         executiveSummary: freshReport.aiNarrative?.executiveSummary || '',
         eventBackground: freshReport.aiNarrative?.eventBackground || '',
@@ -531,256 +690,81 @@ export const ReportPage: React.FC = () => {
     }
   };
 
-  return (
-    <div className="sheeba-report-page w-full max-w-5xl mx-auto space-y-6 pb-32 font-sans text-[#2D1F23] print:max-w-none print:w-full print:m-0 print:p-0 print:pb-0 print:space-y-4">
-      {/* Top Controls Header (Hidden when printing) */}
-      <div className="flex flex-col gap-4 border-b border-gray-200 pb-4 print:hidden">
-        <div>
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#63474D]">
-              Proof-of-Performance Artifact
-            </span>
-            <Badge variant="primary" className="text-[10px]">
-              Sponsor Ready
-            </Badge>
-            {report?.isCustomized && (
-              <Badge variant="outline" className="text-amber-800 bg-amber-50 border-amber-300 text-[10px]">
-                Customized by Organizer
-              </Badge>
-            )}
-          </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23] leading-tight">
-            Sheeba Event Impact Report
-          </h1>
-        </div>
 
-        {/* Toolbar: Event Selector & Action Buttons */}
-        {!loading && events.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FAF7F5] p-3 rounded-2xl border border-[#E8DDD7]">
-            <div className="w-full sm:w-72 md:w-80">
-              <select
-                value={selectedEventId}
-                onChange={(e) => handleSelectEvent(e.target.value)}
-                className="w-full truncate px-3 py-2 bg-white border border-[#E8DDD7] rounded-xl text-xs font-bold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
-              >
-                {events.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.title} ({e.date})
-                  </option>
-                ))}
-              </select>
+  // Render Individual Report Section (Standard or Custom)
+  const renderSectionItem = (section: IReportSectionItem, index: number) => {
+    if (!report) return null;
+    const sectionNumber = index + 1;
+
+    if (section.type === 'custom') {
+      return (
+        <section
+          key={section.id}
+          id={section.id}
+          className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
+        >
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                {sectionNumber}. {section.title}
+              </h2>
             </div>
-
-            {report && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  onClick={() => handleOpenEditModal('summary')}
-                  variant="outline"
-                  size="sm"
-                  icon={<Edit3 className="w-4 h-4 text-[#63474D]" />}
-                  className="whitespace-nowrap bg-white text-xs"
-                >
-                  Edit Report
-                </Button>
-                <Button
-                  onClick={handleExportCSV}
-                  variant="outline"
-                  size="sm"
-                  icon={<FileSpreadsheet className="w-4 h-4 text-[#2A7B5F]" />}
-                  className="whitespace-nowrap bg-white text-xs"
-                >
-                  Export CSV
-                </Button>
-                <Button
-                  onClick={handlePrintPDF}
-                  variant="accent"
-                  size="sm"
-                  icon={<Printer className="w-4 h-4" />}
-                  className="whitespace-nowrap text-xs"
-                >
-                  Print / Save PDF
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {loading ? (
-        <div className="space-y-6 pt-4">
-          <div className="h-1 w-full bg-[#63474D]/20 overflow-hidden rounded-full print:hidden">
-            <div className="h-full bg-[#63474D] animate-pulse w-1/2 rounded-full" />
-          </div>
-          <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] shadow-xs space-y-4 animate-pulse">
-            <div className="h-6 w-48 bg-gray-200 rounded-lg"></div>
-            <div className="h-4 w-96 bg-gray-100 rounded-lg"></div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6">
-              <div className="h-28 bg-gray-100 rounded-2xl"></div>
-              <div className="h-28 bg-gray-100 rounded-2xl"></div>
-              <div className="h-28 bg-gray-100 rounded-2xl"></div>
-            </div>
-          </div>
-        </div>
-      ) : events.length === 0 ? (
-        /* Empty State: Organizer hasn't hosted any events */
-        <div className="bg-white rounded-3xl p-12 border border-[#E8DDD7] text-center space-y-5 shadow-xs max-w-xl mx-auto my-12">
-          <div className="w-16 h-16 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center mx-auto">
-            <BarChart3 className="w-8 h-8 text-[#63474D]" />
-          </div>
-          <div className="space-y-2">
-            <h2 className="font-serif font-bold text-xl text-[#2D1F23]">No Event Reports Available</h2>
-            <p className="text-sm text-[#756366] max-w-md mx-auto leading-relaxed">
-              Reports and institutional sponsor analytics are generated exclusively for events you organize and host. Once you publish an event and check in attendees, your verified impact dossier will appear here.
-            </p>
-          </div>
-          <div className="pt-2">
-            <Link to="/organizer/events/create">
-              <Button variant="primary" icon={<PlusCircle className="w-4 h-4" />}>
-                Create Your First Event
-              </Button>
-            </Link>
-          </div>
-        </div>
-      ) : reportLoading ? (
-        <div className="space-y-6 pt-4">
-          <div className="h-1 w-full bg-[#63474D]/20 overflow-hidden rounded-full print:hidden">
-            <div className="h-full bg-[#63474D] animate-pulse w-1/2 rounded-full" />
-          </div>
-          <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] shadow-xs space-y-4 animate-pulse">
-            <div className="h-6 w-48 bg-gray-200 rounded-lg"></div>
-            <div className="h-4 w-96 bg-gray-100 rounded-lg"></div>
-          </div>
-        </div>
-      ) : !report ? (
-        <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] text-center space-y-4 shadow-xs max-w-md mx-auto my-12">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-6 h-6" />
-          </div>
-          <h3 className="font-serif font-bold text-lg text-[#2D1F23]">Report Data Unavailable</h3>
-          <p className="text-xs text-[#756366]">
-            Could not retrieve performance metrics for this event. Ensure the event exists and you have access permissions.
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* Screen Section Quick Navigation Bar (Sticky, Hidden when printing) */}
-          <div className="sticky top-2 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-1.5 overflow-x-auto print:hidden">
-            <span className="text-[11px] font-bold text-gray-500 uppercase px-2 shrink-0">Sections:</span>
-            {[
-              { id: 'sec-exec-summary', label: '1. Executive Summary' },
-              { id: 'sec-about-event', label: '2. About Event' },
-              { id: 'sec-delivery', label: '3. Delivery' },
-              { id: 'sec-audience', label: '4. Audience' },
-              { id: 'sec-orgs', label: '5. Organizations' },
-              { id: 'sec-interests', label: '6. Interests' },
-              { id: 'sec-motivations', label: '7. Motivations' },
-              { id: 'sec-engagement', label: '8. Engagement' },
-              { id: 'sec-voice', label: '9. Attendee Voice' },
-              { id: 'sec-ai-analysis', label: '10. AI Analysis' },
-              { id: 'sec-findings', label: '11. Key Findings' },
-              { id: 'sec-recommendations', label: '12. Recommendations' },
-              { id: 'sec-partner-impact', label: '13. Partner Impact' },
-              { id: 'sec-conclusion', label: '14. Conclusion' },
-              { id: 'sec-ledger', label: '15. Verified Ledger' },
-            ].map((tab) => (
+            {renderSectionHeaderActions(
+              section,
+              index,
               <button
-                key={tab.id}
-                onClick={() => scrollToSection(tab.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                  activeSection === tab.id
-                    ? 'bg-[#63474D] text-white shadow-xs'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                type="button"
+                onClick={() => handleOpenEditCustomModal(section)}
+                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                title="Edit Section"
               >
-                {tab.label}
+                <Edit3 className="w-3.5 h-3.5" />
+                Edit Section
               </button>
-            ))}
+            )}
           </div>
 
-      <div ref={reportContainerRef} className="space-y-12 print:space-y-8 text-[#2D1F23]">
-          {/* ========================================================================= */}
-          {/* COVER & HEADER SECTION                                                    */}
-          {/* ========================================================================= */}
-          <div className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-12 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none">
-            <div className="border-b border-gray-200 pb-8 space-y-4">
-              <div className="flex items-center justify-end">
-                <span className="text-[10px] font-mono text-gray-400 font-semibold">
-                  REPORT REF: SHEEBA-{report?.eventId ? report.eventId.slice(0, 8).toUpperCase() : 'EVENT'}
-                </span>
-              </div>
-
-              <div>
-                <h1 className="font-serif text-3xl sm:text-5xl font-black text-[#2D1F23] tracking-tight leading-tight">
-                  {report.eventTitle}
-                </h1>
-                <p className="text-sm sm:text-base text-gray-600 font-medium mt-2">
-                  Organized by <strong className="text-[#2D1F23]">{report.organizerName}</strong>
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {report.eventLocation} · {report.eventDate}
-                </p>
-              </div>
-            </div>
-
-            {/* High-Level Delivery Metric Tiles */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
-              <div className="p-4 rounded-2xl border border-gray-200 bg-[#FAF7F5] space-y-1">
-                <span className="text-[10px] uppercase font-bold text-gray-500 block">Total Registered</span>
-                <p className="font-serif text-3xl font-black text-[#2D1F23]">{report.totalRegistered}</p>
-                <p className="text-[10px] text-gray-500 font-medium">Recorded sign-ups</p>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 space-y-1">
-                <span className="text-[10px] uppercase font-bold text-emerald-800 block">Verified Attendance</span>
-                <p className="font-serif text-3xl font-black text-emerald-900">{report.totalAttended}</p>
-                <p className="text-[10px] text-emerald-700 font-medium">{report.attendanceRate}% check-in rate</p>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50 space-y-1">
-                <span className="text-[10px] uppercase font-bold text-blue-800 block">Organizations Reached</span>
-                <p className="font-serif text-3xl font-black text-blue-900">
-                  {report.topOrganizations?.length || 1}+
-                </p>
-                <p className="text-[10px] text-blue-700 font-medium">Institutions & companies</p>
-              </div>
-
-              <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50/50 space-y-1">
-                <span className="text-[10px] uppercase font-bold text-purple-800 block">Badges Awarded</span>
-                <p className="font-serif text-3xl font-black text-purple-900">
-                  {(report.badgeDistribution?.attended || 0) +
-                    (report.badgeDistribution?.participant || 0) +
-                    (report.badgeDistribution?.winner || 0) +
-                    (report.badgeDistribution?.speaker || 0)}
-                </p>
-                <p className="text-[10px] text-purple-700 font-medium">Verifiable door credentials</p>
-              </div>
-            </div>
+          <div className="text-xs sm:text-sm text-gray-800 leading-relaxed space-y-3">
+            {section.content ? (
+              renderFormattedNotes(section.content)
+            ) : (
+              <p className="text-xs text-gray-400 italic">No content in this section yet. Click 'Edit Section' to add content.</p>
+            )}
           </div>
+        </section>
+      );
+    }
 
-          {/* ========================================================================= */}
-          {/* 1. EXECUTIVE SUMMARY                                                      */}
-          {/* ========================================================================= */}
+    switch (section.key || section.id) {
+      case 'sec-exec-summary':
+        return (
           <section
-            id="sec-exec-summary"
+        key={section.id}
+        id="sec-exec-summary"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  1. Executive Summary & Impact Overview
-                </h2>
+                {sectionNumber}. Executive Summary & Impact Overview
+              </h2>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditModal('summary')}
-                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                  title="Edit Executive Summary"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  Edit Section
-                </button>
+                {renderSectionHeaderActions(
+                  section,
+                  index,
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal('summary')}
+                    className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                    title="Edit Executive Summary"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Edit Section
+                  </button>
+                )}
                 <span className="text-[10px] uppercase tracking-wider font-bold text-[#2A7B5F] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                   Verified Performance
                 </span>
@@ -1005,41 +989,45 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
-
-          {/* ========================================================================= */}
-          {/* 2. ABOUT THE EVENT (Background & Objectives)                             */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-about-event':
+        return (
           <section
-            id="sec-about-event"
+        key={section.id}
+        id="sec-about-event"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  2. About the Event
-                </h2>
+                {sectionNumber}. Event Context & Strategic Objectives
+              </h2>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditModal('background')}
-                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                  title="Edit Background & Objectives"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  Edit Context
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditModal('notes')}
-                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                  title="Add / Edit Summit Notes & Proceedings"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  Edit Notes
-                </button>
-              </div>
+              {renderSectionHeaderActions(
+                section,
+                index,
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal('background')}
+                    className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                    title="Edit Background & Objectives"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Edit Context
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal('notes')}
+                    className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                    title="Add / Edit Summit Notes & Proceedings"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Edit Notes
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Event Background */}
@@ -1218,30 +1206,34 @@ export const ReportPage: React.FC = () => {
               );
             })()}
           </section>
-
-          {/* ========================================================================= */}
-          {/* 3. EVENT DELIVERY                                                         */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-delivery':
+        return (
           <section
-            id="sec-delivery"
+        key={section.id}
+        id="sec-delivery"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  3. Event Delivery
-                </h2>
+                {sectionNumber}. Program Delivery & Check-in Fidelity
+              </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => handleOpenEditModal('delivery')}
-                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                title="Edit Event Delivery Narrative"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit Delivery
-              </button>
+              {renderSectionHeaderActions(
+                section,
+                index,
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('delivery')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Event Delivery Narrative"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Delivery
+                </button>
+              )}
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed space-y-3 whitespace-pre-line">
@@ -1272,30 +1264,34 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
-
-          {/* ========================================================================= */}
-          {/* 4. WHO THE EVENT REACHED (Audience & Experience)                          */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-audience':
+        return (
           <section
-            id="sec-audience"
+        key={section.id}
+        id="sec-audience"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  4. Who the Event Reached
-                </h2>
+                {sectionNumber}. Who the Event Reached
+              </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => handleOpenEditModal('delivery')}
-                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                title="Edit Audience Overview"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit Audience
-              </button>
+              {renderSectionHeaderActions(
+                section,
+                index,
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('delivery')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Audience Overview"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Audience
+                </button>
+              )}
             </div>
 
             {/* Audience Overview Narrative */}
@@ -1353,19 +1349,22 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
-
-          {/* ========================================================================= */}
-          {/* 5. ORGANIZATIONS AND COMMUNITY REACH                                      */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-orgs':
+        return (
           <section
-            id="sec-orgs"
+        key={section.id}
+        id="sec-orgs"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                5. Organizations and Community Reach
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  {sectionNumber}. Organizations and Community Reach
+                </h2>
+              </div>
+              {renderSectionHeaderActions(section, index)}
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
@@ -1433,19 +1432,22 @@ export const ReportPage: React.FC = () => {
               )}
             </div>
           </section>
-
-          {/* ========================================================================= */}
-          {/* 6. AREAS OF INTEREST (Technology Interests)                                */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-interests':
+        return (
           <section
-            id="sec-interests"
+        key={section.id}
+        id="sec-interests"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                6. Areas of Interest
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  {sectionNumber}. Areas of Interest
+                </h2>
+              </div>
+              {renderSectionHeaderActions(section, index)}
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
@@ -1534,19 +1536,22 @@ export const ReportPage: React.FC = () => {
               </div>
             )}
           </section>
-
-          {/* ========================================================================= */}
-          {/* 7. ATTENDEE MOTIVATION                                                    */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-motivations':
+        return (
           <section
-            id="sec-motivations"
+        key={section.id}
+        id="sec-motivations"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                7. Attendee Motivation
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  {sectionNumber}. Attendee Motivation
+                </h2>
+              </div>
+              {renderSectionHeaderActions(section, index)}
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
@@ -1586,19 +1591,22 @@ export const ReportPage: React.FC = () => {
               )}
             </div>
           </section>
-
-          {/* ========================================================================= */}
-          {/* 8. ENGAGEMENT & PARTICIPATION                                             */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-engagement':
+        return (
           <section
-            id="sec-engagement"
+        key={section.id}
+        id="sec-engagement"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                8. Engagement & Participation
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  {sectionNumber}. Engagement & Participation
+                </h2>
+              </div>
+              {renderSectionHeaderActions(section, index)}
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
@@ -1627,119 +1635,138 @@ export const ReportPage: React.FC = () => {
               ))}
             </div>
           </section>
-
-          {/* ========================================================================= */}
-          {/* 9. ATTENDEE VOICE                                                         */}
-          {/* ========================================================================= */}
-          {report.aiNarrative?.attendeeVoice && report.aiNarrative.attendeeVoice.length > 0 && (
-            <section
-              id="sec-voice"
-              className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
-            >
-              <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  9. Attendee Voice
-                </h2>
-              </div>
-
-              <p className="text-xs text-gray-600">
-                Selected reflections and motivations shared by attendees during registration and session participation:
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {report.aiNarrative.attendeeVoice.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-5 rounded-2xl border border-gray-200 bg-[#FAF7F5] space-y-3 relative flex flex-col justify-between"
-                  >
-                    <Quote className="w-5 h-5 text-[#AA767C] opacity-40" />
-                    <p className="text-xs text-gray-800 italic leading-relaxed">
-                      "{item.quote}"
-                    </p>
-                    <div className="pt-2 border-t border-gray-200">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D] block">
-                        {item.theme}
-                      </span>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{item.explanation}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ========================================================================= */}
-          {/* 10. AI AUDIENCE & COMMUNITY ANALYSIS                                      */}
-          {/* ========================================================================= */}
-          {report.aiNarrative?.audienceDeepAnalysis && (
-            <section
-              id="sec-ai-analysis"
-              className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
-            >
-              <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  10. AI-Generated Audience Analysis
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs sm:text-sm">
-                <div className="p-5 rounded-2xl border border-gray-200 bg-white space-y-2">
-                  <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-[#63474D]" />
-                    Audience Profile
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                    {report.aiNarrative.audienceDeepAnalysis.profile}
-                  </p>
-                </div>
-
-                <div className="p-5 rounded-2xl border border-gray-200 bg-white space-y-2">
-                  <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-1.5">
-                    <Target className="w-4 h-4 text-[#63474D]" />
-                    Key Thematic Drivers
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                    {report.aiNarrative.audienceDeepAnalysis.keyThemes}
-                  </p>
-                </div>
-
-                <div className="p-5 rounded-2xl border border-gray-200 bg-white space-y-2">
-                  <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-1.5">
-                    <TrendingUp className="w-4 h-4 text-[#63474D]" />
-                    Emerging Interests
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                    {report.aiNarrative.audienceDeepAnalysis.emergingInterests}
-                  </p>
-                </div>
-
-                <div className="p-5 rounded-2xl border border-gray-200 bg-white space-y-2">
-                  <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-1.5">
-                    <Compass className="w-4 h-4 text-[#63474D]" />
-                    Community Opportunities
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                    {report.aiNarrative.audienceDeepAnalysis.communityOpportunities}
-                  </p>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* ========================================================================= */}
-          {/* 11. KEY FINDINGS                                                          */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-voice':
+        return (
           <section
-            id="sec-findings"
+        key={section.id}
+        id="sec-voice"
+              className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  {sectionNumber}. Attendee Voice
+                </h2>
+              </div>
+              {renderSectionHeaderActions(section, index)}
+            </div>
+
+              {report.aiNarrative?.attendeeVoice && report.aiNarrative.attendeeVoice.length > 0 ? (
+                <>
+                  <p className="text-xs text-gray-600">
+                    Selected reflections and motivations shared by attendees during registration and session participation:
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {report.aiNarrative.attendeeVoice.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-5 rounded-2xl border border-gray-200 bg-[#FAF7F5] space-y-3 relative flex flex-col justify-between"
+                      >
+                        <Quote className="w-5 h-5 text-[#AA767C] opacity-40" />
+                        <p className="text-xs text-gray-800 italic leading-relaxed">
+                          "{item.quote}"
+                        </p>
+                        <div className="pt-2 border-t border-gray-200">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#63474D] block">
+                            {item.theme}
+                          </span>
+                          <p className="text-[10px] text-gray-500 mt-0.5">{item.explanation}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-gray-500 italic">
+                  Selected reflections and motivations shared by attendees will appear once attendee voice entries are available.
+                </p>
+              )}
+            </section>
+        );
+      case 'sec-ai-analysis':
+        return (
+          <section
+        key={section.id}
+        id="sec-ai-analysis"
+              className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  {sectionNumber}. AI-Generated Audience Analysis
+                </h2>
+              </div>
+              {renderSectionHeaderActions(section, index)}
+            </div>
+
+              {report.aiNarrative?.audienceDeepAnalysis ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs sm:text-sm">
+                  <div className="p-5 rounded-2xl border border-gray-200 bg-white space-y-2">
+                    <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-[#63474D]" />
+                      Audience Profile
+                    </h3>
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                      {report.aiNarrative.audienceDeepAnalysis.profile}
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl border border-gray-200 bg-white space-y-2">
+                    <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-1.5">
+                      <Target className="w-4 h-4 text-[#63474D]" />
+                      Key Thematic Drivers
+                    </h3>
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                      {report.aiNarrative.audienceDeepAnalysis.keyThemes}
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl border border-gray-200 bg-white space-y-2">
+                    <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-[#63474D]" />
+                      Emerging Interests
+                    </h3>
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                      {report.aiNarrative.audienceDeepAnalysis.emergingInterests}
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-2xl border border-gray-200 bg-white space-y-2">
+                    <h3 className="font-serif font-bold text-sm text-[#2D1F23] flex items-center gap-1.5">
+                      <Compass className="w-4 h-4 text-[#63474D]" />
+                      Community Opportunities
+                    </h3>
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                      {report.aiNarrative.audienceDeepAnalysis.communityOpportunities}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 italic">
+                  Audience thematic analysis and profile synthesis will appear here once computed from event data.
+                </p>
+              )}
+            </section>
+        );
+      case 'sec-findings':
+        return (
+          <section
+        key={section.id}
+        id="sec-findings"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                11. Key Empirical Findings
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  {sectionNumber}. Key Empirical Findings
+                </h2>
+              </div>
+              {renderSectionHeaderActions(section, index)}
             </div>
 
             {report.aiNarrative?.keyFindings && report.aiNarrative.keyFindings.length > 0 ? (
@@ -1761,19 +1788,22 @@ export const ReportPage: React.FC = () => {
               <p className="text-xs text-gray-500 italic">Key findings will appear once generated from verified attendance data.</p>
             )}
           </section>
-
-          {/* ========================================================================= */}
-          {/* 12. OPPORTUNITIES & RECOMMENDATIONS                                       */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-recommendations':
+        return (
           <section
-            id="sec-recommendations"
+        key={section.id}
+        id="sec-recommendations"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                12. Opportunities & Recommendations
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  {sectionNumber}. Opportunities & Recommendations
+                </h2>
+              </div>
+              {renderSectionHeaderActions(section, index)}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1808,33 +1838,34 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
-
-          {/* ========================================================================= */}
-          {/* 13. SPONSOR / PARTNER IMPACT                                              */}
-          {/* ========================================================================= */}
-          {/* ========================================================================= */}
-          {/* 13. SPONSOR / PARTNER IMPACT                                              */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-partner-impact':
+        return (
           <section
-            id="sec-partner-impact"
+        key={section.id}
+        id="sec-partner-impact"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-4 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  13. Sponsor & Partner Impact
-                </h2>
+                {sectionNumber}. Sponsor & Partner Impact
+              </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => handleOpenEditModal('conclusion')}
-                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                title="Edit Partner Impact Summary"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit Partners
-              </button>
+              {renderSectionHeaderActions(
+                section,
+                index,
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('conclusion')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Partner Impact Summary"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Partners
+                </button>
+              )}
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed space-y-3 whitespace-pre-line bg-[#FAF7F5] p-6 rounded-2xl border border-[#E8DDD7]">
@@ -1850,32 +1881,35 @@ export const ReportPage: React.FC = () => {
               )}
             </div>
           </section>
-
-          {/* ========================================================================= */}
-          {/* 14. VERIFIED ATTENDANCE APPENDIX                                          */}
-          {/* 14. STRATEGIC CONCLUSION & EXECUTIVE SUMMARY                              */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-conclusion':
+        return (
           <section
-            id="sec-conclusion"
+        key={section.id}
+        id="sec-conclusion"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  14. Strategic Conclusion & Executive Summary
-                </h2>
+                {sectionNumber}. Strategic Conclusion & Executive Summary
+              </h2>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleOpenEditModal('conclusion')}
-                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                  title="Edit Strategic Conclusion"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  Edit Conclusion
-                </button>
+                {renderSectionHeaderActions(
+                  section,
+                  index,
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal('conclusion')}
+                    className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                    title="Edit Strategic Conclusion"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Edit Conclusion
+                  </button>
+                )}
                 <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 uppercase">
                   Audited Performance Verified
                 </span>
@@ -2029,24 +2063,27 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
-
-          {/* ========================================================================= */}
-          {/* 15. VERIFIED ATTENDANCE APPENDIX                                          */}
-          {/* ========================================================================= */}
+        );
+      case 'sec-ledger':
+        return (
           <section
-            id="sec-ledger"
+        key={section.id}
+        id="sec-ledger"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  15. Verified Attendee Register
-                </h2>
+                {sectionNumber}. Verified Attendee Register
+              </h2>
               </div>
-              <span className="text-[11px] text-gray-500 font-mono">
-                {report.totalRegistered} Registered · {report.totalAttended} Verified In-Person
-              </span>
+              <div className="flex items-center gap-3">
+                {renderSectionHeaderActions(section, index)}
+                <span className="text-[11px] text-gray-500 font-mono">
+                  {report.totalRegistered} Registered · {report.totalAttended} Verified In-Person
+                </span>
+              </div>
             </div>
 
             <div className="p-6 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -2095,8 +2132,409 @@ export const ReportPage: React.FC = () => {
               <span>End of Document</span>
             </div>
           </section>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="sheeba-report-page w-full max-w-5xl mx-auto space-y-6 pb-32 font-sans text-[#2D1F23] print:max-w-none print:w-full print:m-0 print:p-0 print:pb-0 print:space-y-4">
+      {/* Top Controls Header (Hidden when printing) */}
+      <div className="flex flex-col gap-4 border-b border-gray-200 pb-4 print:hidden">
+        <div>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#63474D]">
+              Proof-of-Performance Artifact
+            </span>
+            <Badge variant="primary" className="text-[10px]">
+              Sponsor Ready
+            </Badge>
+            {report?.isCustomized && (
+              <Badge variant="outline" className="text-amber-800 bg-amber-50 border-amber-300 text-[10px]">
+                Customized by Organizer
+              </Badge>
+            )}
+          </div>
+          <h1 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#2D1F23] leading-tight">
+            Sheeba Event Impact Report
+          </h1>
+        </div>
+
+        {/* Toolbar: Event Selector & Action Buttons */}
+        {!loading && events.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FAF7F5] p-3 rounded-2xl border border-[#E8DDD7]">
+            <div className="w-full sm:w-72 md:w-80">
+              <select
+                value={selectedEventId}
+                onChange={(e) => handleSelectEvent(e.target.value)}
+                className="w-full truncate px-3 py-2 bg-white border border-[#E8DDD7] rounded-xl text-xs font-bold text-[#2D1F23] focus:outline-none focus:ring-2 focus:ring-[#63474D] cursor-pointer"
+              >
+                {events.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.title} ({e.date})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {report && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={() => handleOpenEditModal('summary')}
+                  variant="outline"
+                  size="sm"
+                  icon={<Edit3 className="w-4 h-4 text-[#63474D]" />}
+                  className="whitespace-nowrap bg-white text-xs"
+                >
+                  Edit Report
+                </Button>
+                <Button
+                  onClick={handleExportCSV}
+                  variant="outline"
+                  size="sm"
+                  icon={<FileSpreadsheet className="w-4 h-4 text-[#2A7B5F]" />}
+                  className="whitespace-nowrap bg-white text-xs"
+                >
+                  Export CSV
+                </Button>
+                <Button
+                  onClick={handlePrintPDF}
+                  variant="accent"
+                  size="sm"
+                  icon={<Printer className="w-4 h-4" />}
+                  className="whitespace-nowrap text-xs"
+                >
+                  Print / Save PDF
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="space-y-6 pt-4">
+          <div className="h-1 w-full bg-[#63474D]/20 overflow-hidden rounded-full print:hidden">
+            <div className="h-full bg-[#63474D] animate-pulse w-1/2 rounded-full" />
+          </div>
+          <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] shadow-xs space-y-4 animate-pulse">
+            <div className="h-6 w-48 bg-gray-200 rounded-lg"></div>
+            <div className="h-4 w-96 bg-gray-100 rounded-lg"></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6">
+              <div className="h-28 bg-gray-100 rounded-2xl"></div>
+              <div className="h-28 bg-gray-100 rounded-2xl"></div>
+              <div className="h-28 bg-gray-100 rounded-2xl"></div>
+            </div>
+          </div>
+        </div>
+      ) : events.length === 0 ? (
+        /* Empty State: Organizer hasn't hosted any events */
+        <div className="bg-white rounded-3xl p-12 border border-[#E8DDD7] text-center space-y-5 shadow-xs max-w-xl mx-auto my-12">
+          <div className="w-16 h-16 rounded-2xl bg-[#63474D]/10 text-[#63474D] flex items-center justify-center mx-auto">
+            <BarChart3 className="w-8 h-8 text-[#63474D]" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="font-serif font-bold text-xl text-[#2D1F23]">No Event Reports Available</h2>
+            <p className="text-sm text-[#756366] max-w-md mx-auto leading-relaxed">
+              Reports and institutional sponsor analytics are generated exclusively for events you organize and host. Once you publish an event and check in attendees, your verified impact dossier will appear here.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Link to="/organizer/events/create">
+              <Button variant="primary" icon={<PlusCircle className="w-4 h-4" />}>
+                Create Your First Event
+              </Button>
+            </Link>
+          </div>
+        </div>
+      ) : reportLoading ? (
+        <div className="space-y-6 pt-4">
+          <div className="h-1 w-full bg-[#63474D]/20 overflow-hidden rounded-full print:hidden">
+            <div className="h-full bg-[#63474D] animate-pulse w-1/2 rounded-full" />
+          </div>
+          <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] shadow-xs space-y-4 animate-pulse">
+            <div className="h-6 w-48 bg-gray-200 rounded-lg"></div>
+            <div className="h-4 w-96 bg-gray-100 rounded-lg"></div>
+          </div>
+        </div>
+      ) : !report ? (
+        <div className="bg-white rounded-3xl p-10 border border-[#E8DDD7] text-center space-y-4 shadow-xs max-w-md mx-auto my-12">
+          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h3 className="font-serif font-bold text-lg text-[#2D1F23]">Report Data Unavailable</h3>
+          <p className="text-xs text-[#756366]">
+            Could not retrieve performance metrics for this event. Ensure the event exists and you have access permissions.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Screen Section Quick Navigation Bar (Sticky, Hidden when printing) */}
+          <div className="sticky top-2 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-1.5 overflow-x-auto print:hidden">
+            <span className="text-[11px] font-bold text-gray-500 uppercase px-2 shrink-0">Sections:</span>
+            {sections.map((tab, idx) => (
+              <button
+                key={tab.id}
+                onClick={() => scrollToSection(tab.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  activeSection === tab.id
+                    ? 'bg-[#63474D] text-white shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {idx + 1}. {tab.title.split('&')[0].split('—')[0].trim()}
+              </button>
+            ))}
+          </div>
+
+      <div ref={reportContainerRef} className="space-y-12 print:space-y-8 text-[#2D1F23]">
+          {/* ========================================================================= */}
+          {/* COVER & HEADER SECTION                                                    */}
+          {/* ========================================================================= */}
+          <div className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-12 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none">
+            <div className="border-b border-gray-200 pb-8 space-y-4">
+              <div className="flex items-center justify-end">
+                <span className="text-[10px] font-mono text-gray-400 font-semibold">
+                  REPORT REF: SHEEBA-{report?.eventId ? report.eventId.slice(0, 8).toUpperCase() : 'EVENT'}
+                </span>
+              </div>
+
+              <div>
+                <h1 className="font-serif text-3xl sm:text-5xl font-black text-[#2D1F23] tracking-tight leading-tight">
+                  {report.eventTitle}
+                </h1>
+                <p className="text-sm sm:text-base text-gray-600 font-medium mt-2">
+                  Organized by <strong className="text-[#2D1F23]">{report.organizerName}</strong>
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {report.eventLocation} · {report.eventDate}
+                </p>
+              </div>
+            </div>
+
+            {/* High-Level Delivery Metric Tiles */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+              <div className="p-4 rounded-2xl border border-gray-200 bg-[#FAF7F5] space-y-1">
+                <span className="text-[10px] uppercase font-bold text-gray-500 block">Total Registered</span>
+                <p className="font-serif text-3xl font-black text-[#2D1F23]">{report.totalRegistered}</p>
+                <p className="text-[10px] text-gray-500 font-medium">Recorded sign-ups</p>
+              </div>
+
+              <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-emerald-800 block">Verified Attendance</span>
+                <p className="font-serif text-3xl font-black text-emerald-900">{report.totalAttended}</p>
+                <p className="text-[10px] text-emerald-700 font-medium">{report.attendanceRate}% check-in rate</p>
+              </div>
+
+              <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/50 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-blue-800 block">Organizations Reached</span>
+                <p className="font-serif text-3xl font-black text-blue-900">
+                  {report.topOrganizations?.length || 1}+
+                </p>
+                <p className="text-[10px] text-blue-700 font-medium">Institutions & companies</p>
+              </div>
+
+              <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50/50 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-purple-800 block">Badges Awarded</span>
+                <p className="font-serif text-3xl font-black text-purple-900">
+                  {(report.badgeDistribution?.attended || 0) +
+                    (report.badgeDistribution?.participant || 0) +
+                    (report.badgeDistribution?.winner || 0) +
+                    (report.badgeDistribution?.speaker || 0)}
+                </p>
+                <p className="text-[10px] text-purple-700 font-medium">Verifiable door credentials</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* REPORT SECTIONS (Dynamic Ordering, Custom Additions & Deletions)          */}
+          {/* ========================================================================= */}
+          {sections.map((section, index) => renderSectionItem(section, index))}
         </div>
         </>
+      )}
+
+      {/* Add Section Modal */}
+      {isAddSectionModalOpen && addSectionPosition && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm print:hidden">
+          <div className="bg-white rounded-3xl border border-[#E8DDD7] shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-[#FAF7F5] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#FFA686]/20 border border-[#FFA686]/40 flex items-center justify-center text-[#63474D]">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="font-serif text-lg font-bold text-[#2D1F23]">
+                    Add Section {addSectionPosition.placement === 'above' ? 'Above' : 'Below'}
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Inserting {addSectionPosition.placement === 'above' ? 'above' : 'below'} Section{' '}
+                    {addSectionPosition.index + 1}: {sections[addSectionPosition.index]?.title}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddSectionModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1.5 uppercase tracking-wider">
+                  Section Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newSectionForm.title}
+                  onChange={(e) =>
+                    setNewSectionForm((prev) => ({ ...prev, title: e.target.value }))
+                  }
+                  placeholder="e.g. Executive Remarks & Keynotes"
+                  className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:border-[#AA767C] focus:ring-2 focus:ring-[#AA767C]/20 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1.5 uppercase tracking-wider">
+                  Section Content
+                </label>
+                <textarea
+                  rows={7}
+                  value={newSectionForm.content}
+                  onChange={(e) =>
+                    setNewSectionForm((prev) => ({ ...prev, content: e.target.value }))
+                  }
+                  placeholder="Write section narrative, notes, or takeaways. Supports markdown formatting (* bullets, **bold**, ## subheadings)."
+                  className="w-full px-4 py-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:border-[#AA767C] focus:ring-2 focus:ring-[#AA767C]/20 bg-white leading-relaxed font-sans"
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3 bg-[#FAF7F5] shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddSectionModalOpen(false)}
+                disabled={isSavingSections}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveNewSection}
+                disabled={isSavingSections || !newSectionForm.title.trim()}
+                icon={<Save className="w-4 h-4" />}
+              >
+                {isSavingSections ? 'Saving...' : 'Add & Save Section'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Custom Section Modal */}
+      {isEditCustomModalOpen && editingCustomSection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm print:hidden">
+          <div className="bg-white rounded-3xl border border-[#E8DDD7] shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-[#FAF7F5] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#FFA686]/20 border border-[#FFA686]/40 flex items-center justify-center text-[#63474D]">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="font-serif text-lg font-bold text-[#2D1F23]">
+                    Edit Custom Section
+                  </h2>
+                  <p className="text-xs text-gray-500">
+                    Update section title and markdown content
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditCustomModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1.5 uppercase tracking-wider">
+                  Section Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingCustomSection.title}
+                  onChange={(e) =>
+                    setEditingCustomSection((prev) =>
+                      prev ? { ...prev, title: e.target.value } : null
+                    )
+                  }
+                  className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-200 focus:outline-none focus:border-[#AA767C] focus:ring-2 focus:ring-[#AA767C]/20 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#2D1F23] mb-1.5 uppercase tracking-wider">
+                  Section Content
+                </label>
+                <textarea
+                  rows={8}
+                  value={editingCustomSection.content || ''}
+                  onChange={(e) =>
+                    setEditingCustomSection((prev) =>
+                      prev ? { ...prev, content: e.target.value } : null
+                    )
+                  }
+                  className="w-full px-4 py-3 text-sm rounded-xl border border-gray-200 focus:outline-none focus:border-[#AA767C] focus:ring-2 focus:ring-[#AA767C]/20 bg-white leading-relaxed font-sans"
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-100 flex items-center justify-end gap-3 bg-[#FAF7F5] shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditCustomModalOpen(false)}
+                disabled={isSavingSections}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveEditedCustomSection}
+                disabled={isSavingSections || !editingCustomSection.title.trim()}
+                icon={<Save className="w-4 h-4" />}
+              >
+                {isSavingSections ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Save/Action Feedback Toast */}
+      {sectionNotification && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#2D1F23] text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-semibold animate-in fade-in slide-in-from-bottom-3 border border-[#E8DDD7]/20">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{sectionNotification}</span>
+        </div>
       )}
 
       {/* Edit Report Modal */}

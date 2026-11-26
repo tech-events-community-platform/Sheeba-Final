@@ -2089,6 +2089,7 @@ export const api = {
       data: {
         aiNarrative?: Partial<SponsorReportData['aiNarrative']>;
         customNotes?: string;
+        customSections?: any[];
       }
     ): Promise<SponsorReportData> => {
       try {
