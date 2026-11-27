@@ -308,18 +308,42 @@ export const ReportPage: React.FC = () => {
 
   const reportContainerRef = useRef<HTMLDivElement>(null);
 
+  const isStrideOrMinT =
+    Boolean(report?.eventTitle?.toLowerCase().includes('stride')) ||
+    Boolean(report?.eventTitle?.toLowerCase().includes('mint')) ||
+    Boolean(report?.organizerName?.toLowerCase().includes('ministry')) ||
+    Boolean(report?.organizerName?.toLowerCase().includes('mint'));
+
   // Edit Report State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editTab, setEditTab] = useState<'summary' | 'background' | 'delivery' | 'conclusion' | 'notes'>('summary');
+  const [editTab, setEditTab] = useState<
+    | 'summary'
+    | 'background'
+    | 'delivery'
+    | 'orgs'
+    | 'interests'
+    | 'engagement'
+    | 'findings'
+    | 'conclusion'
+    | 'notes'
+  >('summary');
   const [editForm, setEditForm] = useState({
     executiveSummary: '',
     eventBackground: '',
     objectives: '',
     deliveryNarrative: '',
     audienceOverview: '',
+    organizationsNarrative: '',
+    interestsNarrative: '',
+    motivationNarrative: '',
+    engagementNarrative: '',
     partnerImpactSummary: '',
     strategicConclusion: '',
     customNotes: '',
+    communityFindings: '',
+    futureProgramming: '',
+    mentorship: '',
+    communityDevelopment: '',
   });
   const [isSavingReport, setIsSavingReport] = useState(false);
   const [isResettingReport, setIsResettingReport] = useState(false);
@@ -423,6 +447,48 @@ export const ReportPage: React.FC = () => {
     await persistSections(updatedSections);
   };
 
+  const getTabForSection = (
+    sectionId: string
+  ):
+    | 'summary'
+    | 'background'
+    | 'delivery'
+    | 'orgs'
+    | 'interests'
+    | 'engagement'
+    | 'findings'
+    | 'conclusion'
+    | 'notes' => {
+    switch (sectionId) {
+      case 'sec-exec-summary':
+        return 'summary';
+      case 'sec-about-event':
+        return 'background';
+      case 'sec-delivery':
+      case 'sec-audience':
+        return 'delivery';
+      case 'sec-orgs':
+        return 'orgs';
+      case 'sec-interests':
+      case 'sec-motivations':
+        return 'interests';
+      case 'sec-engagement':
+        return 'engagement';
+      case 'sec-voice':
+      case 'sec-ai-analysis':
+      case 'sec-findings':
+      case 'sec-recommendations':
+        return 'findings';
+      case 'sec-partner-impact':
+      case 'sec-conclusion':
+        return 'conclusion';
+      case 'sec-notes':
+      case 'sec-ledger':
+      default:
+        return 'notes';
+    }
+  };
+
   const renderSectionHeaderActions = (
     section: IReportSectionItem,
     index: number,
@@ -447,7 +513,25 @@ export const ReportPage: React.FC = () => {
       >
         <ArrowDown className="w-3.5 h-3.5" />
       </button>
-      {customButtons}
+      {customButtons ? (
+        customButtons
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            if (section.type === 'custom') {
+              handleOpenEditCustomModal(section);
+            } else {
+              handleOpenEditModal(getTabForSection(section.id));
+            }
+          }}
+          className="p-1.5 text-gray-500 hover:text-[#2D1F23] hover:bg-gray-100 rounded-lg transition-colors cursor-pointer flex items-center justify-center border border-gray-200/60"
+          title={`Edit ${section.title}`}
+          aria-label={`Edit ${section.title}`}
+        >
+          <Edit3 className="w-3.5 h-3.5" />
+        </button>
+      )}
       <button
         type="button"
         onClick={() => handleDeleteSection(section.id, section.title)}
@@ -460,7 +544,18 @@ export const ReportPage: React.FC = () => {
     </div>
   );
 
-  const handleOpenEditModal = (targetTab: 'summary' | 'background' | 'delivery' | 'conclusion' | 'notes' = 'summary') => {
+  const handleOpenEditModal = (
+    targetTab:
+      | 'summary'
+      | 'background'
+      | 'delivery'
+      | 'orgs'
+      | 'interests'
+      | 'engagement'
+      | 'findings'
+      | 'conclusion'
+      | 'notes' = 'summary'
+  ) => {
     if (!report) return;
     setEditForm({
       executiveSummary: report.aiNarrative?.executiveSummary || '',
@@ -468,13 +563,27 @@ export const ReportPage: React.FC = () => {
       objectives: report.aiNarrative?.objectives || '',
       deliveryNarrative: report.aiNarrative?.deliveryNarrative || '',
       audienceOverview: report.aiNarrative?.audienceOverview || '',
+      organizationsNarrative: report.aiNarrative?.organizationsNarrative || '',
+      interestsNarrative: report.aiNarrative?.interestsNarrative || '',
+      motivationNarrative: report.aiNarrative?.motivationNarrative || '',
+      engagementNarrative: report.aiNarrative?.engagementNarrative || '',
       partnerImpactSummary: report.aiNarrative?.partnerImpactSummary || '',
       strategicConclusion: report.aiNarrative?.strategicConclusion || '',
       customNotes: report.customNotes || '',
+      communityFindings: report.aiNarrative?.communityFindings || '',
+      futureProgramming: report.aiNarrative?.structuredRecommendations?.futureProgramming || '',
+      mentorship: report.aiNarrative?.structuredRecommendations?.mentorship || '',
+      communityDevelopment: report.aiNarrative?.structuredRecommendations?.communityDevelopment || '',
     });
     setEditTab(targetTab);
     setSaveFeedback(null);
     setIsEditModalOpen(true);
+  };
+
+  const handleRestoreSections = async () => {
+    if (!window.confirm('Restore all standard report sections to their default order?')) return;
+    setSections(DEFAULT_STANDARD_SECTIONS);
+    await persistSections(DEFAULT_STANDARD_SECTIONS);
   };
 
   const handleSaveReport = async () => {
@@ -497,8 +606,18 @@ export const ReportPage: React.FC = () => {
           objectives: editForm.objectives,
           deliveryNarrative: editForm.deliveryNarrative,
           audienceOverview: editForm.audienceOverview,
+          organizationsNarrative: editForm.organizationsNarrative,
+          interestsNarrative: editForm.interestsNarrative,
+          motivationNarrative: editForm.motivationNarrative,
+          engagementNarrative: editForm.engagementNarrative,
           partnerImpactSummary: editForm.partnerImpactSummary,
           strategicConclusion: editForm.strategicConclusion,
+          communityFindings: editForm.communityFindings,
+          structuredRecommendations: {
+            futureProgramming: editForm.futureProgramming,
+            mentorship: editForm.mentorship,
+            communityDevelopment: editForm.communityDevelopment,
+          },
         },
         customNotes: editForm.customNotes,
         customSections: sections,
@@ -534,9 +653,17 @@ export const ReportPage: React.FC = () => {
         objectives: freshReport.aiNarrative?.objectives || '',
         deliveryNarrative: freshReport.aiNarrative?.deliveryNarrative || '',
         audienceOverview: freshReport.aiNarrative?.audienceOverview || '',
+        organizationsNarrative: freshReport.aiNarrative?.organizationsNarrative || '',
+        interestsNarrative: freshReport.aiNarrative?.interestsNarrative || '',
+        motivationNarrative: freshReport.aiNarrative?.motivationNarrative || '',
+        engagementNarrative: freshReport.aiNarrative?.engagementNarrative || '',
         partnerImpactSummary: freshReport.aiNarrative?.partnerImpactSummary || '',
         strategicConclusion: freshReport.aiNarrative?.strategicConclusion || '',
         customNotes: '',
+        communityFindings: freshReport.aiNarrative?.communityFindings || '',
+        futureProgramming: freshReport.aiNarrative?.structuredRecommendations?.futureProgramming || '',
+        mentorship: freshReport.aiNarrative?.structuredRecommendations?.mentorship || '',
+        communityDevelopment: freshReport.aiNarrative?.structuredRecommendations?.communityDevelopment || '',
       });
       setSaveFeedback('Reverted to AI draft!');
       setTimeout(() => {
@@ -1375,36 +1502,38 @@ export const ReportPage: React.FC = () => {
               )}
             </div>
 
-            {/* Main Organizing Entities & Summit Partners */}
-            <div className="space-y-3">
-              <h3 className="font-serif font-bold text-sm text-[#2D1F23]">
-                Main Organizing Entities & Summit Partners
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {[
-                  { name: "Ministry of Innovation and Technology (MInT)", role: 'Lead Host & Convening Ministry' },
-                  { name: 'STRIDE Ethiopia 2.0', role: 'National Summit Initiative' },
-                  { name: 'Wingu Africa (wingu.africa)', role: 'Digital Infrastructure Partner' },
-                  { name: 'Space Science and Geospatial Institute (SSGI)', role: 'Research & Space Science' },
-                  { name: 'Ethio telecom', role: 'National Telecom Partner' },
-                  { name: 'Ethiopian Technology Authority (ETA)', role: 'Regulatory & Tech Authority' },
-                  { name: 'Betin', role: 'Ecosystem Innovation Partner' },
-                  { name: 'Ethiopian Intellectual Property Authority (EIPA)', role: 'IP & Patents Partner' },
-                ].map((partner, i) => (
-                  <div
-                    key={i}
-                    className="p-3.5 rounded-xl border border-[#63474D]/20 bg-[#FAF7F5] space-y-1 text-xs"
-                  >
-                    <span className="font-bold text-gray-900 block truncate" title={partner.name}>
-                      {partner.name}
-                    </span>
-                    <span className="text-[10px] font-medium text-[#63474D] block">
-                      {partner.role}
-                    </span>
-                  </div>
-                ))}
+            {/* Main Organizing Entities & Summit Partners (Displayed for MInT/STRIDE events only) */}
+            {isStrideOrMinT && (
+              <div className="space-y-3">
+                <h3 className="font-serif font-bold text-sm text-[#2D1F23]">
+                  Main Organizing Entities & Summit Partners
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { name: "Ministry of Innovation and Technology (MInT)", role: 'Lead Host & Convening Ministry' },
+                    { name: 'STRIDE Ethiopia 2.0', role: 'National Summit Initiative' },
+                    { name: 'Wingu Africa (wingu.africa)', role: 'Digital Infrastructure Partner' },
+                    { name: 'Space Science and Geospatial Institute (SSGI)', role: 'Research & Space Science' },
+                    { name: 'Ethio telecom', role: 'National Telecom Partner' },
+                    { name: 'Ethiopian Technology Authority (ETA)', role: 'Regulatory & Tech Authority' },
+                    { name: 'Betin', role: 'Ecosystem Innovation Partner' },
+                    { name: 'Ethiopian Intellectual Property Authority (EIPA)', role: 'IP & Patents Partner' },
+                  ].map((partner, i) => (
+                    <div
+                      key={i}
+                      className="p-3.5 rounded-xl border border-[#63474D]/20 bg-[#FAF7F5] space-y-1 text-xs"
+                    >
+                      <span className="font-bold text-gray-900 block truncate" title={partner.name}>
+                        {partner.name}
+                      </span>
+                      <span className="text-[10px] font-medium text-[#63474D] block">
+                        {partner.role}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Participating Startups & Ecosystem Ventures Represented */}
             <div className="space-y-3 pt-2">
@@ -2180,6 +2309,17 @@ export const ReportPage: React.FC = () => {
 
             {report && (
               <div className="flex flex-wrap items-center gap-2">
+                {sections.length < DEFAULT_STANDARD_SECTIONS.length && (
+                  <Button
+                    onClick={handleRestoreSections}
+                    variant="outline"
+                    size="sm"
+                    icon={<RotateCcw className="w-4 h-4 text-amber-600" />}
+                    className="whitespace-nowrap bg-white text-xs text-amber-700 border-amber-200 hover:bg-amber-50"
+                  >
+                    Restore All Sections
+                  </Button>
+                )}
                 <Button
                   onClick={() => handleOpenEditModal('summary')}
                   variant="outline"
@@ -2571,6 +2711,10 @@ export const ReportPage: React.FC = () => {
                 { id: 'summary', label: '1. Executive Summary' },
                 { id: 'background', label: '2. Background & Objectives' },
                 { id: 'delivery', label: '3 & 4. Delivery & Audience' },
+                { id: 'orgs', label: '5. Organizations & Reach' },
+                { id: 'interests', label: '6 & 7. Interests & Motivation' },
+                { id: 'engagement', label: '8. Engagement' },
+                { id: 'findings', label: '11 & 12. Findings & Recs' },
                 { id: 'conclusion', label: '13 & 14. Partners & Conclusion' },
                 { id: 'notes', label: 'Summit Notes / Proceedings' },
               ].map((tab) => (
@@ -2675,6 +2819,112 @@ export const ReportPage: React.FC = () => {
                         setEditForm({ ...editForm, audienceOverview: e.target.value })
                       }
                       placeholder="Participant cohort characteristics, startup maturity, and sector composition..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'orgs' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      5. Organizations and Community Reach Narrative
+                    </label>
+                    <textarea
+                      rows={8}
+                      value={editForm.organizationsNarrative}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, organizationsNarrative: e.target.value })
+                      }
+                      placeholder="Narrative describing organizational representation and community reach..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'interests' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      6. Areas of Interest Narrative
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editForm.interestsNarrative}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, interestsNarrative: e.target.value })
+                      }
+                      placeholder="Narrative summarizing attendee interest areas and domains..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      7. Attendee Motivation Narrative
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editForm.motivationNarrative}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, motivationNarrative: e.target.value })
+                      }
+                      placeholder="Narrative detailing participant drivers and learning motivations..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'engagement' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      8. Engagement & Participation Narrative
+                    </label>
+                    <textarea
+                      rows={8}
+                      value={editForm.engagementNarrative}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, engagementNarrative: e.target.value })
+                      }
+                      placeholder="Details on check-in velocity, floor participation, and session engagement..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'findings' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      11. Key Empirical Findings
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={editForm.communityFindings}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, communityFindings: e.target.value })
+                      }
+                      placeholder="Empirical data insights, verified observations, and takeaways..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      12. Opportunities & Future Programming
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={editForm.futureProgramming}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, futureProgramming: e.target.value })
+                      }
+                      placeholder="Recommendations for future programming and initiatives..."
                       className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
                     />
                   </div>
