@@ -88,13 +88,28 @@ export const aiNarrativeUpdateSchema = z.object({
 export type AiNarrativeUpdateInput = z.infer<typeof aiNarrativeUpdateSchema>;
 
 /**
+ * Report custom section schema
+ */
+export const reportCustomSectionSchema = z.object({
+  id: z.string({ message: 'Section id must be a string.' }),
+  key: z.string({ message: 'Section key must be a string.' }).optional(),
+  title: z.string({ message: 'Section title must be a string.' }),
+  content: z.string({ message: 'Section content must be a string.' }).optional(),
+  type: z.enum(['standard', 'custom']).default('custom'),
+  order: z.number().optional(),
+});
+
+export type ReportCustomSectionInput = z.infer<typeof reportCustomSectionSchema>;
+
+/**
  * Report update request schema for PUT /api/reports/events/:id
- * Accepts optional `aiNarrative`, optional `customNotes`, and optional direct narrative fields.
+ * Accepts optional `aiNarrative`, optional `customNotes`, optional `customSections`, and optional direct narrative fields.
  */
 export const updateReportSchema = z
   .object({
     aiNarrative: aiNarrativeUpdateSchema.optional(),
     customNotes: z.string({ message: 'Custom notes must be a string.' }).optional(),
+    customSections: z.array(reportCustomSectionSchema).optional(),
     // Direct narrative fields if provided at root level
     executiveSummary: z.string({ message: 'Executive summary must be a string.' }).optional(),
     eventBackground: z.string({ message: 'Event background must be a string.' }).optional(),
@@ -118,6 +133,7 @@ export const updateReportSchema = z
     return {
       aiNarrative: mergedAiNarrative,
       customNotes: data.customNotes,
+      customSections: data.customSections,
     };
   });
 

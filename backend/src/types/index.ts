@@ -320,8 +320,18 @@ export interface SponsorReportData {
     strategicConclusion?: string;
   };
   customNotes?: string;
+  customSections?: IReportSectionItem[];
   isCustomized?: boolean;
   updatedAt?: string;
+}
+
+export interface IReportSectionItem {
+  id: string;
+  key?: string;
+  title: string;
+  content?: string;
+  type: 'standard' | 'custom';
+  order?: number;
 }
 
 export interface IJwtPayload {

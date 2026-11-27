@@ -478,12 +478,18 @@ export class ReportService {
     let finalNarrative: any = null;
     let isCustomized = false;
     let customNotes = '';
+    let customSections: SponsorReportData['customSections'] = [];
     let reportUpdatedAt = '';
 
     if (!forceRefresh) {
       try {
+        // Ensure custom_sections column exists in event_reports
+        await query(
+          `ALTER TABLE event_reports ADD COLUMN IF NOT EXISTS custom_sections JSONB DEFAULT '[]'::jsonb`
+        ).catch(() => {});
+
         const savedRes = await query(
-          `SELECT ai_narrative, custom_notes, updated_at FROM event_reports WHERE event_id = $1`,
+          `SELECT ai_narrative, custom_notes, custom_sections, updated_at FROM event_reports WHERE event_id = $1`,
           [event.id]
         );
         if (savedRes.rowCount && savedRes.rowCount > 0) {
@@ -493,6 +499,13 @@ export class ReportService {
             : savedRow.ai_narrative;
           isCustomized = true;
           customNotes = savedRow.custom_notes || '';
+          if (savedRow.custom_sections) {
+            customSections = typeof savedRow.custom_sections === 'string'
+              ? JSON.parse(savedRow.custom_sections)
+              : savedRow.custom_sections;
+          } else if (finalNarrative && Array.isArray(finalNarrative.customSections)) {
+            customSections = finalNarrative.customSections;
+          }
           reportUpdatedAt = savedRow.updated_at ? new Date(savedRow.updated_at).toISOString() : '';
         }
       } catch (dbErr) {
@@ -560,6 +573,7 @@ export class ReportService {
       sampleInterests: interestsBreakdown.map((i) => i.name),
       aiNarrative: finalNarrative,
       customNotes,
+      customSections,
       isCustomized,
       updatedAt: reportUpdatedAt || undefined,
     };
@@ -658,6 +672,7 @@ export class ReportService {
     data: {
       aiNarrative?: Partial<SponsorReportData['aiNarrative']>;
       customNotes?: string;
+      customSections?: SponsorReportData['customSections'];
     },
     userId?: string,
     userRole?: UserRole
@@ -677,6 +692,11 @@ export class ReportService {
       throw err;
     }
 
+    // Ensure custom_sections column exists in event_reports
+    await query(
+      `ALTER TABLE event_reports ADD COLUMN IF NOT EXISTS custom_sections JSONB DEFAULT '[]'::jsonb`
+    ).catch(() => {});
+
     // Get current baseline report
     const currentReport = await this.getEventReport(eventId, userId, userRole, false);
 
@@ -686,17 +706,23 @@ export class ReportService {
     };
 
     const notesToSave = data.customNotes !== undefined ? data.customNotes : (currentReport.customNotes || '');
+    const sectionsToSave = data.customSections !== undefined ? data.customSections : (currentReport.customSections || []);
+
+    if (sectionsToSave) {
+      (mergedNarrative as any).customSections = sectionsToSave;
+    }
 
     await query(
-      `INSERT INTO event_reports (event_id, ai_narrative, custom_notes, updated_by, updated_at)
-       VALUES ($1, $2, $3, $4, NOW())
+      `INSERT INTO event_reports (event_id, ai_narrative, custom_notes, custom_sections, updated_by, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
        ON CONFLICT (event_id)
        DO UPDATE SET
          ai_narrative = EXCLUDED.ai_narrative,
          custom_notes = EXCLUDED.custom_notes,
+         custom_sections = EXCLUDED.custom_sections,
          updated_by = EXCLUDED.updated_by,
          updated_at = NOW()`,
-      [event.id, JSON.stringify(mergedNarrative), notesToSave, userId]
+      [event.id, JSON.stringify(mergedNarrative), notesToSave, JSON.stringify(sectionsToSave), userId]
     );
 
     // Invalidate cache
