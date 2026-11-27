@@ -13,6 +13,8 @@ import {
   FileSpreadsheet,
   FileText,
   Edit3,
+  Trash2,
+  AlertTriangle,
   X,
   Printer,
   ShieldCheck,
@@ -286,15 +288,82 @@ export const ReportPage: React.FC = () => {
 
   const reportContainerRef = useRef<HTMLDivElement>(null);
 
+  // Section Deletion / Visibility State
+  const [hiddenSections, setHiddenSections] = useState<string[]>([]);
+  const [sectionToDelete, setSectionToDelete] = useState<{ id: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (!selectedEventId) {
+      setHiddenSections([]);
+      return;
+    }
+    try {
+      const saved = localStorage.getItem(`sheeba_report_hidden_${selectedEventId}`);
+      setHiddenSections(saved ? JSON.parse(saved) : []);
+    } catch {
+      setHiddenSections([]);
+    }
+  }, [selectedEventId]);
+
+  const handlePromptDeleteSection = (id: string, title: string) => {
+    setSectionToDelete({ id, title });
+  };
+
+  const handleConfirmDeleteSection = () => {
+    if (!sectionToDelete) return;
+    const newHidden = Array.from(new Set([...hiddenSections, sectionToDelete.id]));
+    setHiddenSections(newHidden);
+    if (selectedEventId) {
+      try {
+        localStorage.setItem(`sheeba_report_hidden_${selectedEventId}`, JSON.stringify(newHidden));
+      } catch (e) {
+        console.warn('Failed to save hidden sections', e);
+      }
+    }
+    setSectionToDelete(null);
+  };
+
+  const handleRestoreAllSections = () => {
+    setHiddenSections([]);
+    if (selectedEventId) {
+      try {
+        localStorage.removeItem(`sheeba_report_hidden_${selectedEventId}`);
+      } catch (e) {
+        console.warn('Failed to clear hidden sections', e);
+      }
+    }
+  };
+
   // Edit Report State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editTab, setEditTab] = useState<'summary' | 'background' | 'delivery' | 'conclusion' | 'notes'>('summary');
+  const [editTab, setEditTab] = useState<
+    | 'summary'
+    | 'background'
+    | 'delivery'
+    | 'audience'
+    | 'orgs'
+    | 'interests'
+    | 'motivations'
+    | 'engagement'
+    | 'findings'
+    | 'partner-impact'
+    | 'conclusion'
+    | 'notes'
+  >('summary');
   const [editForm, setEditForm] = useState({
     executiveSummary: '',
     eventBackground: '',
     objectives: '',
     deliveryNarrative: '',
     audienceOverview: '',
+    organizationsNarrative: '',
+    interestsNarrative: '',
+    motivationNarrative: '',
+    engagementNarrative: '',
+    communityFindings: '',
+    futureProgramming: '',
+    mentorship: '',
+    communityDevelopment: '',
     partnerImpactSummary: '',
     strategicConclusion: '',
     customNotes: '',
@@ -303,7 +372,21 @@ export const ReportPage: React.FC = () => {
   const [isResettingReport, setIsResettingReport] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
-  const handleOpenEditModal = (targetTab: 'summary' | 'background' | 'delivery' | 'conclusion' | 'notes' = 'summary') => {
+  const handleOpenEditModal = (
+    targetTab:
+      | 'summary'
+      | 'background'
+      | 'delivery'
+      | 'audience'
+      | 'orgs'
+      | 'interests'
+      | 'motivations'
+      | 'engagement'
+      | 'findings'
+      | 'partner-impact'
+      | 'conclusion'
+      | 'notes' = 'summary'
+  ) => {
     if (!report) return;
     setEditForm({
       executiveSummary: report.aiNarrative?.executiveSummary || '',
@@ -311,6 +394,14 @@ export const ReportPage: React.FC = () => {
       objectives: report.aiNarrative?.objectives || '',
       deliveryNarrative: report.aiNarrative?.deliveryNarrative || '',
       audienceOverview: report.aiNarrative?.audienceOverview || '',
+      organizationsNarrative: report.aiNarrative?.organizationsNarrative || '',
+      interestsNarrative: report.aiNarrative?.interestsNarrative || '',
+      motivationNarrative: report.aiNarrative?.motivationNarrative || '',
+      engagementNarrative: report.aiNarrative?.engagementNarrative || '',
+      communityFindings: report.aiNarrative?.communityFindings || '',
+      futureProgramming: report.aiNarrative?.structuredRecommendations?.futureProgramming || '',
+      mentorship: report.aiNarrative?.structuredRecommendations?.mentorship || '',
+      communityDevelopment: report.aiNarrative?.structuredRecommendations?.communityDevelopment || '',
       partnerImpactSummary: report.aiNarrative?.partnerImpactSummary || '',
       strategicConclusion: report.aiNarrative?.strategicConclusion || '',
       customNotes: report.customNotes || '',
@@ -340,6 +431,16 @@ export const ReportPage: React.FC = () => {
           objectives: editForm.objectives,
           deliveryNarrative: editForm.deliveryNarrative,
           audienceOverview: editForm.audienceOverview,
+          organizationsNarrative: editForm.organizationsNarrative,
+          interestsNarrative: editForm.interestsNarrative,
+          motivationNarrative: editForm.motivationNarrative,
+          engagementNarrative: editForm.engagementNarrative,
+          communityFindings: editForm.communityFindings,
+          structuredRecommendations: {
+            futureProgramming: editForm.futureProgramming,
+            mentorship: editForm.mentorship,
+            communityDevelopment: editForm.communityDevelopment,
+          },
           partnerImpactSummary: editForm.partnerImpactSummary,
           strategicConclusion: editForm.strategicConclusion,
         },
@@ -375,6 +476,14 @@ export const ReportPage: React.FC = () => {
         objectives: freshReport.aiNarrative?.objectives || '',
         deliveryNarrative: freshReport.aiNarrative?.deliveryNarrative || '',
         audienceOverview: freshReport.aiNarrative?.audienceOverview || '',
+        organizationsNarrative: freshReport.aiNarrative?.organizationsNarrative || '',
+        interestsNarrative: freshReport.aiNarrative?.interestsNarrative || '',
+        motivationNarrative: freshReport.aiNarrative?.motivationNarrative || '',
+        engagementNarrative: freshReport.aiNarrative?.engagementNarrative || '',
+        communityFindings: freshReport.aiNarrative?.communityFindings || '',
+        futureProgramming: freshReport.aiNarrative?.structuredRecommendations?.futureProgramming || '',
+        mentorship: freshReport.aiNarrative?.structuredRecommendations?.mentorship || '',
+        communityDevelopment: freshReport.aiNarrative?.structuredRecommendations?.communityDevelopment || '',
         partnerImpactSummary: freshReport.aiNarrative?.partnerImpactSummary || '',
         strategicConclusion: freshReport.aiNarrative?.strategicConclusion || '',
         customNotes: '',
@@ -531,6 +640,14 @@ export const ReportPage: React.FC = () => {
     }
   };
 
+  const isStrideOrMinT = Boolean(
+    report?.eventTitle?.toLowerCase().includes('stride') ||
+    report?.eventTitle?.toLowerCase().includes('mint') ||
+    report?.organizerName?.toLowerCase().includes('innovation') ||
+    report?.organizerName?.toLowerCase().includes('mint') ||
+    report?.organizerName?.toLowerCase().includes('stride')
+  );
+
   return (
     <div className="sheeba-report-page w-full max-w-5xl mx-auto space-y-6 pb-32 font-sans text-[#2D1F23] print:max-w-none print:w-full print:m-0 print:p-0 print:pb-0 print:space-y-4">
       {/* Top Controls Header (Hidden when printing) */}
@@ -664,37 +781,57 @@ export const ReportPage: React.FC = () => {
       ) : (
         <>
           {/* Screen Section Quick Navigation Bar (Sticky, Hidden when printing) */}
-          <div className="sticky top-2 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-1.5 overflow-x-auto print:hidden">
-            <span className="text-[11px] font-bold text-gray-500 uppercase px-2 shrink-0">Sections:</span>
-            {[
-              { id: 'sec-exec-summary', label: '1. Executive Summary' },
-              { id: 'sec-about-event', label: '2. About Event' },
-              { id: 'sec-delivery', label: '3. Delivery' },
-              { id: 'sec-audience', label: '4. Audience' },
-              { id: 'sec-orgs', label: '5. Organizations' },
-              { id: 'sec-interests', label: '6. Interests' },
-              { id: 'sec-motivations', label: '7. Motivations' },
-              { id: 'sec-engagement', label: '8. Engagement' },
-              { id: 'sec-voice', label: '9. Attendee Voice' },
-              { id: 'sec-ai-analysis', label: '10. AI Analysis' },
-              { id: 'sec-findings', label: '11. Key Findings' },
-              { id: 'sec-recommendations', label: '12. Recommendations' },
-              { id: 'sec-partner-impact', label: '13. Partner Impact' },
-              { id: 'sec-conclusion', label: '14. Conclusion' },
-              { id: 'sec-ledger', label: '15. Verified Ledger' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => scrollToSection(tab.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                  activeSection === tab.id
-                    ? 'bg-[#63474D] text-white shadow-xs'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="sticky top-2 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between gap-2 overflow-x-auto print:hidden">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <span className="text-[11px] font-bold text-gray-500 uppercase px-2 shrink-0">Sections:</span>
+              {[
+                { id: 'sec-exec-summary', label: '1. Executive Summary' },
+                { id: 'sec-about-event', label: '2. About Event' },
+                { id: 'sec-delivery', label: '3. Delivery' },
+                { id: 'sec-audience', label: '4. Audience' },
+                { id: 'sec-orgs', label: '5. Organizations' },
+                { id: 'sec-interests', label: '6. Interests' },
+                { id: 'sec-motivations', label: '7. Motivations' },
+                { id: 'sec-engagement', label: '8. Engagement' },
+                { id: 'sec-voice', label: '9. Attendee Voice' },
+                { id: 'sec-ai-analysis', label: '10. AI Analysis' },
+                { id: 'sec-findings', label: '11. Key Findings' },
+                { id: 'sec-recommendations', label: '12. Recommendations' },
+                { id: 'sec-partner-impact', label: '13. Partner Impact' },
+                { id: 'sec-conclusion', label: '14. Conclusion' },
+                { id: 'sec-ledger', label: '15. Verified Ledger' },
+              ]
+                .filter((tab) => !hiddenSections.includes(tab.id))
+                .map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => scrollToSection(tab.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      activeSection === tab.id
+                        ? 'bg-[#63474D] text-white shadow-xs'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+            </div>
+
+            {hiddenSections.length > 0 && (
+              <div className="flex items-center gap-2 pl-2 border-l border-gray-200 shrink-0">
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 whitespace-nowrap">
+                  {hiddenSections.length} hidden
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRestoreAllSections}
+                  className="text-xs text-[#63474D] hover:text-[#2D1F23] font-bold hover:underline cursor-pointer whitespace-nowrap"
+                  title="Restore all hidden sections"
+                >
+                  Restore all
+                </button>
+              </div>
+            )}
           </div>
 
       <div ref={reportContainerRef} className="space-y-12 print:space-y-8 text-[#2D1F23]">
@@ -760,6 +897,7 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           {/* 1. EXECUTIVE SUMMARY                                                      */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-exec-summary') && (
           <section
             id="sec-exec-summary"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
@@ -780,6 +918,15 @@ export const ReportPage: React.FC = () => {
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-exec-summary', '1. Executive Summary & Impact Overview')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
                 </button>
                 <span className="text-[10px] uppercase tracking-wider font-bold text-[#2A7B5F] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
                   Verified Performance
@@ -1005,10 +1152,12 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 2. ABOUT THE EVENT (Background & Objectives)                             */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-about-event') && (
           <section
             id="sec-about-event"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
@@ -1038,6 +1187,15 @@ export const ReportPage: React.FC = () => {
                 >
                   <FileText className="w-3.5 h-3.5" />
                   Edit Notes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-about-event', '2. About the Event')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
                 </button>
               </div>
             </div>
@@ -1218,10 +1376,12 @@ export const ReportPage: React.FC = () => {
               );
             })()}
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 3. EVENT DELIVERY                                                         */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-delivery') && (
           <section
             id="sec-delivery"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
@@ -1233,15 +1393,26 @@ export const ReportPage: React.FC = () => {
                   3. Event Delivery
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => handleOpenEditModal('delivery')}
-                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                title="Edit Event Delivery Narrative"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit Delivery
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('delivery')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Event Delivery Narrative"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-delivery', '3. Event Delivery')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed space-y-3 whitespace-pre-line">
@@ -1272,10 +1443,12 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 4. WHO THE EVENT REACHED (Audience & Experience)                          */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-audience') && (
           <section
             id="sec-audience"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
@@ -1287,15 +1460,26 @@ export const ReportPage: React.FC = () => {
                   4. Who the Event Reached
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => handleOpenEditModal('delivery')}
-                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                title="Edit Audience Overview"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit Audience
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('audience')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Audience Overview"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-audience', '4. Who the Event Reached')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             {/* Audience Overview Narrative */}
@@ -1353,19 +1537,43 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 5. ORGANIZATIONS AND COMMUNITY REACH                                      */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-orgs') && (
           <section
             id="sec-orgs"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                5. Organizations and Community Reach
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  5. Organizations and Community Reach
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('orgs')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Organizations Narrative"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-orgs', '5. Organizations and Community Reach')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
@@ -1376,36 +1584,38 @@ export const ReportPage: React.FC = () => {
               )}
             </div>
 
-            {/* Main Organizing Entities & Summit Partners */}
-            <div className="space-y-3">
-              <h3 className="font-serif font-bold text-sm text-[#2D1F23]">
-                Main Organizing Entities & Summit Partners
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {[
-                  { name: "Ministry of Innovation and Technology (MInT)", role: 'Lead Host & Convening Ministry' },
-                  { name: 'STRIDE Ethiopia 2.0', role: 'National Summit Initiative' },
-                  { name: 'Wingu Africa (wingu.africa)', role: 'Digital Infrastructure Partner' },
-                  { name: 'Space Science and Geospatial Institute (SSGI)', role: 'Research & Space Science' },
-                  { name: 'Ethio telecom', role: 'National Telecom Partner' },
-                  { name: 'Ethiopian Technology Authority (ETA)', role: 'Regulatory & Tech Authority' },
-                  { name: 'Betin', role: 'Ecosystem Innovation Partner' },
-                  { name: 'Ethiopian Intellectual Property Authority (EIPA)', role: 'IP & Patents Partner' },
-                ].map((partner, i) => (
-                  <div
-                    key={i}
-                    className="p-3.5 rounded-xl border border-[#63474D]/20 bg-[#FAF7F5] space-y-1 text-xs"
-                  >
-                    <span className="font-bold text-gray-900 block truncate" title={partner.name}>
-                      {partner.name}
-                    </span>
-                    <span className="text-[10px] font-medium text-[#63474D] block">
-                      {partner.role}
-                    </span>
-                  </div>
-                ))}
+            {/* Main Organizing Entities & Summit Partners (Restricted to MInT / STRIDE events) */}
+            {isStrideOrMinT && (
+              <div className="space-y-3">
+                <h3 className="font-serif font-bold text-sm text-[#2D1F23]">
+                  Main Organizing Entities & Summit Partners
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { name: "Ministry of Innovation and Technology (MInT)", role: 'Lead Host & Convening Ministry' },
+                    { name: 'STRIDE Ethiopia 2.0', role: 'National Summit Initiative' },
+                    { name: 'Wingu Africa (wingu.africa)', role: 'Digital Infrastructure Partner' },
+                    { name: 'Space Science and Geospatial Institute (SSGI)', role: 'Research & Space Science' },
+                    { name: 'Ethio telecom', role: 'National Telecom Partner' },
+                    { name: 'Ethiopian Technology Authority (ETA)', role: 'Regulatory & Tech Authority' },
+                    { name: 'Betin', role: 'Ecosystem Innovation Partner' },
+                    { name: 'Ethiopian Intellectual Property Authority (EIPA)', role: 'IP & Patents Partner' },
+                  ].map((partner, i) => (
+                    <div
+                      key={i}
+                      className="p-3.5 rounded-xl border border-[#63474D]/20 bg-[#FAF7F5] space-y-1 text-xs"
+                    >
+                      <span className="font-bold text-gray-900 block truncate" title={partner.name}>
+                        {partner.name}
+                      </span>
+                      <span className="text-[10px] font-medium text-[#63474D] block">
+                        {partner.role}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Participating Startups & Ecosystem Ventures Represented */}
             <div className="space-y-3 pt-2">
@@ -1433,19 +1643,43 @@ export const ReportPage: React.FC = () => {
               )}
             </div>
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 6. AREAS OF INTEREST (Technology Interests)                                */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-interests') && (
           <section
             id="sec-interests"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                6. Areas of Interest
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  6. Areas of Interest
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('interests')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Interests Narrative"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-interests', '6. Areas of Interest')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
@@ -1534,19 +1768,43 @@ export const ReportPage: React.FC = () => {
               </div>
             )}
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 7. ATTENDEE MOTIVATION                                                    */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-motivations') && (
           <section
             id="sec-motivations"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                7. Attendee Motivation
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  7. Attendee Motivation
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('motivations')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Motivation Narrative"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-motivations', '7. Attendee Motivation')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
@@ -1586,19 +1844,43 @@ export const ReportPage: React.FC = () => {
               )}
             </div>
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 8. ENGAGEMENT & PARTICIPATION                                             */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-engagement') && (
           <section
             id="sec-engagement"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                8. Engagement & Participation
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  8. Engagement & Participation
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('engagement')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Engagement Narrative"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-engagement', '8. Engagement & Participation')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed whitespace-pre-line">
@@ -1627,20 +1909,43 @@ export const ReportPage: React.FC = () => {
               ))}
             </div>
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 9. ATTENDEE VOICE                                                         */}
           {/* ========================================================================= */}
-          {report.aiNarrative?.attendeeVoice && report.aiNarrative.attendeeVoice.length > 0 && (
+          {!hiddenSections.includes('sec-voice') && report.aiNarrative?.attendeeVoice && report.aiNarrative.attendeeVoice.length > 0 && (
             <section
               id="sec-voice"
               className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
             >
-              <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  9. Attendee Voice
-                </h2>
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                  <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                    9. Attendee Voice
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal('findings')}
+                    className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                    title="Edit Attendee Voice / Analysis"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Edit Section
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePromptDeleteSection('sec-voice', '9. Attendee Voice')}
+                    className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                    title="Remove this section from report"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                </div>
               </div>
 
               <p className="text-xs text-gray-600">
@@ -1672,16 +1977,38 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           {/* 10. AI AUDIENCE & COMMUNITY ANALYSIS                                      */}
           {/* ========================================================================= */}
-          {report.aiNarrative?.audienceDeepAnalysis && (
+          {!hiddenSections.includes('sec-ai-analysis') && report.aiNarrative?.audienceDeepAnalysis && (
             <section
               id="sec-ai-analysis"
               className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
             >
-              <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                  10. AI-Generated Audience Analysis
-                </h2>
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                  <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                    10. AI-Generated Audience Analysis
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal('findings')}
+                    className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                    title="Edit AI Analysis"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Edit Section
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePromptDeleteSection('sec-ai-analysis', '10. AI-Generated Audience Analysis')}
+                    className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                    title="Remove this section from report"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs sm:text-sm">
@@ -1731,15 +2058,38 @@ export const ReportPage: React.FC = () => {
           {/* ========================================================================= */}
           {/* 11. KEY FINDINGS                                                          */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-findings') && (
           <section
             id="sec-findings"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                11. Key Empirical Findings
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  11. Key Empirical Findings
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('findings')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Key Findings Narrative"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-findings', '11. Key Empirical Findings')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             {report.aiNarrative?.keyFindings && report.aiNarrative.keyFindings.length > 0 ? (
@@ -1761,19 +2111,43 @@ export const ReportPage: React.FC = () => {
               <p className="text-xs text-gray-500 italic">Key findings will appear once generated from verified attendance data.</p>
             )}
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 12. OPPORTUNITIES & RECOMMENDATIONS                                       */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-recommendations') && (
           <section
             id="sec-recommendations"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
-              <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
-                12. Opportunities & Recommendations
-              </h2>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
+                <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
+                  12. Opportunities & Recommendations
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('findings')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Recommendations"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-recommendations', '12. Opportunities & Recommendations')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1808,13 +2182,12 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 13. SPONSOR / PARTNER IMPACT                                              */}
           {/* ========================================================================= */}
-          {/* ========================================================================= */}
-          {/* 13. SPONSOR / PARTNER IMPACT                                              */}
-          {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-partner-impact') && (
           <section
             id="sec-partner-impact"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-4 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
@@ -1826,15 +2199,26 @@ export const ReportPage: React.FC = () => {
                   13. Sponsor & Partner Impact
                 </h2>
               </div>
-              <button
-                type="button"
-                onClick={() => handleOpenEditModal('conclusion')}
-                className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                title="Edit Partner Impact Summary"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                Edit Partners
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('partner-impact')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Edit Partner Impact Summary"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-partner-impact', '13. Sponsor & Partner Impact')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             <div className="text-xs sm:text-sm text-gray-800 leading-relaxed space-y-3 whitespace-pre-line bg-[#FAF7F5] p-6 rounded-2xl border border-[#E8DDD7]">
@@ -1850,11 +2234,12 @@ export const ReportPage: React.FC = () => {
               )}
             </div>
           </section>
+          )}
 
           {/* ========================================================================= */}
-          {/* 14. VERIFIED ATTENDANCE APPENDIX                                          */}
           {/* 14. STRATEGIC CONCLUSION & EXECUTIVE SUMMARY                              */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-conclusion') && (
           <section
             id="sec-conclusion"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
@@ -1874,7 +2259,16 @@ export const ReportPage: React.FC = () => {
                   title="Edit Strategic Conclusion"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
-                  Edit Conclusion
+                  Edit Section
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-conclusion', '14. Strategic Conclusion & Executive Summary')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
                 </button>
                 <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 uppercase">
                   Audited Performance Verified
@@ -2029,24 +2423,46 @@ export const ReportPage: React.FC = () => {
               </div>
             </div>
           </section>
+          )}
 
           {/* ========================================================================= */}
           {/* 15. VERIFIED ATTENDANCE APPENDIX                                          */}
           {/* ========================================================================= */}
+          {!hiddenSections.includes('sec-ledger') && (
           <section
             id="sec-ledger"
             className="sheeba-report-section bg-white rounded-3xl border border-[#E8DDD7] p-8 sm:p-10 shadow-xs space-y-6 print:break-inside-avoid print:p-6 print:rounded-2xl print:border print:border-[#E8DDD7] print:shadow-none print:space-y-4"
           >
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#63474D]"></span>
                 <h2 className="font-serif text-xl sm:text-2xl font-black text-[#2D1F23]">
                   15. Verified Attendee Register
                 </h2>
               </div>
-              <span className="text-[11px] text-gray-500 font-mono">
-                {report.totalRegistered} Registered · {report.totalAttended} Verified In-Person
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditModal('notes')}
+                  className="print:hidden text-xs text-[#63474D] hover:text-[#2D1F23] flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  title="Add / Edit Summit Notes"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit Notes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePromptDeleteSection('sec-ledger', '15. Verified Attendee Register')}
+                  className="print:hidden text-xs text-red-600 hover:text-red-700 flex items-center gap-1 font-semibold px-2 py-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Remove this section from report"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+                <span className="text-[11px] text-gray-500 font-mono">
+                  {report.totalRegistered} Registered · {report.totalAttended} Verified In-Person
+                </span>
+              </div>
             </div>
 
             <div className="p-6 rounded-2xl bg-[#FAF7F5] border border-[#E8DDD7] flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -2095,8 +2511,52 @@ export const ReportPage: React.FC = () => {
               <span>End of Document</span>
             </div>
           </section>
+          )}
         </div>
         </>
+      )}
+
+      {/* Delete Section Confirmation Modal */}
+      {sectionToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm print:hidden">
+          <div className="bg-white rounded-3xl border border-[#E8DDD7] shadow-2xl w-full max-w-md p-6 space-y-5 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-serif font-bold text-lg text-[#2D1F23]">
+                  Remove Section from Report?
+                </h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Are you sure you want to remove <strong className="text-[#2D1F23]">"{sectionToDelete.title}"</strong>?
+                </p>
+                <p className="text-[11px] text-gray-500">
+                  This section will be hidden from the report view and exported PDFs. You can restore it anytime via the "Restore all" button on the navigation bar.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSectionToDelete(null)}
+              >
+                Cancel
+              </Button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteSection}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Yes, Remove Section
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Edit Report Modal */}
@@ -2130,11 +2590,18 @@ export const ReportPage: React.FC = () => {
             {/* Modal Tabs */}
             <div className="px-6 pt-3 border-b border-gray-100 bg-white flex items-center gap-1 shrink-0 overflow-x-auto scrollbar-none">
               {[
-                { id: 'summary', label: '1. Executive Summary' },
-                { id: 'background', label: '2. Background & Objectives' },
-                { id: 'delivery', label: '3 & 4. Delivery & Audience' },
-                { id: 'conclusion', label: '13 & 14. Partners & Conclusion' },
-                { id: 'notes', label: 'Summit Notes / Proceedings' },
+                { id: 'summary', label: '1. Exec Summary' },
+                { id: 'background', label: '2. Background' },
+                { id: 'delivery', label: '3. Delivery' },
+                { id: 'audience', label: '4. Audience' },
+                { id: 'orgs', label: '5. Organizations' },
+                { id: 'interests', label: '6. Interests' },
+                { id: 'motivations', label: '7. Motivations' },
+                { id: 'engagement', label: '8. Engagement' },
+                { id: 'findings', label: '9–12. Analysis & Recs' },
+                { id: 'partner-impact', label: '13. Partner Impact' },
+                { id: 'conclusion', label: '14. Conclusion' },
+                { id: 'notes', label: 'Summit Notes' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -2194,7 +2661,7 @@ export const ReportPage: React.FC = () => {
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
-                      Event Objectives & Core Masterclasses
+                      Event Objectives & Core Tracks
                     </label>
                     <textarea
                       rows={6}
@@ -2202,7 +2669,7 @@ export const ReportPage: React.FC = () => {
                       onChange={(e) =>
                         setEditForm({ ...editForm, objectives: e.target.value })
                       }
-                      placeholder="Core objectives, key program deliverables, or masterclass tracks..."
+                      placeholder="Core objectives, key program deliverables, or tracks..."
                       className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
                     />
                   </div>
@@ -2216,7 +2683,7 @@ export const ReportPage: React.FC = () => {
                       3. Event Delivery Narrative
                     </label>
                     <textarea
-                      rows={6}
+                      rows={8}
                       value={editForm.deliveryNarrative}
                       onChange={(e) =>
                         setEditForm({ ...editForm, deliveryNarrative: e.target.value })
@@ -2225,13 +2692,17 @@ export const ReportPage: React.FC = () => {
                       className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
                     />
                   </div>
+                </div>
+              )}
 
+              {editTab === 'audience' && (
+                <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
                       4. Audience Overview Narrative
                     </label>
                     <textarea
-                      rows={6}
+                      rows={8}
                       value={editForm.audienceOverview}
                       onChange={(e) =>
                         setEditForm({ ...editForm, audienceOverview: e.target.value })
@@ -2243,14 +2714,154 @@ export const ReportPage: React.FC = () => {
                 </div>
               )}
 
-              {editTab === 'conclusion' && (
+              {editTab === 'orgs' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      5. Organizations & Community Reach Narrative
+                    </label>
+                    <textarea
+                      rows={8}
+                      value={editForm.organizationsNarrative}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, organizationsNarrative: e.target.value })
+                      }
+                      placeholder="Narrative analyzing the diversity and breadth of organizations, universities, and ventures represented..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'interests' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      6. Areas of Interest Narrative
+                    </label>
+                    <textarea
+                      rows={8}
+                      value={editForm.interestsNarrative}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, interestsNarrative: e.target.value })
+                      }
+                      placeholder="Narrative on participant technology domain interests and topical demand..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'motivations' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      7. Attendee Motivation Narrative
+                    </label>
+                    <textarea
+                      rows={8}
+                      value={editForm.motivationNarrative}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, motivationNarrative: e.target.value })
+                      }
+                      placeholder="Narrative describing attendee goals, learning aspirations, and professional drivers..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'engagement' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      8. Engagement & Participation Narrative
+                    </label>
+                    <textarea
+                      rows={8}
+                      value={editForm.engagementNarrative}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, engagementNarrative: e.target.value })
+                      }
+                      placeholder="Narrative explaining attendance conversion, credential issuance, and room engagement..."
+                      className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'findings' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                      Empirical Findings & Synthesis Narrative
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={editForm.communityFindings}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, communityFindings: e.target.value })
+                      }
+                      placeholder="Key qualitative findings and empirical observations..."
+                      className="w-full p-3 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                        Future Programming
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={editForm.futureProgramming}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, futureProgramming: e.target.value })
+                        }
+                        placeholder="Future workshops, technical tracks..."
+                        className="w-full p-2.5 rounded-xl border border-gray-300 text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                        Mentorship
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={editForm.mentorship}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, mentorship: e.target.value })
+                        }
+                        placeholder="Mentorship connecting participants..."
+                        className="w-full p-2.5 rounded-xl border border-gray-300 text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-[#63474D] mb-1">
+                        Community Development
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={editForm.communityDevelopment}
+                        onChange={(e) =>
+                          setEditForm({ ...editForm, communityDevelopment: e.target.value })
+                        }
+                        placeholder="Partnership opportunities..."
+                        className="w-full p-2.5 rounded-xl border border-gray-300 text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {editTab === 'partner-impact' && (
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
                       13. Sponsor & Partner Impact Summary
                     </label>
                     <textarea
-                      rows={6}
+                      rows={8}
                       value={editForm.partnerImpactSummary}
                       onChange={(e) =>
                         setEditForm({ ...editForm, partnerImpactSummary: e.target.value })
@@ -2259,13 +2870,17 @@ export const ReportPage: React.FC = () => {
                       className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
                     />
                   </div>
+                </div>
+              )}
 
+              {editTab === 'conclusion' && (
+                <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#63474D] mb-1">
                       14. Strategic Conclusion & Executive Sign-off
                     </label>
                     <textarea
-                      rows={6}
+                      rows={8}
                       value={editForm.strategicConclusion}
                       onChange={(e) =>
                         setEditForm({ ...editForm, strategicConclusion: e.target.value })
@@ -2292,7 +2907,7 @@ export const ReportPage: React.FC = () => {
                       onChange={(e) =>
                         setEditForm({ ...editForm, customNotes: e.target.value })
                       }
-                      placeholder="## Morning Plenary Sessions&#10;* Keynote by JICA on startup ecosystem...&#10;&#10;## Afternoon Masterclasses&#10;* Startup Master Plan Briefing by BCG..."
+                      placeholder="## Morning Plenary Sessions&#10;* Keynote on ecosystem trends...&#10;&#10;## Afternoon Masterclasses&#10;* Master Plan Briefing..."
                       className="w-full p-4 rounded-2xl border border-gray-300 text-xs sm:text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#63474D] bg-[#FAF7F5]"
                     />
                   </div>
